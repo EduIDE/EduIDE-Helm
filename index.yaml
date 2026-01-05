@@ -1,0 +1,37 @@
+apiVersion: v1
+entries:
+  theia-cloud:
+  - apiVersion: v2
+    appVersion: 1.2.0-next
+    created: "2026-01-05T10:09:16.872882247Z"
+    description: A Helm chart for Theia Cloud
+    digest: f0a4df258a14a1310c0e8447a0658c6a3a5eb4ca3df10dc1997ff31c5fd2760f
+    name: theia-cloud
+    type: application
+    urls:
+    - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-1.2.0-next.2/theia-cloud-1.2.0-next.2.tgz
+    version: 1.2.0-next.2
+  theia-cloud-base:
+  - apiVersion: v2
+    appVersion: 1.2.0-next
+    created: "2026-01-05T10:09:17.096860577Z"
+    description: Theia-cloud base chart
+    digest: c314d5c7c4162ae08f69730ef784df805634f142b0a1d898d4a96272329189cc
+    name: theia-cloud-base
+    type: application
+    urls:
+    - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-base-1.2.0-next.0/theia-cloud-base-1.2.0-next.0.tgz
+    version: 1.2.0-next.0
+  theia-cloud-crds:
+  - apiVersion: v2
+    appVersion: 1.2.0-next
+    created: "2026-01-05T10:09:17.318814669Z"
+    description: A Helm chart for the custom resource definitions (CRDs) of Theia
+      Cloud
+    digest: 79e33dd45818417c4c47ea8dea8a3595d2044774a3ad5bc2e98ba9c691d66780
+    name: theia-cloud-crds
+    type: application
+    urls:
+    - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-crds-1.2.0-next.0/theia-cloud-crds-1.2.0-next.0.tgz
+    version: 1.2.0-next.0
+generated: "2026-01-05T10:09:17.318820139Z"
