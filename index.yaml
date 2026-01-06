@@ -11,6 +11,16 @@ entries:
     urls:
     - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-1.2.0-next.2/theia-cloud-1.2.0-next.2.tgz
     version: 1.2.0-next.2
+  - apiVersion: v2
+    appVersion: 1.2.0-next
+    created: "2026-01-06T08:55:33.848153468Z"
+    description: A Helm chart for Theia Cloud
+    digest: 700550e68081fe3428e434cd526491b861d5cc6d8f21ae49dc535f3ff5d63250
+    name: theia-cloud
+    type: application
+    urls:
+    - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-1.2.0-next.2/theia-cloud-1.2.0-next.2.tgz
+    version: 1.2.0-next.2
   theia-cloud-base:
   - apiVersion: v2
     appVersion: 1.2.0-next
@@ -34,4 +44,4 @@ entries:
     urls:
     - https://github.com/ls1intum/theia-cloud-helm/releases/download/theia-cloud-crds-1.2.0-next.0/theia-cloud-crds-1.2.0-next.0.tgz
     version: 1.2.0-next.0
-generated: "2026-01-05T10:09:17.318820139Z"
+generated: "2026-01-06T08:55:33.848176041Z"
