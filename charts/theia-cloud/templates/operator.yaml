@@ -26,6 +26,9 @@ spec:
       - name: operator-container
         image: {{ tpl (.Values.operator.image | toString) . }}
         imagePullPolicy: {{ if .Values.operator.imagePullPolicy }}{{ tpl (.Values.operator.imagePullPolicy | toString) . }}{{ else }}{{ tpl (.Values.imagePullPolicy | toString) . }}{{ end }}
+        envFrom:
+        - configMapRef:
+            name: operator-config
         args:
           {{- if .Values.keycloak.enable }}
           - "--keycloak"
