@@ -5,4 +5,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   SENTRY_ENVIRONMENT: {{ .Release.Namespace }}
+  OTEL_TRACES_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
 
