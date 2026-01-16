@@ -1,5 +1,4 @@
 {{- if .Values.landingPage.enabled }}
-{{- $logoFileExtension :=  tpl (.Values.landingPage.logoFileExtension | toString) . -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -29,7 +28,8 @@ data:
         },
         {{- end }}
       ],
-      logoFileExtension: "{{ $logoFileExtension }}",
+      // We force PNG because we are forcing logo.png in the deployment
+      logoFileExtension: "png",
       disableInfo: {{ tpl (.Values.landingPage.disableInfo | toString) . }},
       {{- if .Values.landingPage.infoText }}
       infoText: "{{ tpl (.Values.landingPage.infoText | toString) . }}",
@@ -41,12 +41,8 @@ data:
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
     };
-binaryData:
+
   {{- if .Values.landingPage.logoData }}
-  {{ printf "logo.%s: " $logoFileExtension }}{{ .Values.landingPage.logoData }}
-  {{- else }}
-  {{- range $path, $bytes := .Files.Glob (printf "%s" .Values.landingPage.logo)}}
-  {{ printf "logo.%s: " $logoFileExtension }}{{ $.Files.Get $path | b64enc }}
-  {{ end }}
+  logo.png: {{ .Values.landingPage.logoData }}
   {{- end }}
 {{- end }}
