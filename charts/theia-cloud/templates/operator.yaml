@@ -14,10 +14,11 @@ spec:
     metadata:
       labels:
         app: operator
-      {{- if .Values.operator.logging.override }}
       annotations:
+        helm.sh/revision: {{ .Release.Revision | quote }}
+        {{- if .Values.operator.logging.override }}
         checksum/config: {{ include (print $.Template.BasePath "/operator-configmap-logging.yaml") . | sha256sum }}
-      {{- end }}
+        {{- end }}
     spec:
       # we need to be able to create and read operators
       automountServiceAccountToken: true

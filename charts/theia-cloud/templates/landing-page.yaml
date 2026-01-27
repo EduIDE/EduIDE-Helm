@@ -16,6 +16,7 @@ spec:
       labels:
         app: landing-page
       annotations:
+        helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/landing-page-config-map.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false

@@ -15,6 +15,7 @@ spec:
       labels:
         app: service
       annotations:
+        helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}
     spec:
       # we need to be able to create and read sessions

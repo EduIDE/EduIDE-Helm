@@ -40,6 +40,8 @@ spec:
         app: image-preloading
         app.kubernetes.io/name: image-preloading
         app.kubernetes.io/part-of: theia-cloud
+      annotations:
+        helm.sh/revision: {{ .Release.Revision | quote }}
     spec:
       # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
       terminationGracePeriodSeconds: 0
