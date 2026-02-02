@@ -40,6 +40,71 @@ data:
       {{- if .Values.landingPage.loadingText }}
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
+      {{- if .Values.landingPage.footerLinks }}
+      footerLinks: {
+        {{- if .Values.landingPage.footerLinks.attribution }}
+        attribution: {
+          {{- if .Values.landingPage.footerLinks.attribution.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.attribution.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.attribution.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.attribution.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.attribution.version }}
+          version: "{{ tpl (.Values.landingPage.footerLinks.attribution.version | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.bugReport }}
+        bugReport: {
+          {{- if .Values.landingPage.footerLinks.bugReport.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.bugReport.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.bugReport.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.bugReport.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.bugReport.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.featureRequest }}
+        featureRequest: {
+          {{- if .Values.landingPage.footerLinks.featureRequest.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.about }}
+        about: {
+          {{- if .Values.landingPage.footerLinks.about.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.about.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.about.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.about.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.about.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+      },
+      {{- end }}
     };
 
   {{- if .Values.landingPage.logoData }}
