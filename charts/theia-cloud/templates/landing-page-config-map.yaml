@@ -105,6 +105,7 @@ data:
         {{- end }}
       },
       {{- end }}
+      sentryEnvironment: "{{ .Release.Namespace }}",
     };
 
   {{- if .Values.landingPage.logoData }}
