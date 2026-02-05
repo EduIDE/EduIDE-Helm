@@ -1,4 +1,4 @@
-{{- if .Values.hosts.usePaths }}
+{{- if and .Values.ingress.enabled .Values.hosts.usePaths }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

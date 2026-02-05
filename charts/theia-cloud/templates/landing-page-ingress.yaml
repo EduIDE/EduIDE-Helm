@@ -1,4 +1,4 @@
-{{- if .Values.landingPage.enabled }}
+{{- if and .Values.ingress.enabled .Values.landingPage.enabled }}
 {{- if not .Values.hosts.usePaths }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress

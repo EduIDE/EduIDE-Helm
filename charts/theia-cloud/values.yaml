@@ -317,7 +317,10 @@ service:
 
 # -- Values to influence the ingresses
 # @default -- (see details below)
+# -- Ingress is deprecated. Use Gateway API instead.
 ingress:
+  # -- Whether to render Ingress resources (deprecated)
+  enabled: false
   # -- Values to influence the instances ingress
   instances:
     # -- The name of the ingress which will be updated to publish new theia application.
@@ -365,6 +368,20 @@ ingress:
   # -- whether the default Theia Cloud tls secret names should be used. If false no tls secret name will be set on the ingress
   # only needed when ingress.tls == true
   addTLSSecretName: true
+
+# -- Gateway API configuration (Envoy Gateway by default)
+gateway:
+  # -- Whether to render Gateway/HTTPRoute resources
+  enabled: true
+  # -- GatewayClassName to use (Envoy Gateway default is typically "envoy")
+  className: "envoy"
+  # -- Name of the Gateway resource
+  name: "theia-cloud-gateway"
+  # -- HTTPS listener port
+  httpsPort: 443
+  # -- Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects)
+  httpEnabled: false
+  httpPort: 80
 
 operatorrole:
   name: operator-api-access

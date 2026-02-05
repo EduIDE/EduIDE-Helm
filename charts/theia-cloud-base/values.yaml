@@ -9,6 +9,8 @@ issuerprod:
   enable: true
   # -- name for the let's encrypt production cluster issuer
   name: letsencrypt-prod
+  # -- DNS-01 solver configuration (provider-specific)
+  dns01: {}
 
 issuerstaging:
   # -- name for the self signed cluster issuer

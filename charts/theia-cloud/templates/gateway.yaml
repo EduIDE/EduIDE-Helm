@@ -1,0 +1,90 @@
+{{- if .Values.gateway.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ .Values.gateway.name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  listeners:
+  {{- if .Values.ingress.tls }}
+  {{- if .Values.hosts.usePaths }}
+  - name: https-base
+    protocol: HTTPS
+    port: {{ .Values.gateway.httpsPort }}
+    hostname: {{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: ws-cert-secret
+  {{- range $wildcard := .Values.hosts.allWildcardInstances }}
+  - name: {{ printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" $wildcard "-") | trunc 63 | trimSuffix "-" }}
+    protocol: HTTPS
+    port: {{ $.Values.gateway.httpsPort }}
+    hostname: {{ printf "%s%s" (tpl $wildcard $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      {{- if hasKey $.Values.ingress.instances.allWildcardSecretNames $wildcard }}
+      - kind: Secret
+        name: {{ tpl (get $.Values.ingress.instances.allWildcardSecretNames $wildcard) $ | quote }}
+      {{- else }}
+      - kind: Secret
+        name: ws-cert-secret
+      {{- end }}
+  {{- end }}
+  {{- else }}
+  - name: https-instances
+    protocol: HTTPS
+    port: {{ .Values.gateway.httpsPort }}
+    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.instance .) (tpl .Values.hosts.configuration.baseHost .) }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: ws-cert-secret
+  - name: https-service
+    protocol: HTTPS
+    port: {{ .Values.gateway.httpsPort }}
+    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.service .) (tpl .Values.hosts.configuration.baseHost .) }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: service-cert-secret
+  {{- if .Values.landingPage.enabled }}
+  - name: https-landing
+    protocol: HTTPS
+    port: {{ .Values.gateway.httpsPort }}
+    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.landing .) (tpl .Values.hosts.configuration.baseHost .) }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: landing-page-cert-secret
+  {{- end }}
+  {{- range $wildcard := .Values.hosts.allWildcardInstances }}
+  - name: {{ printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" $wildcard "-") | trunc 63 | trimSuffix "-" }}
+    protocol: HTTPS
+    port: {{ $.Values.gateway.httpsPort }}
+    hostname: {{ printf "%s%s.%s" (tpl $wildcard $) (tpl $.Values.hosts.configuration.instance $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      {{- if hasKey $.Values.ingress.instances.allWildcardSecretNames $wildcard }}
+      - kind: Secret
+        name: {{ tpl (get $.Values.ingress.instances.allWildcardSecretNames $wildcard) $ | quote }}
+      {{- else }}
+      - kind: Secret
+        name: ws-cert-secret
+      {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- if .Values.gateway.httpEnabled }}
+  - name: http
+    protocol: HTTP
+    port: {{ .Values.gateway.httpPort }}
+  {{- end }}
+{{- end }}
