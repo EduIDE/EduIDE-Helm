@@ -382,6 +382,8 @@ gateway:
   # -- Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects)
   httpEnabled: false
   httpPort: 80
+  # -- HTTPRoute request timeout for service-route (Envoy default can be 15s)
+  serviceRouteRequestTimeout: "60s"
 
 operatorrole:
   name: operator-api-access
