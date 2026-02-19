@@ -13,7 +13,6 @@ rules:
   - create
   - watch
   - get
-  - edit
   - patch
   - delete
   - update

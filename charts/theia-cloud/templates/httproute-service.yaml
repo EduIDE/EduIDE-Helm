@@ -26,8 +26,8 @@ spec:
     timeouts:
       request: {{ .Values.gateway.serviceRouteRequestTimeout | quote }}
     {{- end }}
-    filters:
     {{- if .Values.hosts.usePaths }}
+    filters:
     - type: URLRewrite
       urlRewrite:
         path:

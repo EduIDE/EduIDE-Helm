@@ -9,9 +9,9 @@ spec:
   - name: {{ .Values.gateway.name }}
   hostnames:
   {{- if .Values.hosts.usePaths }}
-  - {{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
+  - {{ tpl (.Values.hosts.configuration.baseHost | toString) . | quote }}
   {{- else }}
-  - {{ printf "%s.%s" (tpl .Values.hosts.configuration.landing .) (tpl .Values.hosts.configuration.baseHost .) }}
+  - {{ printf "%s.%s" (tpl .Values.hosts.configuration.landing .) (tpl .Values.hosts.configuration.baseHost .) | quote }}
   {{- end }}
   rules:
   {{- if .Values.hosts.usePaths }}
