@@ -84,7 +84,7 @@ hosts:
   # all app definitions need to be added.
   # IMPORTANT: If this gets updated, the helm chart needs to be re-installed because
   # helm upgrade will not properly update this at the moment.
-  # These are required to configure TLS (if enabled via ingress.tls == true)
+  # These are required to configure TLS (if enabled via gateway.tls == true)
   # I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured.
   allWildcardInstances: []
 
@@ -315,60 +315,6 @@ service:
   # -- protocol of the REST-API
   protocol: https
 
-# -- Values to influence the ingresses
-# @default -- (see details below)
-# -- Ingress is deprecated. Use Gateway API instead.
-ingress:
-  # -- Whether to render Ingress resources (deprecated)
-  enabled: false
-  # -- Values to influence the instances ingress
-  instances:
-    # -- The name of the ingress which will be updated to publish new theia application.
-    # If this is not existing it will be created.
-    # You may chose to set the ingress up yourself and point Theia Cloud to the ingress via
-    # the name
-    name: "theia-cloud-demo-ws-ingress"
-
-    # -- Sets the maximum allowed size of the client request body inside the application (e.g. file uploads in Theia).
-    # Defaults to 1m. Setting size to 0 disables checking of client request body size.
-    proxyBodySize: 1m
-
-    # -- All additional wildcard hostnames and the respective TLS secret names.
-    # Use this for wildcard hostnames that should use a TLS certificate with a `secretName` different from the default one.
-    # Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`.
-    allWildcardSecretNames: {}
-    #  "*.webview.": webview-ws-cert-secret
-
-    # -- Additional configuration to the ingress configuration via the `nginx.ingress.kubernetes.io/configuration-snippet` annotation.
-    # One entry in this array results in a line for the annotation.
-    # Do not add a semicolon at the end of the line here, it is automatically added.
-    # Note: Since ingress-nginx version 1.10 this annotation needs to be enabled. See [this README](../../README.md#cluster-prerequisites) for more information.
-    configurationSnippets:
-      - "proxy_set_header 'X-Forwarded-Uri' $request_uri"
-
-  # -- When set to true the cert-manager.io annotations will be set.
-  # Only used when ingress.addTLSSecretName === true
-  # When false certificate management is handled outside of Theia Cloud.
-  certManagerAnnotations: true
-
-  # -- The cluster issuer to use
-  # Only needed when ingress.certManagerAnnotations is true
-  clusterIssuer: letsencrypt-prod
-
-  # -- When set to true the cert-manager.io/common-name annotation will be set.
-  # This is only required when the issued certificate by the cert-manager misses a
-  # common-name
-  # Only needed when ingress.certManagerAnnotations is true
-  theiaCloudCommonName: false
-
-  # -- Does Theia Cloud expect TLS connections (true)
-  # or is TLS terminated outside of Theia Cloud (e.g. via a Load Balancer) (false)
-  tls: true
-
-  # -- whether the default Theia Cloud tls secret names should be used. If false no tls secret name will be set on the ingress
-  # only needed when ingress.tls == true
-  addTLSSecretName: true
-
 # -- Gateway API configuration (Envoy Gateway by default)
 gateway:
   # -- Whether to render Gateway/HTTPRoute resources
@@ -382,6 +328,14 @@ gateway:
   # -- Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects)
   httpEnabled: false
   httpPort: 80
+  # -- Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false)
+  tls: true
+  # -- Name of the HTTPRoute that is updated to publish new Theia application instances
+  instancesRouteName: "theia-cloud-demo-ws-ingress"
+  # -- Additional wildcard hostnames and optional dedicated TLS secret names
+  # Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`.
+  instancesWildcardSecretNames: {}
+  #  "*.webview.": webview-ws-cert-secret
   # -- HTTPRoute request timeout for service-route (Envoy default can be 15s)
   serviceRouteRequestTimeout: "60s"
 

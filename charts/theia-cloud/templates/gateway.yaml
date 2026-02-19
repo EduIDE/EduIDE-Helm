@@ -7,7 +7,7 @@ metadata:
 spec:
   gatewayClassName: {{ .Values.gateway.className }}
   listeners:
-  {{- if .Values.ingress.tls }}
+  {{- if .Values.gateway.tls }}
   {{- if .Values.hosts.usePaths }}
   - name: https-base
     protocol: HTTPS
@@ -26,9 +26,9 @@ spec:
     tls:
       mode: Terminate
       certificateRefs:
-      {{- if hasKey $.Values.ingress.instances.allWildcardSecretNames $wildcard }}
+      {{- if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}
       - kind: Secret
-        name: {{ tpl (get $.Values.ingress.instances.allWildcardSecretNames $wildcard) $ | quote }}
+        name: {{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}
       {{- else }}
       - kind: Secret
         name: ws-cert-secret
@@ -72,9 +72,9 @@ spec:
     tls:
       mode: Terminate
       certificateRefs:
-      {{- if hasKey $.Values.ingress.instances.allWildcardSecretNames $wildcard }}
+      {{- if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}
       - kind: Secret
-        name: {{ tpl (get $.Values.ingress.instances.allWildcardSecretNames $wildcard) $ | quote }}
+        name: {{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}
       {{- else }}
       - kind: Secret
         name: ws-cert-secret
