@@ -317,12 +317,26 @@ service:
 
 # -- Gateway API configuration (Envoy Gateway by default)
 gateway:
-  # -- Whether to render Gateway/HTTPRoute resources
+  # -- Master switch for Gateway API resources.
   enabled: true
+  # -- Whether to render a Gateway resource in the release namespace.
+  # Set to false when using a centralized shared Gateway in another namespace.
+  create: true
+  routes:
+    # -- Whether to render HTTPRoute resources.
+    enabled: true
   # -- GatewayClassName to use (Envoy Gateway default is typically "envoy")
   className: "envoy"
   # -- Name of the Gateway resource
   name: "theia-cloud-gateway"
+  # -- Optional explicit parentRefs for HTTPRoutes.
+  # If empty, routes attach to `gateway.name` in the same namespace.
+  #
+  # Example for a centralized shared gateway:
+  # parentRefs:
+  #   - name: theia-shared-gateway
+  #     namespace: gateway-system
+  parentRefs: []
   # -- HTTPS listener port
   httpsPort: 443
   # -- Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects)
