@@ -311,7 +311,7 @@ operator:
   # -- Whether the operator should stop in cases where an exception is not handled
   continueOnException: false
 
-  # -- Whether to enable build cacheing
+  # -- Whether to enable build caching
   enableBuildCaching: false
 
   # -- The URL of the remote build cache server. Only used when enableBuildCaching is true.
