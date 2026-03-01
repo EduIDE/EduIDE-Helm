@@ -311,6 +311,21 @@ operator:
   # -- Whether the operator should stop in cases where an exception is not handled
   continueOnException: false
 
+  # -- Whether to enable build cacheing
+  enableBuildCaching: false
+
+  # -- The URL of the remote build cache server. Only used when enableBuildCaching is true.
+  buildCacheUrl: ""
+
+  # -- Whether sessions are allowed to push to the build cache. Only used when enableBuildCaching is true.
+  enableBuildCachePush: false
+
+  # -- Whether to enable the dependency cache (Reposilite).
+  enableDependencyCaching: false
+
+  # -- The URL of the dependency cache server (Reposilite). Only used when enableDependencyCaching is true.
+  dependencyCacheUrl: ""
+
   # -- Allows to override the operator's log4j configuration
   # @default -- (see details below)
   logging:

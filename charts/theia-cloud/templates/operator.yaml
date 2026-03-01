@@ -94,6 +94,23 @@ spec:
           {{- if .Values.operator.continueOnException }}
           - "--continueOnException"
           {{- end }}
+          {{- if .Values.operator.enableBuildCaching }}
+          - "--enableBuildCaching"
+          {{- if .Values.operator.buildCacheUrl }}
+          - "--buildCacheUrl"
+          - "{{ tpl (.Values.operator.buildCacheUrl | toString) . }}"
+          {{- end }}
+          {{- if .Values.operator.enableBuildCachePush }}
+          - "--enableBuildCachePush"
+          {{- end }}
+          {{- end }}
+          {{- if .Values.operator.enableDependencyCaching }}
+          - "--enableDependencyCaching"
+          {{- if .Values.operator.dependencyCacheUrl }}
+          - "--dependencyCacheUrl"
+          - "{{ tpl (.Values.operator.dependencyCacheUrl | toString) . }}"
+          {{- end }}
+          {{- end }}
         {{- if .Values.operator.logging.override }}
         volumeMounts:
           - name: operator-logging-config
