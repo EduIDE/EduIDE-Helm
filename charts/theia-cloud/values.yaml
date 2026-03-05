@@ -156,6 +156,52 @@ landingPage:
   # and vice-versa.
   logoFileExtension: "svg"
 
+  # -- Optional: Customize footer links on the landing page
+  # All footer link configurations are optional. If not provided, default values will be used.
+  # @default -- (see details below)
+  footerLinks:
+    # # -- Optional: Attribution section (bottom left of footer)
+    # attribution:
+    #   # -- Text to display (e.g., "Built by TUM AET Team")
+    #   text: "Built by TUM AET Team 👨‍💻"
+    #   # -- URL to link to (e.g., team website)
+    #   url: "https://aet.cit.tum.de/"
+    #   # -- Version string to display (e.g., "v1.0.0")
+    #   version: "v1.0.0"
+    #
+    # # -- Optional: Bug report link
+    # bugReport:
+    #   # -- Link text (e.g., "Report a bug")
+    #   text: "Report a bug"
+    #   # -- URL for bug reports (e.g., GitHub issues)
+    #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
+    #   # -- Optional: Link target (_blank or _self)
+    #   target: "_blank"
+    #   # -- Optional: Link rel attribute
+    #   rel: "noreferrer"
+    #
+    # # -- Optional: Feature request link
+    # featureRequest:
+    #   # -- Link text (e.g., "Request a feature")
+    #   text: "Request a feature"
+    #   # -- URL for feature requests (e.g., GitHub issues)
+    #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
+    #   # -- Optional: Link target (_blank or _self)
+    #   target: "_blank"
+    #   # -- Optional: Link rel attribute
+    #   rel: "noreferrer"
+    #
+    # # -- Optional: About link
+    # about:
+    #   # -- Link text (e.g., "About")
+    #   text: "About"
+    #   # -- URL for about page
+    #   url: "https://theia-cloud.io/"
+    #   # -- Optional: Link target (_blank or _self)
+    #   target: "_blank"
+    #   # -- Optional: Link rel attribute
+    #   rel: "noreferrer"
+
 # -- Values related to Keycloak
 # @default -- (see details below)
 keycloak:
@@ -264,6 +310,21 @@ operator:
 
   # -- Whether the operator should stop in cases where an exception is not handled
   continueOnException: false
+
+  # -- Whether to enable build caching
+  enableBuildCaching: false
+
+  # -- The URL of the remote build cache server. Only used when enableBuildCaching is true.
+  buildCacheUrl: ""
+
+  # -- Whether sessions are allowed to push to the build cache. Only used when enableBuildCaching is true.
+  enableBuildCachePush: false
+
+  # -- Whether to enable the dependency cache (Reposilite).
+  enableDependencyCaching: false
+
+  # -- The URL of the dependency cache server (Reposilite). Only used when enableDependencyCaching is true.
+  dependencyCacheUrl: ""
 
   # -- Allows to override the operator's log4j configuration
   # @default -- (see details below)
