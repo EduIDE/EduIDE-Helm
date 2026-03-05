@@ -1,4 +1,11 @@
 {{- if .Values.issuerprod.enable }}
+{{- $solvers := default (list) .Values.issuerprod.solvers }}
+{{- if not (kindIs "slice" $solvers) }}
+{{- fail "issuerprod.solvers must be a list of ACME solver entries" }}
+{{- end }}
+{{- if eq (len $solvers) 0 }}
+{{- fail "issuerprod.solvers must define at least one ACME solver when issuerprod.enable=true" }}
+{{- end }}
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -10,8 +17,6 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
-    - http01: 
-        ingress:
-            class: nginx
+{{ toYaml $solvers | nindent 4 }}
 {{- end }}
             

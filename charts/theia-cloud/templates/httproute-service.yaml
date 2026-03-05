@@ -1,0 +1,40 @@
+{{- if and .Values.gateway.enabled .Values.gateway.routes.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: service-route
+  namespace: {{ .Release.Namespace }}
+spec:
+  parentRefs:
+{{ include "theia-cloud.gateway.parentRefs" . | nindent 2 }}
+  hostnames:
+  {{- if .Values.hosts.usePaths }}
+  - {{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
+  {{- else }}
+  - {{ printf "%s.%s" (tpl .Values.hosts.configuration.service .) (tpl .Values.hosts.configuration.baseHost .) }}
+  {{- end }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        {{- if .Values.hosts.usePaths }}
+        value: /{{ tpl (.Values.hosts.configuration.service | toString) . }}/service
+        {{- else }}
+        value: /service
+        {{- end }}
+    {{- if .Values.gateway.serviceRouteRequestTimeout }}
+    timeouts:
+      request: {{ .Values.gateway.serviceRouteRequestTimeout | quote }}
+    {{- end }}
+    {{- if .Values.hosts.usePaths }}
+    filters:
+    - type: URLRewrite
+      urlRewrite:
+        path:
+          type: ReplacePrefixMatch
+          replacePrefixMatch: /service
+    {{- end }}
+    backendRefs:
+    - name: service-service
+      port: {{ tpl (.Values.service.port | toString) . }}
+{{- end }}

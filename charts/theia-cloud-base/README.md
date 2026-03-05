@@ -15,8 +15,9 @@ Theia-cloud base chart
 | issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
 | issuerca.enable | bool | `true` | whether to install the CA certificate signer |
 | issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |
-| issuerprod.enable | bool | `true` | whether to install the let's encrypt production cluster issuer |
+| issuerprod.enable | bool | `false` | whether to install the let's encrypt production cluster issuer |
 | issuerprod.name | string | `"letsencrypt-prod"` | name for the let's encrypt production cluster issuer |
+| issuerprod.solvers | list | `[]` | ACME solver list for cert-manager (required when `issuerprod.enable=true`) |
 | issuerstaging.name | string | `"theia-cloud-selfsigned-issuer"` | name for the self signed cluster issuer |
 | operatorrole.name | string | `"operator-api-access"` | name for the operator's cluster role |
 | servicerole.name | string | `"service-api-access"` | name for the services' cluster role |

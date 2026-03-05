@@ -6,9 +6,11 @@ issuerca:
 
 issuerprod:
   # -- whether to install the let's encrypt production cluster issuer
-  enable: true
+  enable: false
   # -- name for the let's encrypt production cluster issuer
   name: letsencrypt-prod
+  # -- ACME solver list for cert-manager (required when `issuerprod.enable=true`)
+  solvers: []
 
 issuerstaging:
   # -- name for the self signed cluster issuer

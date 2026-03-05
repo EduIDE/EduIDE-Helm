@@ -14,15 +14,9 @@ The charts depend on well-established software in the Kubernetes ecosystem. Plea
 
 - **cert-manager.io** is used for certificate management, supports internal/testing issuers and supports Let's Encrypt certificates. Installation instructions can be found [here](https://cert-manager.io), a helm chart [here](https://cert-manager.io/docs/installation/helm/).
 
-- **ingress-nginx** is used to performantly assemble _nginx_ configuration files and synchronizes changes. Learn more about it [here](https://kubernetes.github.io/ingress-nginx/).
-
-**Note:** Since ingress-nginx version 1.10 , the annotation `nginx.ingress.kubernetes.io/configuration-snippet` is disabled by default and needs to be enabled.
-To enable this option, you need to set the flag `allow-snippet-annotations: "true"` in the ingress-nginx values.
-
-```sh
-kubectl -n ingress-nginx patch cm ingress-nginx-controller --patch '{"data":{"allow-snippet-annotations":"true"}}'
-kubectl -n ingress-nginx delete pod -l app.kubernetes.io/name=ingress-nginx
-```
+- **Envoy Gateway** (Gateway API) is used to route traffic to Theia Cloud components.
+  Ensure Gateway API CRDs and Envoy Gateway are installed in your cluster and the GatewayClass name
+  matches `theia-cloud.gateway.className` (default: `envoy`).
 
 You can find more information in the official [Theia Cloud documentation](https://theia-cloud.io/documentation/setuptheiacloud/).
 
