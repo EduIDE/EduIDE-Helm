@@ -1,4 +1,4 @@
-# Theia Cloud Helm Charts
+# EduIDE Cloud Helm Charts
 
 This repository contains the helm charts for Theia Cloud.
 
