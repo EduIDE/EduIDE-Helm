@@ -8,6 +8,14 @@ There are three charts:
 - `theia-cloud-crds` installs the custom resource definitions
 - `theia-cloud` installs Theia Cloud itself and depends on `theia-cloud-base` and `theia-cloud-crds`
 
+## Release Model
+
+Released charts are published as OCI artifacts to `ghcr.io/eduide/charts`.
+`theia-deployment` should consume those published chart versions directly for normal staging and production deployments.
+
+Pull requests also publish preview OCI chart versions using a `pr-<number>` suffix on top of the chart version already present in `Chart.yaml`.
+`theia-deployment` can consume those previews through a simple tag input such as `pr-123`.
+
 ## Cluster Prerequisites
 
 The charts depend on well-established software in the Kubernetes ecosystem. Please make sure to install the dependencies before releasing with _helm_.

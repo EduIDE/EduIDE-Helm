@@ -4,24 +4,137 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+  workflow_dispatch:
 
 jobs:
   release:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OCI_REGISTRY: ghcr.io
+      OCI_REPOSITORY: charts
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # 1.7.0
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
         with:
-          skip_existing: true
+          version: v3.14.0
+
+      - name: Login to GHCR
         env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
+
+      - name: Package and publish charts
+        run: |
+          set -euo pipefail
+
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
+          mkdir -p dist
+
+          charts=(
+            theia-cloud-base
+            theia-cloud-crds
+            theia-cloud
+          )
+
+          for chart in "${charts[@]}"; do
+            version="$(awk '/^version:/ {print $2; exit}' "charts/${chart}/Chart.yaml")"
+            artifact="dist/${chart}-${version}.tgz"
+            ref="${OCI_PREFIX}/${chart}"
+
+            if helm show chart "${ref}" --version "${version}" >/dev/null 2>&1; then
+              echo "Chart ${chart}:${version} already published, skipping"
+              continue
+            fi
+
+            helm package "charts/${chart}" --destination dist
+            helm push "${artifact}" "${OCI_PREFIX}"
+            helm show chart "${ref}" --version "${version}" >/dev/null
+          done
+
+  release-pr-preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OCI_REGISTRY: ghcr.io
+      OCI_REPOSITORY: charts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
+
+      - name: Package and publish PR preview charts
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
+          PREVIEW_SUFFIX="pr-${PR_NUMBER}"
+          mkdir -p dist
+
+          to_preview_version() {
+            local base="$1"
+            printf '%s.%s' "$base" "$PREVIEW_SUFFIX"
+          }
+
+          charts=(
+            theia-cloud-base
+            theia-cloud-crds
+            theia-cloud
+          )
+
+          for chart in "${charts[@]}"; do
+            src_dir="charts/${chart}"
+            work_dir="dist/${chart}"
+            cp -R "$src_dir" "$work_dir"
+
+            base_version="$(awk '/^version:/ {print $2; exit}' "${src_dir}/Chart.yaml")"
+            preview_version="$(to_preview_version "$base_version")"
+            ref="${OCI_PREFIX}/${chart}"
+            artifact="dist/${chart}-${preview_version}.tgz"
+
+            if helm show chart "${ref}" --version "${preview_version}" >/dev/null 2>&1; then
+              echo "Preview chart ${chart}:${preview_version} already published, skipping"
+              continue
+            fi
+
+            sed -i "s/^version: .*/version: ${preview_version}/" "${work_dir}/Chart.yaml"
+
+            helm package "$work_dir" --destination dist
+            helm push "${artifact}" "${OCI_PREFIX}"
+            helm show chart "${ref}" --version "${preview_version}" >/dev/null
+          done
