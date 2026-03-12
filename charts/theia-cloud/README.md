@@ -100,6 +100,8 @@ A Helm chart for Theia Cloud
 | preloading.images | list | `[]` | Images to preload. Images must support running /bin/sh. If the list is empty and demoApplication.install == true, demoApplication.name is automatically added. |
 | service | object | (see details below) | Values of the Theia Cloud REST service |
 | service.authToken | string | `"asdfghjkl"` | The service authentication token used in the communication between website and REST-API for spam mitigation. This token is public. Please choose a random generated string. |
+| service.adminApiTokenSecret.key | string | `"ADMIN_API_TOKEN"` | Secret key containing the admin API token. |
+| service.adminApiTokenSecret.name | string | `"service-admin-api-token"` | Name of an existing Kubernetes Secret containing the admin API token. The chart does not create or manage this Secret. |
 | service.image | string | `"theiacloud/theia-cloud-service:1.2.0-next"` | The image to use |
 | service.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the service's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | service.imagePullSecret | string | `nil` | Optional: the image pull secret |

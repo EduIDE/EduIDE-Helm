@@ -32,6 +32,14 @@ spec:
         envFrom:
         - configMapRef:
             name: service-config
+      {{- if and .Values.service.adminApiTokenSecret.name .Values.service.adminApiTokenSecret.key }}
+        env:
+        - name: ADMIN_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ tpl (.Values.service.adminApiTokenSecret.name | toString) . }}
+              key: {{ tpl (.Values.service.adminApiTokenSecret.key | toString) . }}
+      {{- end }}
       {{- if .Values.service.imagePullSecret }}
       imagePullSecrets:
         - name: {{ tpl (.Values.service.imagePullSecret | toString) . }}

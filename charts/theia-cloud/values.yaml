@@ -360,6 +360,12 @@ service:
   # for spam mitigation. This token is public. Please choose a random generated string.
   authToken: asdfghjkl
 
+  # -- Reference to an existing Kubernetes Secret containing the bearer token for admin API token protected endpoints.
+  # The chart does not create or manage this Secret.
+  adminApiTokenSecret:
+    name: service-admin-api-token
+    key: ADMIN_API_TOKEN
+
   # -- The image to use
   image: theiacloud/theia-cloud-service:1.2.0-next
 
@@ -406,7 +412,7 @@ gateway:
   # -- Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false)
   tls: true
   # -- Name of the HTTPRoute that is updated to publish new Theia application instances
-  instancesRouteName: "theia-cloud-demo-ws-ingress"
+  instancesRouteName: "theia-cloud-demo-ws-route"
   # -- Additional wildcard hostnames and optional dedicated TLS secret names
   # Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`.
   instancesWildcardSecretNames: {}
