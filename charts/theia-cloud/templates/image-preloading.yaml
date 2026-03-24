@@ -46,13 +46,47 @@ spec:
       # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
       terminationGracePeriodSeconds: 0
       initContainers:
-      {{- range $index, $image := $images }}
+      {{- range $index, $entry := $images }}
+      {{- $imageRef := "" }}
+      {{- $isMap := kindIs "map" $entry }}
+      {{- if $isMap }}
+        {{- $imageRef = tpl ($entry.image | toString) $ }}
+      {{- else }}
+        {{- $imageRef = tpl ($entry | toString) $ }}
+      {{- end }}
+      {{- $useShell := true }}
+      {{- $customCmd := list }}
+      {{- $customArgs := list }}
+      {{- $hasArgsKey := false }}
+      {{- if $isMap }}
+        {{- if or $entry.command (hasKey $entry "args") }}
+          {{- $useShell = false }}
+        {{- end }}
+        {{- with $entry.command }}
+          {{- $customCmd = . }}
+        {{- end }}
+        {{- if hasKey $entry "args" }}
+          {{- $hasArgsKey = true }}
+          {{- $customArgs = $entry.args }}
+        {{- end }}
+      {{- end }}
       - name: image-preload-{{ $index }}
-        image: {{ $image }}
+        image: {{ $imageRef | quote }}
         imagePullPolicy: {{ $imagePullPolicy }}
+        {{- if $useShell }}
         command: ["/bin/sh", "-c"]
         args:
-        - "echo 'Loaded image {{ $image }}'; exit 0"
+        - {{ printf "echo 'Loaded image %s'; exit 0" $imageRef | quote }}
+        {{- else }}
+        {{- with $customCmd }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $hasArgsKey }}
+        args:
+          {{- toYaml $customArgs | nindent 10 }}
+        {{- end }}
+        {{- end }}
       {{- end }}
       # Run the pause container to make the Pod go into the Running state without consuming resources
       containers:
