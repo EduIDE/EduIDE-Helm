@@ -56,7 +56,7 @@ A Helm chart for Theia Cloud
 | keycloak.enable | bool | `false` | Whether keycloak authentication shall be used |
 | keycloak.realm | string | `"TheiaCloud"` | The Keycloak Realm. Only has to be specified when enable: true |
 | landingPage | object | (see details below) | Values related to the landing page |
-| landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name The value is the label that is supposed to be shown in the UI  Example: different-app-definition:   label: "Different App Definition" further-app-definition:   label: "Further App Definition" |
+| landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name. The value contains the label shown in the UI and may optionally include `image` or `Image` to override the logo name/path forwarded to the landing page config. Example: different-app-definition: label: "Different App Definition" image: "different-app-definition" |
 | landingPage.appDefinition | string | `"theia-cloud-demo"` | the app id to launch |
 | landingPage.disableInfo | bool | `false` | Should showing info title and text below the launch button be disabled true hides the info title and text false shows the info title and text |
 | landingPage.enabled | bool | `true` | Whether the landing page shall be enabled |

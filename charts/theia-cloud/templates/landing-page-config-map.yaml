@@ -1,4 +1,5 @@
 {{- if .Values.landingPage.enabled }}
+{{- $root := . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,9 +23,13 @@ data:
       appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
       additionalApps: [
         {{- range $key, $val := .Values.landingPage.additionalApps }}
+        {{- $image := (get $val "image" | default (get $val "Image")) }}
         {
           serviceAuthToken: {{ $key | quote}},
           appName: {{ $val.label | quote }},
+          {{- if $image }}
+          image: {{ tpl ($image | toString) $root | quote }},
+          {{- end }}
         },
         {{- end }}
       ],
