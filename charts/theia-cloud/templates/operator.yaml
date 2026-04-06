@@ -30,6 +30,9 @@ spec:
         envFrom:
         - configMapRef:
             name: operator-config
+        env:
+        - name: SENTRY_ENABLE
+          value: {{ tpl (.Values.operator.sentry.enable | toString) . | quote }}
         args:
           {{- if .Values.keycloak.enable }}
           - "--keycloak"

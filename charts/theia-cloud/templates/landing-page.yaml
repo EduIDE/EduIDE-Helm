@@ -24,6 +24,9 @@ spec:
         - name: landing-page-container
           image: {{ tpl (.Values.landingPage.image | toString) . }}
           imagePullPolicy: {{ if .Values.landingPage.imagePullPolicy }}{{ tpl (.Values.landingPage.imagePullPolicy | toString) . }}{{ else }}{{ tpl (.Values.imagePullPolicy | toString) . }}{{ end }}
+          env:
+            - name: SENTRY_ENABLE
+              value: {{ tpl (.Values.landingPage.sentry.enable | toString) . | quote }}
           ports:
             - name: http
               containerPort: 80

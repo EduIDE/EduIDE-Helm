@@ -32,8 +32,10 @@ spec:
         envFrom:
         - configMapRef:
             name: service-config
-      {{- if and .Values.service.adminApiTokenSecret.name .Values.service.adminApiTokenSecret.key }}
         env:
+        - name: SENTRY_ENABLE
+          value: {{ tpl (.Values.service.sentry.enable | toString) . | quote }}
+      {{- if and .Values.service.adminApiTokenSecret.name .Values.service.adminApiTokenSecret.key }}
         - name: ADMIN_API_TOKEN
           valueFrom:
             secretKeyRef:

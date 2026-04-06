@@ -45,6 +45,7 @@ data:
       {{- if .Values.landingPage.loadingText }}
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
+      sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
       {{- if .Values.landingPage.footerLinks }}
       footerLinks: {
         {{- if .Values.landingPage.footerLinks.attribution }}
