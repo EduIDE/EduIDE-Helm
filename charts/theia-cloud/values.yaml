@@ -104,6 +104,12 @@ landingPage:
   # -- Optional: the image pull secret
   imagePullSecret:
 
+  # -- Values related to Sentry on the landing page.
+  # @default -- (see details below)
+  sentry:
+    # -- Whether to set SENTRY_ENABLE=true in the landing page deployment.
+    enable: true
+
   # -- the app id to launch
   appDefinition: "theia-cloud-demo"
 
@@ -262,6 +268,12 @@ operator:
   # -- Optional: the image pull secret
   imagePullSecret:
 
+  # -- Values related to Sentry on the operator.
+  # @default -- (see details below)
+  sentry:
+    # -- Whether to set SENTRY_ENABLE=true in the operator deployment.
+    enable: true
+
   # -- Whether theia applications shall be started eager. This means that the application is already
   # running without a user. When a user requests a new session, one of the already launched ones
   # is assigned.
@@ -378,6 +390,12 @@ service:
 
   # -- Optional: the image pull secret
   imagePullSecret:
+
+  # -- Values related to Sentry on the service.
+  # @default -- (see details below)
+  sentry:
+    # -- Whether to set SENTRY_ENABLE=true in the service deployment.
+    enable: true
 
   # -- service port (default: 8081)
   port: 8081
