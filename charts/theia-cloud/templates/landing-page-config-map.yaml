@@ -27,17 +27,14 @@ data:
         {
           serviceAuthToken: {{ $key | quote}},
           appName: {{ $val.label | quote }},
-<<<<<<< Updated upstream
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
-=======
           {{- if $val.buildSystems }}
           buildSystems: [
             {{- range $val.buildSystems }}
             { id: {{ .id | quote }}{{- if .label }}, label: {{ .label | quote }}{{- end }} },
             {{- end }}
           ],
->>>>>>> Stashed changes
           {{- end }}
         },
         {{- end }}
