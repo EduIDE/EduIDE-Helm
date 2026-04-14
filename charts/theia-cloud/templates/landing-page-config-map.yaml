@@ -29,6 +29,7 @@ data:
           appName: {{ $val.label | quote }},
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
+          {{- end }}
           {{- if $val.buildSystems }}
           buildSystems: [
             {{- range $val.buildSystems }}
