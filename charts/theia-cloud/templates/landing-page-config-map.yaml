@@ -30,6 +30,13 @@ data:
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
           {{- end }}
+          {{- if $val.buildSystems }}
+          buildSystems: [
+            {{- range $val.buildSystems }}
+            { id: {{ .id | quote }}{{- if .label }}, label: {{ .label | quote }}{{- end }} },
+            {{- end }}
+          ],
+          {{- end }}
         },
         {{- end }}
       ],
