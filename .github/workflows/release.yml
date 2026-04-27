@@ -120,13 +120,17 @@ jobs:
           for chart in "${charts[@]}"; do
             src_dir="charts/${chart}"
             work_dir="dist/${chart}"
-            rm -rf "$work_dir"
             cp -R "$src_dir" "$work_dir"
 
             base_version="$(awk '/^version:/ {print $2; exit}' "${src_dir}/Chart.yaml")"
             preview_version="$(to_preview_version "$base_version")"
             ref="${OCI_PREFIX}/${chart}"
             artifact="dist/${chart}-${preview_version}.tgz"
+
+            if helm show chart "${ref}" --version "${preview_version}" >/dev/null 2>&1; then
+              echo "Preview chart ${chart}:${preview_version} already published, skipping"
+              continue
+            fi
 
             sed -i "s/^version: .*/version: ${preview_version}/" "${work_dir}/Chart.yaml"
 
