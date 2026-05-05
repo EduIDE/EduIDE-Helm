@@ -27,8 +27,21 @@ data:
         {
           serviceAuthToken: {{ $key | quote}},
           appName: {{ $val.label | quote }},
+          {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
+          visible: {{ get $val "visible" }},
+          {{- end }}
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
+          {{- end }}
+          {{- if $val.buildSystems }}
+          buildSystems: [
+            {{- range $val.buildSystems }}
+            {
+              id: {{ .id | quote }},
+              label: {{ .label | quote }},
+            },
+            {{- end }}
+          ],
           {{- end }}
         },
         {{- end }}
