@@ -36,10 +36,7 @@ data:
           {{- if $val.buildSystems }}
           buildSystems: [
             {{- range $val.buildSystems }}
-            {
-              id: {{ .id | quote }},
-              label: {{ .label | quote }},
-            },
+            { id: {{ .id | quote }}{{- if .label }}, label: {{ .label | quote }}{{- end }} },
             {{- end }}
           ],
           {{- end }}
