@@ -27,6 +27,9 @@ data:
         {
           serviceAuthToken: {{ $key | quote}},
           appName: {{ $val.label | quote }},
+          {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
+          visible: {{ get $val "visible" }},
+          {{- end }}
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
           {{- end }}

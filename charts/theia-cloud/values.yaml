@@ -126,6 +126,7 @@ landingPage:
   # different-app-definition:
   #   label: "Different App Definition"
   #   image: "different-app-definition"
+  #   visible: false
   # further-app-definition:
   #   label: "Further App Definition"
   additionalApps:
