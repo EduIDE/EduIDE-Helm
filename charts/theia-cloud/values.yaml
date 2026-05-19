@@ -120,13 +120,14 @@ landingPage:
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain
-  # an image override that is forwarded to the landing page config.
+  # image, visible, buildSystems, and aiVariant fields forwarded to the landing page config.
   #
   # Example:
   # different-app-definition:
   #   label: "Different App Definition"
   #   image: "different-app-definition"
   #   visible: false
+  #   aiVariant: "different-app-definition-ai"
   # further-app-definition:
   #   label: "Further App Definition"
   additionalApps:

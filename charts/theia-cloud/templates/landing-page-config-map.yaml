@@ -27,6 +27,9 @@ data:
         {
           serviceAuthToken: {{ $key | quote}},
           appName: {{ $val.label | quote }},
+          {{- if $val.aiVariant }}
+          aiVariant: {{ tpl ($val.aiVariant | toString) $root | quote }},
+          {{- end }}
           {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
           visible: {{ get $val "visible" }},
           {{- end }}
