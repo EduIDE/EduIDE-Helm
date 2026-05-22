@@ -97,21 +97,25 @@ spec:
           {{- if .Values.operator.continueOnException }}
           - "--continueOnException"
           {{- end }}
-          {{- if .Values.operator.enableBuildCaching }}
+          {{- if .Values.operator.buildCache.enabled }}
           - "--enableBuildCaching"
-          {{- if .Values.operator.buildCacheUrl }}
+          {{- if .Values.operator.buildCache.gradleUrl }}
           - "--buildCacheUrl"
-          - "{{ tpl (.Values.operator.buildCacheUrl | toString) . }}"
+          - "{{ tpl (.Values.operator.buildCache.gradleUrl | toString) . }}"
           {{- end }}
-          {{- if .Values.operator.enableBuildCachePush }}
+          {{- if .Values.operator.buildCache.bazelUrl }}
+          - "--bazelBuildCacheUrl"
+          - "{{ tpl (.Values.operator.buildCache.bazelUrl | toString) . }}"
+          {{- end }}
+          {{- if .Values.operator.buildCache.enablePush }}
           - "--enableBuildCachePush"
           {{- end }}
           {{- end }}
-          {{- if .Values.operator.enableDependencyCaching }}
+          {{- if .Values.operator.dependencyCache.enabled }}
           - "--enableDependencyCaching"
-          {{- if .Values.operator.dependencyCacheUrl }}
+          {{- if .Values.operator.dependencyCache.url }}
           - "--dependencyCacheUrl"
-          - "{{ tpl (.Values.operator.dependencyCacheUrl | toString) . }}"
+          - "{{ tpl (.Values.operator.dependencyCache.url | toString) . }}"
           {{- end }}
           {{- end }}
         {{- if .Values.operator.logging.override }}
