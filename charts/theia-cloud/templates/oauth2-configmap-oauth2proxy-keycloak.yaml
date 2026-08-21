@@ -1,9 +1,17 @@
+{{- /* keycloak and gitea use the same single oauth2-proxy provider, so only one may be enabled. */ -}}
+{{- if and .Values.keycloak.enable .Values.gitea.enable }}{{- fail "keycloak.enable and gitea.enable are mutually exclusive (single oauth2-proxy provider)" }}{{- end }}
 {{- /* Extract the host where the Keycloak runs by extracting it from the auth URL via regex. */ -}}
 {{- $keycloakUrl := tpl (.Values.keycloak.authUrl | toString) . -}}
 {{- /* Regex to match a URL that matches the host in group 1: ([^/]+) */ -}}
 {{- $hostRegex := `^https?://([^/]+)(/.*)?$` -}}
 {{- /* Replace the URL with only the first group which is only the host. */ -}}
 {{- $keycloakHost:= regexReplaceAll $hostRegex $keycloakUrl `$1` -}}
+{{- /* Extract the host where Gitea runs the same way from the issuer URL. */ -}}
+{{- $giteaUrl := tpl (.Values.gitea.issuerUrl | toString) . -}}
+{{- $giteaHost := regexReplaceAll $hostRegex $giteaUrl `$1` -}}
+{{- /* Host of the currently enabled OIDC provider, used for the whitelist defaults. */ -}}
+{{- $oauthHost := $keycloakHost -}}
+{{- if .Values.gitea.enable }}{{- $oauthHost = $giteaHost -}}{{- end }}
 
 apiVersion: v1
 kind: ConfigMap
@@ -13,14 +21,29 @@ metadata:
 data:
   oauth2-proxy.cfg: |+
     # Provider config
+    {{- if .Values.gitea.enable }}
+    provider="oidc"
+    {{- else }}
     provider="keycloak-oidc"
+    {{- end }}
     redirect_url="https://placeholder/oauth2/callback"
+    {{- if .Values.gitea.enable }}
+    oidc_issuer_url="{{ $giteaUrl }}"
+    {{- else }}
     oidc_issuer_url="{{ $keycloakUrl }}realms/{{ tpl (.Values.keycloak.realm | toString) . }}"
+    {{- end }}
     ssl_insecure_skip_verify=true
     # Client config
+    {{- if .Values.gitea.enable }}
+    client_id="{{ tpl (.Values.gitea.clientId | toString) . }}"
+    client_secret="{{ tpl (.Values.gitea.clientSecret | toString) . }}"
+    cookie_secret="{{ tpl (.Values.gitea.cookieSecret | toString) . }}"
+    pass_access_token=true
+    {{- else }}
     client_id="{{ tpl (.Values.keycloak.clientId | toString) . }}"
     client_secret="{{ tpl (.Values.keycloak.clientSecret | toString) . }}"
     cookie_secret="{{ tpl (.Values.keycloak.cookieSecret | toString) . }}"
+    {{- end }}
     cookie_secure="false"
     #proxy_prefix=""
     # Upstream config
@@ -43,7 +66,7 @@ data:
       {{- if gt (len $whitelistDomains) 0 }}
     whitelist_domains={{ toJson $whitelistDomains }}
       {{- else }}
-    whitelist_domains=["{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}:*","{{ $keycloakHost }}:*"]
+    whitelist_domains=["{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}:*","{{ $oauthHost }}:*"]
       {{- end }}
     {{- else }}
       {{- if gt (len $cookieDomains) 0 }}
@@ -54,7 +77,7 @@ data:
       {{- if gt (len $whitelistDomains) 0 }}
     whitelist_domains={{ toJson $whitelistDomains }}
       {{- else }}
-    whitelist_domains=["{{ tpl (.Values.hosts.configuration.instance | toString) . }}:*","{{ $keycloakHost }}:*"]
+    whitelist_domains=["{{ tpl (.Values.hosts.configuration.instance | toString) . }}:*","{{ $oauthHost }}:*"]
       {{- end }}
     {{- end }}
     custom_templates_dir="/templates"
