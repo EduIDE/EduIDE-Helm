@@ -31,6 +31,9 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
+      - name: AGENTS.md does not reference missing paths
+        run: ./scripts/check-agents-md.sh
+
       - name: helm lint
         run: |
           set -euo pipefail
