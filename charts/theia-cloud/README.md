@@ -81,8 +81,8 @@ A Helm chart for Theia Cloud
 | monitor.activityTracker.enable | bool | `true` | Should the activityTracker module be enabled |
 | monitor.activityTracker.interval | int | `1` | Minutes between re-pinging the pods |
 | monitor.enable | bool | `true` | Should the monitor be enabled |
-| oauth2Proxy | object | `{"cookieDomains":[],"sslInsecureSkipVerify":true,"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
-| oauth2Proxy.sslInsecureSkipVerify | bool | `true` | Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider (sets ssl_insecure_skip_verify). Defaults to true for backwards compatibility. Set to false to enforce certificate validation when the provider uses a trusted certificate. |
+| oauth2Proxy | object | `{"cookieDomains":[],"sslInsecureSkipVerify":false,"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
+| oauth2Proxy.sslInsecureSkipVerify | bool | `false` | Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider (sets ssl_insecure_skip_verify). Defaults to false to enforce certificate validation. Set to true only when the provider uses a self-signed or otherwise untrusted certificate. |
 | operator | object | (see details below) | Values related to the operator |
 | operator.bandwidthLimiter | string | `"K8SANNOTATION"` | Whether Theia Cloud shall limit network speed. This might not be fully supported on all cloud provider/in all clusters. Possible values: - K8SANNOTATION                   Set via kubernetes annotations (kubernetes.io/egress-bandwidth and kubernetes.io/ingress-bandwidth) - WONDERSHAPER                    Set via wondershaper init container - K8SANNOTATIONANDWONDERSHAPER    Set Kubernetes annotations and use wondershaper init container |
 | operator.cloudProvider | string | `"K8S"` | Select your cloud provider. Possible values: - K8S      Plain Kubernetes - MINIKUBE Local deployment on Minikube |
