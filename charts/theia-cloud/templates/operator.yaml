@@ -43,6 +43,9 @@ spec:
           - "--keycloakClientId"
           - "{{ tpl (.Values.keycloak.clientId | toString) . }}"
           {{- end }}
+          {{- if .Values.gitea.enable }}
+          - "--gitea"
+          {{- end }}
           {{ if .Values.operator.eagerStart }}- "--eagerStart"{{ end }}
           - "--cloudProvider"
           - {{ tpl (.Values.operator.cloudProvider | toString) . }}
