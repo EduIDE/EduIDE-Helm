@@ -8,37 +8,10 @@ spec:
   gatewayClassName: {{ .Values.gateway.className }}
   listeners:
   {{- if .Values.gateway.tls }}
-  {{- if .Values.hosts.usePaths }}
-  - name: https-base
-    protocol: HTTPS
-    port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - kind: Secret
-        name: ws-cert-secret
-  {{- range $wildcard := .Values.hosts.allWildcardInstances }}
-  - name: {{ printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" $wildcard "-") | trunc 63 | trimSuffix "-" }}
-    protocol: HTTPS
-    port: {{ $.Values.gateway.httpsPort }}
-    hostname: {{ printf "%s%s" (tpl $wildcard $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
-    tls:
-      mode: Terminate
-      certificateRefs:
-      {{- if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}
-      - kind: Secret
-        name: {{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}
-      {{- else }}
-      - kind: Secret
-        name: ws-cert-secret
-      {{- end }}
-  {{- end }}
-  {{- else }}
   - name: https-instances
     protocol: HTTPS
     port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.instance .) (tpl .Values.hosts.configuration.baseHost .) }}
+    hostname: {{ include "theia-cloud.host.instance" . }}
     tls:
       mode: Terminate
       certificateRefs:
@@ -47,7 +20,7 @@ spec:
   - name: https-service
     protocol: HTTPS
     port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.service .) (tpl .Values.hosts.configuration.baseHost .) }}
+    hostname: {{ include "theia-cloud.host.service" . }}
     tls:
       mode: Terminate
       certificateRefs:
@@ -57,7 +30,7 @@ spec:
   - name: https-landing
     protocol: HTTPS
     port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ printf "%s.%s" (tpl .Values.hosts.configuration.landing .) (tpl .Values.hosts.configuration.baseHost .) }}
+    hostname: {{ include "theia-cloud.host.landing" . }}
     tls:
       mode: Terminate
       certificateRefs:
@@ -65,21 +38,15 @@ spec:
         name: landing-page-cert-secret
   {{- end }}
   {{- range $wildcard := .Values.hosts.allWildcardInstances }}
-  - name: {{ printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" $wildcard "-") | trunc 63 | trimSuffix "-" }}
+  - name: {{ include "theia-cloud.gateway.wildcardListenerName" (dict "wildcard" $wildcard) }}
     protocol: HTTPS
     port: {{ $.Values.gateway.httpsPort }}
-    hostname: {{ printf "%s%s.%s" (tpl $wildcard $) (tpl $.Values.hosts.configuration.instance $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
+    hostname: {{ printf "%s%s" (tpl $wildcard $) (include "theia-cloud.host.instance" $) | quote }}
     tls:
       mode: Terminate
       certificateRefs:
-      {{- if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}
       - kind: Secret
-        name: {{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}
-      {{- else }}
-      - kind: Secret
-        name: ws-cert-secret
-      {{- end }}
-  {{- end }}
+        name: {{ if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}{{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}{{ else }}ws-cert-secret{{ end }}
   {{- end }}
   {{- end }}
   {{- if .Values.gateway.httpEnabled }}

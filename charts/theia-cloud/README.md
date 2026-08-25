@@ -1,6 +1,6 @@
 # theia-cloud
 
-![Version: 1.4.0-next.7](https://img.shields.io/badge/Version-1.4.0--next.7-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0-next](https://img.shields.io/badge/AppVersion-1.4.0--next-informational?style=flat-square)
+![Version: 1.5.0-next.0](https://img.shields.io/badge/Version-1.5.0--next.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0-next](https://img.shields.io/badge/AppVersion-1.4.0--next-informational?style=flat-square)
 
 A Helm chart for Theia Cloud
 
@@ -41,14 +41,11 @@ A Helm chart for Theia Cloud
 | hosts | object | (see details below) | You may adjust the hostname below. |
 | hosts.allWildcardInstances | list | `[]` | all additional wildcard hostnames that may be required in the launched Theia-applications, e.g. "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews. Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from all app definitions need to be added. IMPORTANT: If this gets updated, the helm chart needs to be re-installed because helm upgrade will not properly update this at the moment. These are required to configure TLS (if enabled via gateway.tls == true) I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured. |
 | hosts.configuration | object | (see details below) | Configuration for the hostnames. Contains the baseHost and afixes for all services |
-| hosts.configuration.baseHost | string | `"192.168.39.173.nip.io"` | baseHost configures the host for all services. Depending on hosts.usePaths the services will be prepended as a subdomain or appended as a path |
+| hosts.configuration.baseHost | string | `"192.168.39.173.nip.io"` | baseHost configures the host for all services. Service names are prepended as subdomains, e.g. service.<landing>.<baseHost> |
 | hosts.configuration.instance | string | `"instances"` | afix for deployed instances |
 | hosts.configuration.landing | string | `"trynow"` | afix of the landing page |
 | hosts.configuration.service | string | `"servicex"` | afix of the REST service |
-| hosts.usePaths | bool | `false` | Use paths configures that all services should run on the same host but on different paths. true uses paths false uses an explicit host for each service |
 | imagePullPolicy | string | `"Always"` | The default imagePullPolicy for containers of theia cloud. Can be overridden for individual components by specifying the imagePullPolicy variable there. Possible values: - Always - IfNotPresent - Never |
-| issuer | object | (see details below) | Values related to certificates/Cert-manager |
-| issuer.email | string | `"mmorlock@example.com"` | EMail address of the certificate issuer. |
 | keycloak | object | (see details below) | Values related to Keycloak |
 | keycloak.adminGroup | string | `"theia-cloud/admin"` | The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints. |
 | keycloak.authUrl | string | `"https://keycloak.url/auth/"` | Key cloak auth URL. Only has to be specified when enable: true |

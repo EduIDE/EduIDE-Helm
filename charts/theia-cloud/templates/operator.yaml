@@ -51,25 +51,13 @@ spec:
           - "--wondershaperImage"
           - {{ tpl (.Values.operator.wondershaperImage | toString) . }}
           - "--serviceUrl"
-          {{- if .Values.hosts.usePaths }}
-          - {{ tpl (.Values.service.protocol | toString) . }}://{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}/{{ tpl (.Values.hosts.configuration.service | toString) . }}
-          {{- else}}
-          - {{ tpl (.Values.service.protocol | toString) . }}://{{ tpl (.Values.hosts.configuration.service | toString) . }}.{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
-          {{- end }}
+          - {{ include "theia-cloud.url.service" . }}
           - "--sessionsPerUser"
           - "{{ tpl (.Values.operator.sessionsPerUser | toString) . }}"
           - "--serviceAuthToken"
           - {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . }}
-          {{- if .Values.hosts.usePaths }}
           - "--instancesHost"
-          - "{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}"
-          - "--usePaths"
-          - "--instancesPath"
-          - "{{ tpl (.Values.hosts.configuration.instance | toString) . }}"
-          {{- else }}
-          - "--instancesHost"
-          - "{{ tpl (.Values.hosts.configuration.instance | toString) . }}.{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}"
-          {{- end }}
+          - "{{ include "theia-cloud.host.instance" . }}"
           - "--storageClassName"
           - "{{ tpl (.Values.operator.storageClassName | toString) . }}"
           - "--requestedStorage"

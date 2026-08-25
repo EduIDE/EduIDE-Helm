@@ -1,4 +1,10 @@
 {{- if and .Values.gateway.enabled .Values.gateway.routes.enabled }}
+{{/*
+  rules is intentionally empty. The operator patches rules into this route at
+  runtime, one per live session. Adding a placeholder rule here would be
+  reconciled away, and a Go-template comment is used so the note does not end
+  up in the rendered manifest.
+*/}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -8,16 +14,7 @@ spec:
   parentRefs:
 {{ include "theia-cloud.gateway.parentRefs" . | nindent 2 }}
   hostnames:
-  {{- if .Values.hosts.usePaths }}
-  - {{ tpl (.Values.hosts.configuration.baseHost | toString) . }}
-  {{- range .Values.hosts.allWildcardInstances }}
-  - {{ printf "%s%s" (tpl . $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
-  {{- end }}
-  {{- else }}
-  - {{ printf "%s.%s" (tpl .Values.hosts.configuration.instance .) (tpl .Values.hosts.configuration.baseHost .) }}
-  {{- range .Values.hosts.allWildcardInstances }}
-  - {{ printf "%s%s.%s" (tpl . $) (tpl $.Values.hosts.configuration.instance $) (tpl $.Values.hosts.configuration.baseHost $) | quote }}
-  {{- end }}
-  {{- end }}
+  - {{ include "theia-cloud.host.instance" . }}
+  {{- include "theia-cloud.host.wildcardInstances" . | trim | nindent 2 }}
   rules: []
 {{- end }}
