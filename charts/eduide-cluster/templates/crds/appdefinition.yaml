@@ -3,6 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   name: appdefinitions.theia.cloud
   annotations:
+    # Never delete on uninstall: that would take every live Session,
+    # Workspace and AppDefinition on the cluster with it.
+    helm.sh/resource-policy: keep
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/conversion-webhook-certificate
 spec:
   group: theia.cloud

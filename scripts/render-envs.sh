@@ -42,8 +42,13 @@ if [[ -n "$CHARTS_ARG" ]]; then
 else
   CHARTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts"
 fi
-[[ -d "$CHARTS_DIR/theia-cloud" ]] || {
-  echo "No theia-cloud chart under $CHARTS_DIR" >&2
+# The tenant chart was called theia-cloud before the split into
+# eduide (tenant) and eduide-cluster (cluster-scoped). Accept both so this
+# script can render a base checkout that predates the rename.
+TENANT_CHART=eduide
+[[ -d "$CHARTS_DIR/$TENANT_CHART" ]] || TENANT_CHART=theia-cloud
+[[ -d "$CHARTS_DIR/$TENANT_CHART" ]] || {
+  echo "No eduide or theia-cloud chart under $CHARTS_DIR" >&2
   exit 2
 }
 echo "rendering from $CHARTS_DIR"
@@ -76,7 +81,7 @@ for dir in "$DEPLOY"/deployments/*/; do
   yq -r 'explode(.) | ."theia-cloud"' "$dir/values.yaml" > "$values"
   ns="$(yq -r '.hosts.configuration.landing // "default"' "$values")"
 
-  if ! helm template theia-cloud "$CHARTS_DIR/theia-cloud" \
+  if ! helm template theia-cloud "$CHARTS_DIR/$TENANT_CHART" \
         -f "$values" --namespace "$ns" 2> "$OUT/$env_name.err" | mask > "$OUT/$env_name.yaml"; then
     echo "RENDER FAILED for $env_name:" >&2
     cat "$OUT/$env_name.err" >&2
@@ -88,7 +93,7 @@ for dir in "$DEPLOY"/deployments/*/; do
 done
 
 # The cluster-scoped charts take no per-environment values.
-for chart in theia-cloud-base theia-cloud-crds; do
+for chart in eduide-cluster; do
   helm template "$chart" "$CHARTS_DIR/$chart" --namespace default | mask > "$OUT/_$chart.yaml"
   printf '  rendered %-45s %s resources\n' "$chart" "$(grep -c '^kind:' "$OUT/_$chart.yaml" || true)"
   rendered=$((rendered + 1))

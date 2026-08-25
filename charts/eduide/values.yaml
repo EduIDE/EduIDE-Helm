@@ -434,3 +434,7 @@ preloading:
   # -- Optional: Override the imagePullPolicy for the image preloading containers.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
+
+# -- Skip the check that eduide-cluster is installed on this cluster.
+# Only useful for rendering against a cluster that intentionally lacks it.
+skipPreflight: false

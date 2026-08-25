@@ -48,9 +48,8 @@ jobs:
           mkdir -p dist
 
           charts=(
-            theia-cloud-base
-            theia-cloud-crds
-            theia-cloud
+            eduide-cluster
+            eduide
           )
 
           for chart in "${charts[@]}"; do
@@ -112,9 +111,8 @@ jobs:
           }
 
           charts=(
-            theia-cloud-base
-            theia-cloud-crds
-            theia-cloud
+            eduide-cluster
+            eduide
           )
 
           for chart in "${charts[@]}"; do

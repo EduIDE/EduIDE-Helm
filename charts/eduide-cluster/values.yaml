@@ -1,3 +1,10 @@
+# Cluster-scoped half of EduIDE. Installed ONCE per cluster.
+#
+# The tenant chart (eduide) is installed once per environment and owns
+# nothing in here. Splitting them is what removes the race where three
+# concurrent tenant deploys all reinstalled the same cluster-scoped
+# objects into the default namespace.
+
 issuerca:
   # -- whether to install the CA certificate signer
   enable: true
@@ -31,3 +38,15 @@ servicerole:
 certmanager:
   # -- the namespace where the cert-manager is installed
   namespace: cert-manager
+
+# --- CRDs and the conversion webhook ---
+conversion:
+  # -- The image of the webhook container
+  image: theiacloud/theia-cloud-conversion-webhook:1.2.0-next
+  # -- The location of where the certificates are mounted into the container (needs to match with application.properties)
+  certMountPath: /etc/webhook/certs
+  # -- The certificate reload period in seconds
+  certReloadPeriod: 604800
+
+# -- The cluster issuer to use for the certificate
+clusterIssuer: theia-cloud-selfsigned-issuer

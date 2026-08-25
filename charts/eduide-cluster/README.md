@@ -1,8 +1,9 @@
-# theia-cloud-base
+# eduide-cluster
 
-![Version: 1.0.0-rc0](https://img.shields.io/badge/Version-1.0.0--rc0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0-next](https://img.shields.io/badge/AppVersion-1.4.0--next-informational?style=flat-square)
+![Version: 1.0.0-rc0](https://img.shields.io/badge/Version-1.0.0--rc0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.0.0-rc0](https://img.shields.io/badge/AppVersion-1.0.0--rc0-informational?style=flat-square)
 
-Theia-cloud base chart
+Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
+cert-manager issuers. Install once per cluster, before any eduide release.
 
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
@@ -12,6 +13,10 @@ Theia-cloud base chart
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | certmanager.namespace | string | `"cert-manager"` | the namespace where the cert-manager is installed |
+| clusterIssuer | string | `"theia-cloud-selfsigned-issuer"` | The cluster issuer to use for the certificate |
+| conversion.certMountPath | string | `"/etc/webhook/certs"` | The location of where the certificates are mounted into the container (needs to match with application.properties) |
+| conversion.certReloadPeriod | int | `604800` | The certificate reload period in seconds |
+| conversion.image | string | `"theiacloud/theia-cloud-conversion-webhook:1.2.0-next"` | The image of the webhook container |
 | issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
 | issuerca.enable | bool | `true` | whether to install the CA certificate signer |
 | issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |

@@ -1,6 +1,8 @@
 apiVersion: v2
-name: theia-cloud
-description: A Helm chart for Theia Cloud
+name: eduide
+description: |
+  EduIDE tenant release: operator, REST service, landing page and routes for one
+  environment. Requires eduide-cluster to be installed on the cluster first.
 # A chart can be either an 'application' or a 'library' chart.
 #
 # Application charts are a collection of templates that can be packaged into versioned archives
