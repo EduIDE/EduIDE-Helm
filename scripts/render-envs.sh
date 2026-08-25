@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # Render every real environment against the charts in this repo.
 #
-#   ./scripts/render-envs.sh <output-dir> [path-to-EduIDE-deployment]
+#   ./scripts/render-envs.sh <output-dir> [path-to-EduIDE-deployment] [charts-dir]
+#
+# charts-dir defaults to the charts/ next to this script. The render-diff job
+# passes it explicitly so that ONE copy of this script renders both the base and
+# the head chart trees. Rendering each side with its own copy of the script would
+# fold script changes (the mask list, say) into the diff, when the only thing the
+# job is meant to surface is what the charts do differently.
 #
 # Used by the render-diff CI job, which runs this on the PR base and head and
 # diffs the two trees. That diff answers the only question that matters when
@@ -17,8 +23,9 @@
 
 set -euo pipefail
 
-OUT="${1:?usage: render-envs.sh <output-dir> [deployment-repo]}"
+OUT="${1:?usage: render-envs.sh <output-dir> [deployment-repo] [charts-dir]}"
 DEPLOY="${2:-}"
+CHARTS_ARG="${3:-}"
 
 if [[ -z "$DEPLOY" ]]; then
   for candidate in ../EduIDE-deployment ../../EduIDE-deployment ./EduIDE-deployment; do
@@ -30,7 +37,16 @@ fi
   exit 2
 }
 
-CHARTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts"
+if [[ -n "$CHARTS_ARG" ]]; then
+  CHARTS_DIR="$(cd "$CHARTS_ARG" && pwd)"
+else
+  CHARTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/charts"
+fi
+[[ -d "$CHARTS_DIR/theia-cloud" ]] || {
+  echo "No theia-cloud chart under $CHARTS_DIR" >&2
+  exit 2
+}
+echo "rendering from $CHARTS_DIR"
 mkdir -p "$OUT"
 
 # --- MASKS ---------------------------------------------------------------

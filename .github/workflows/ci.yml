@@ -145,13 +145,16 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
+      # Both renders use the HEAD copy of the script, pointed at each side's
+      # charts. Using each side's own script would fold script changes into the
+      # diff; the job exists to show what the CHARTS do differently.
       - name: Render base
         id: base
         continue-on-error: true
-        run: ./head/scripts/render-envs.sh "$PWD/out-base" "$PWD/deployment"
+        run: ./head/scripts/render-envs.sh "$PWD/out-base" "$PWD/deployment" "$PWD/base/charts"
 
       - name: Render head
-        run: ./head/scripts/render-envs.sh "$PWD/out-head" "$PWD/deployment"
+        run: ./head/scripts/render-envs.sh "$PWD/out-head" "$PWD/deployment" "$PWD/head/charts"
 
       - name: Diff
         id: diff
