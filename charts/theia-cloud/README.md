@@ -1,6 +1,6 @@
 # theia-cloud
 
-![Version: 1.2.0-next.2](https://img.shields.io/badge/Version-1.2.0--next.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0-next](https://img.shields.io/badge/AppVersion-1.2.0--next-informational?style=flat-square)
+![Version: 1.4.0-next.7](https://img.shields.io/badge/Version-1.4.0--next.7-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0-next](https://img.shields.io/badge/AppVersion-1.4.0--next-informational?style=flat-square)
 
 A Helm chart for Theia Cloud
 
@@ -25,8 +25,21 @@ A Helm chart for Theia Cloud
 | demoApplication.name | string | `"theiacloud/theia-cloud-demo:1.2.0-next"` | The name of docker image to be used |
 | demoApplication.pullSecret | string | `""` | the image pull secret. Leave empty if registry is public |
 | demoApplication.timeout | string | `"30"` | Limit in minutes |
+| gateway | object | `{"className":"envoy","create":true,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
+| gateway.className | string | `"envoy"` | GatewayClassName to use (Envoy Gateway default is typically "envoy") |
+| gateway.create | bool | `true` | Whether to render a Gateway resource in the release namespace. Set to false when using a centralized shared Gateway in another namespace. |
+| gateway.enabled | bool | `true` | Master switch for Gateway API resources. |
+| gateway.httpEnabled | bool | `false` | Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects) |
+| gateway.httpsPort | int | `443` | HTTPS listener port |
+| gateway.instancesRouteName | string | `"theia-cloud-demo-ws-route"` | Name of the HTTPRoute that is updated to publish new Theia application instances |
+| gateway.instancesWildcardSecretNames | object | `{}` | Additional wildcard hostnames and optional dedicated TLS secret names Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`. |
+| gateway.name | string | `"theia-cloud-gateway"` | Name of the Gateway resource |
+| gateway.parentRefs | list | `[]` | Optional explicit parentRefs for HTTPRoutes. If empty, routes attach to `gateway.name` in the same namespace.  Example for a centralized shared gateway: parentRefs:   - name: theia-shared-gateway     namespace: gateway-system |
+| gateway.routes.enabled | bool | `true` | Whether to render HTTPRoute resources. |
+| gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
+| gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
 | hosts | object | (see details below) | You may adjust the hostname below. |
-| hosts.allWildcardInstances | list | `[]` | all additional wildcard hostnames that may be required in the launched Theia-applications, e.g. "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews. Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from all app definitions need to be added. IMPORTANT: If this gets updated, the helm chart needs to be re-installed because helm upgrade will not properly update this at the moment. These are required to configure TLS (if enabled via ingress.tls == true) I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured. |
+| hosts.allWildcardInstances | list | `[]` | all additional wildcard hostnames that may be required in the launched Theia-applications, e.g. "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews. Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from all app definitions need to be added. IMPORTANT: If this gets updated, the helm chart needs to be re-installed because helm upgrade will not properly update this at the moment. These are required to configure TLS (if enabled via gateway.tls == true) I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured. |
 | hosts.configuration | object | (see details below) | Configuration for the hostnames. Contains the baseHost and afixes for all services |
 | hosts.configuration.baseHost | string | `"192.168.39.173.nip.io"` | baseHost configures the host for all services. Depending on hosts.usePaths the services will be prepended as a subdomain or appended as a path |
 | hosts.configuration.instance | string | `"instances"` | afix for deployed instances |
@@ -34,17 +47,6 @@ A Helm chart for Theia Cloud
 | hosts.configuration.service | string | `"servicex"` | afix of the REST service |
 | hosts.usePaths | bool | `false` | Use paths configures that all services should run on the same host but on different paths. true uses paths false uses an explicit host for each service |
 | imagePullPolicy | string | `"Always"` | The default imagePullPolicy for containers of theia cloud. Can be overridden for individual components by specifying the imagePullPolicy variable there. Possible values: - Always - IfNotPresent - Never |
-| ingress | object | (see details below) | Values to influence the ingresses |
-| ingress.addTLSSecretName | bool | `true` | whether the default Theia Cloud tls secret names should be used. If false no tls secret name will be set on the ingress only needed when ingress.tls == true |
-| ingress.certManagerAnnotations | bool | `true` | When set to true the cert-manager.io annotations will be set. Only used when ingress.addTLSSecretName === true When false certificate management is handled outside of Theia Cloud. |
-| ingress.clusterIssuer | string | `"letsencrypt-prod"` | The cluster issuer to use Only needed when ingress.certManagerAnnotations is true |
-| ingress.instances | object | `{"allWildcardSecretNames":{},"configurationSnippets":["proxy_set_header 'X-Forwarded-Uri' $request_uri"],"name":"theia-cloud-demo-ws-ingress","proxyBodySize":"1m"}` | Values to influence the instances ingress |
-| ingress.instances.allWildcardSecretNames | object | `{}` | All additional wildcard hostnames and the respective TLS secret names. Use this for wildcard hostnames that should use a TLS certificate with a `secretName` different from the default one. Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`. |
-| ingress.instances.configurationSnippets | list | `["proxy_set_header 'X-Forwarded-Uri' $request_uri"]` | Additional configuration to the ingress configuration via the `nginx.ingress.kubernetes.io/configuration-snippet` annotation. One entry in this array results in a line for the annotation. Do not add a semicolon at the end of the line here, it is automatically added. Note: Since ingress-nginx version 1.10 this annotation needs to be enabled. See [this README](../../README.md#cluster-prerequisites) for more information. |
-| ingress.instances.name | string | `"theia-cloud-demo-ws-ingress"` | The name of the ingress which will be updated to publish new theia application. If this is not existing it will be created. You may chose to set the ingress up yourself and point Theia Cloud to the ingress via the name |
-| ingress.instances.proxyBodySize | string | `"1m"` | Sets the maximum allowed size of the client request body inside the application (e.g. file uploads in Theia). Defaults to 1m. Setting size to 0 disables checking of client request body size. |
-| ingress.theiaCloudCommonName | bool | `false` | When set to true the cert-manager.io/common-name annotation will be set. This is only required when the issued certificate by the cert-manager misses a common-name Only needed when ingress.certManagerAnnotations is true |
-| ingress.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (e.g. via a Load Balancer) (false) |
 | issuer | object | (see details below) | Values related to certificates/Cert-manager |
 | issuer.email | string | `"mmorlock@example.com"` | EMail address of the certificate issuer. |
 | keycloak | object | (see details below) | Values related to Keycloak |
@@ -56,11 +58,12 @@ A Helm chart for Theia Cloud
 | keycloak.enable | bool | `false` | Whether keycloak authentication shall be used |
 | keycloak.realm | string | `"TheiaCloud"` | The Keycloak Realm. Only has to be specified when enable: true |
 | landingPage | object | (see details below) | Values related to the landing page |
-| landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name. The value contains the label shown in the UI and may optionally include `image` or `Image` to override the logo name/path forwarded to the landing page config. Example: different-app-definition: label: "Different App Definition" image: "different-app-definition" |
+| landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name The value contains the label shown in the UI and may optionally contain an image override that is forwarded to the landing page config.  Example: different-app-definition:   label: "Different App Definition"   image: "different-app-definition"   visible: false further-app-definition:   label: "Further App Definition" |
 | landingPage.appDefinition | string | `"theia-cloud-demo"` | the app id to launch |
 | landingPage.disableInfo | bool | `false` | Should showing info title and text below the launch button be disabled true hides the info title and text false shows the info title and text |
 | landingPage.enabled | bool | `true` | Whether the landing page shall be enabled |
 | landingPage.ephemeralStorage | bool | `true` | If set to true no persisted storage is used when creating sessions on the landing page. Set to false if you want to use persisted storage. |
+| landingPage.footerLinks | string | (see details below) | Optional: Customize footer links on the landing page All footer link configurations are optional. If not provided, default values will be used. |
 | landingPage.image | string | `"theiacloud/theia-cloud-landing-page:1.2.0-next"` | the landing page image to use |
 | landingPage.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the landing page's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | landingPage.imagePullSecret | string | `nil` | Optional: the image pull secret |
@@ -70,6 +73,8 @@ A Helm chart for Theia Cloud
 | landingPage.logo | string | `"logos/theiablueprint.svg"` | The logo of the application that should be displayed on the landing pages |
 | landingPage.logoData | string | `nil` | set landingPage.logoData=$(cat path/to/file.svg | base64 -w 0 -) Another way is to directly add the base64 string to the values file. |
 | landingPage.logoFileExtension | string | `"svg"` | The file extension of the logo. Must be set to match the logo respectively the logoData. This is required because browsers cannot show a binary image (e.g. png) with a svg ending and vice-versa. |
+| landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
+| landingPage.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the landing page deployment. |
 | monitor | object | (see details below) | Values to influence the monitor initialization on the operator |
 | monitor.activityTracker | object | (see details below) | Values to influence the activityTracker module |
 | monitor.activityTracker.enable | bool | `true` | Should the activityTracker module be enabled |
@@ -78,8 +83,16 @@ A Helm chart for Theia Cloud
 | oauth2Proxy | object | `{"cookieDomains":[],"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
 | operator | object | (see details below) | Values related to the operator |
 | operator.bandwidthLimiter | string | `"K8SANNOTATION"` | Whether Theia Cloud shall limit network speed. This might not be fully supported on all cloud provider/in all clusters. Possible values: - K8SANNOTATION                   Set via kubernetes annotations (kubernetes.io/egress-bandwidth and kubernetes.io/ingress-bandwidth) - WONDERSHAPER                    Set via wondershaper init container - K8SANNOTATIONANDWONDERSHAPER    Set Kubernetes annotations and use wondershaper init container |
+| operator.buildCache | object | `{"bazelUrl":"","enablePush":false,"enabled":false,"gradleUrl":""}` | Build cache configuration |
+| operator.buildCache.bazelUrl | string | `""` | The URL of the remote Bazel build cache server. |
+| operator.buildCache.enablePush | bool | `false` | Whether sessions are allowed to push to the build cache. |
+| operator.buildCache.enabled | bool | `false` | Whether to enable build caching |
+| operator.buildCache.gradleUrl | string | `""` | The URL of the remote Gradle build cache server. |
 | operator.cloudProvider | string | `"K8S"` | Select your cloud provider. Possible values: - K8S      Plain Kubernetes - MINIKUBE Local deployment on Minikube |
 | operator.continueOnException | bool | `false` | Whether the operator should stop in cases where an exception is not handled |
+| operator.dependencyCache | object | `{"enabled":false,"url":""}` | Dependency cache configuration (Reposilite) |
+| operator.dependencyCache.enabled | bool | `false` | Whether to enable the dependency cache |
+| operator.dependencyCache.url | string | `""` | The URL of the dependency cache server. |
 | operator.eagerStart | bool | `false` | Whether theia applications shall be started eager. This means that the application is already running without a user. When a user requests a new session, one of the already launched ones is assigned.  Currently only false is fully supported. |
 | operator.image | string | `"theiacloud/theia-cloud-operator:1.2.0-next"` | The operator image |
 | operator.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the operator's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
@@ -90,6 +103,8 @@ A Helm chart for Theia Cloud
 | operator.oAuth2ProxyVersion | string | `"v7.12.0"` | The version to use of the quay.io/oauth2-proxy/oauth2-proxy image |
 | operator.replicas | int | `1` | Number of operator instances to create |
 | operator.requestedStorage | string | `"250Mi"` | The amount of requested storage for each persistent volume claim (PVC) for workspaces. This is directly passed to created PVCs and must be a valid Kubernetes quantity. See https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/ |
+| operator.sentry | object | (see details below) | Values related to Sentry on the operator. |
+| operator.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the operator deployment. |
 | operator.sessionsPerUser | string | `"1"` | Set the number of active sessions a single user can launch |
 | operator.storageClassName | string | `"default"` | The name of the storage class for persistent volume claims for workspaces. This storage class must be present on the cluster. Most cloud providers offer a default storage class without additional configuration. |
 | operator.wondershaperImage | string | `"theiacloud/theia-cloud-wondershaper:1.2.0-next"` | If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container |
@@ -97,16 +112,17 @@ A Helm chart for Theia Cloud
 | preloading | object | (see details below) | Values to configure preloading of images on Kubernetes nodes. |
 | preloading.enable | bool | `true` | Is image preloading enabled. |
 | preloading.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the image preloading containers. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
-| preloading.images | list | `[]` | Images to preload. Images must support running /bin/sh. If the list is empty and demoApplication.install == true, demoApplication.name is automatically added. |
+| preloading.images | list | `[]` | Images to preload. Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). If the list is empty and demoApplication.install == true, demoApplication.name is automatically added. |
 | service | object | (see details below) | Values of the Theia Cloud REST service |
+| service.adminApiTokenSecret | object | `{"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | Reference to an existing Kubernetes Secret containing the bearer token for admin API token protected endpoints. The chart does not create or manage this Secret. |
 | service.authToken | string | `"asdfghjkl"` | The service authentication token used in the communication between website and REST-API for spam mitigation. This token is public. Please choose a random generated string. |
-| service.adminApiTokenSecret.key | string | `"ADMIN_API_TOKEN"` | Secret key containing the admin API token. |
-| service.adminApiTokenSecret.name | string | `"service-admin-api-token"` | Name of an existing Kubernetes Secret containing the admin API token. The chart does not create or manage this Secret. |
 | service.image | string | `"theiacloud/theia-cloud-service:1.2.0-next"` | The image to use |
 | service.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the service's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | service.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | service.port | int | `8081` | service port (default: 8081) |
 | service.protocol | string | `"https"` | protocol of the REST-API |
+| service.sentry | object | (see details below) | Values related to Sentry on the service. |
+| service.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the service deployment. |
 | servicerole.name | string | `"service-api-access"` |  |
 
 ----------------------------------------------
