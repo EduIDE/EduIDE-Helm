@@ -15,6 +15,14 @@ data:
       keycloakAuthUrl: "{{ tpl (.Values.keycloak.authUrl | toString) . }}",
       keycloakRealm: "{{ tpl (.Values.keycloak.realm | toString) . }}",
       keycloakClientId: "{{ tpl (.Values.keycloak.clientId | toString) . }}",
+      useGiteaOidc: {{ tpl (.Values.gitea.enable | toString) . }},
+      {{- if .Values.gitea.enable }}
+      giteaIssuerUrl: "{{ tpl (.Values.gitea.issuerUrl | toString) . }}",
+      giteaClientId: "{{ tpl (.Values.gitea.clientId | toString) . }}",
+      {{- else }}
+      giteaIssuerUrl: "",
+      giteaClientId: "",
+      {{- end }}
       {{- if .Values.hosts.usePaths }}
       serviceUrl: "{{ tpl (.Values.service.protocol | toString) . }}://{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}/{{ tpl (.Values.hosts.configuration.service | toString) . }}",
       {{- else }}

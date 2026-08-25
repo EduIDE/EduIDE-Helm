@@ -242,8 +242,38 @@ keycloak:
   # for how to generate a strong cookie secret.
   cookieSecret: "OQINaROshtE9TcZkNAm5Zs2Pv3xaWytBmc5W7sPX7ws="
 
+# -- Values related to Gitea / generic OIDC authentication.
+# Mutually exclusive with keycloak (a single oauth2-proxy provider is supported per session).
+# @default -- (see details below)
+gitea:
+  # -- Whether Gitea / generic OIDC authentication shall be used
+  enable: false
+
+  # -- The Gitea base URL used as the OIDC issuer. Only has to be specified when enable: true.
+  # This must be the issuer base URL without a trailing slash and without a realms path,
+  # e.g. "https://gitea.example.com".
+  issuerUrl: "https://gitea.example.com"
+
+  # -- The client-id. Only has to be specified when enable: true
+  clientId: "theia-cloud"
+
+  # -- The client secret configured for the OIDC application in Gitea.
+  # Must be provided (rendering fails when gitea.enable is true and this is empty).
+  clientSecret: ""
+
+  # -- The cookie secret. This should not be public! Must be provided when enable: true
+  # (rendering fails when gitea.enable is true and this is empty).
+  # See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret
+  # for how to generate a strong cookie secret.
+  cookieSecret: ""
+
 # -- Values related to OAuth2 Proxy configuration
 oauth2Proxy:
+  # -- Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider
+  # (sets ssl_insecure_skip_verify). Defaults to false to enforce certificate validation.
+  # Set to true only when the provider uses a self-signed or otherwise untrusted certificate.
+  sslInsecureSkipVerify: false
+
   # Allowed redirect domains for OAuth2 Proxy (controls whitelist_domains).
   # When empty, defaults are used:
   #   if hosts.usePaths: [ "<baseHost>:*", "<keycloak host>:*" ]
