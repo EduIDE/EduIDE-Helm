@@ -257,16 +257,23 @@ gitea:
   # -- The client-id. Only has to be specified when enable: true
   clientId: "theia-cloud"
 
-  # -- The oaid client secret configured for the OIDC application in Gitea.
-  clientSecret: "publicbutoauth2proxywantsasecret"
+  # -- The client secret configured for the OIDC application in Gitea.
+  # Must be provided (rendering fails when gitea.enable is true and this is empty).
+  clientSecret: ""
 
-  # -- The cookie secret. This should not be public! Only has to be specified when enable: true
+  # -- The cookie secret. This should not be public! Must be provided when enable: true
+  # (rendering fails when gitea.enable is true and this is empty).
   # See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret
   # for how to generate a strong cookie secret.
-  cookieSecret: "OQINaROshtE9TcZkNAm5Zs2Pv3xaWytBmc5W7sPX7ws="
+  cookieSecret: ""
 
 # -- Values related to OAuth2 Proxy configuration
 oauth2Proxy:
+  # -- Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider
+  # (sets ssl_insecure_skip_verify). Defaults to true for backwards compatibility.
+  # Set to false to enforce certificate validation when the provider uses a trusted certificate.
+  sslInsecureSkipVerify: true
+
   # Allowed redirect domains for OAuth2 Proxy (controls whitelist_domains).
   # When empty, defaults are used:
   #   if hosts.usePaths: [ "<baseHost>:*", "<keycloak host>:*" ]
