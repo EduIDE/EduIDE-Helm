@@ -1,0 +1,230 @@
+# Cut one EduIDE platform release across four repositories.
+#
+# The order is deliberate: BUILD, VERIFY, then TAG.
+#
+# Tagging first is the obvious design and the wrong one. Building 15 multi-GB
+# IDE images is the flakiest step in the pipeline; if image 17 of 19 fails after
+# the tags exist, immutable vX.Y.Z tags are stranded on repositories whose
+# images were never published. Building first means a flake costs a re-run.
+#
+# Every image is checked to actually exist before any chart claims to pin it,
+# which removes the "chart pins a tag that was never pushed" failure mode.
+
+name: Release train
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Platform version, e.g. 2.3.0 or 2.3.0-rc.1 (no leading v)"
+        required: true
+        type: string
+      dry_run:
+        description: "Plan only. Build nothing, tag nothing, publish nothing."
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  # Everything the platform version pins. swift is deliberately absent: it
+  # exists under images/ and in the compose file but is in no build matrix, so
+  # it is never published. Listing it here would fail every release; leaving it
+  # implicit would let the gap rot unnoticed.
+  CLOUD_IMAGES: "eduide-cloud/operator eduide-cloud/service eduide-cloud/conversion-webhook"
+  IDE_IMAGES: "eduide/base eduide/c eduide/c-templates eduide/haskell eduide/java-17 eduide/java-17-templates eduide/javascript eduide/ocaml eduide/python eduide/rust"
+  OTHER_IMAGES: "eduidec-landing-page"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env:
+          V: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$V" == v* ]]; then
+            echo "::error::give the version without a leading v (chart versions and image tags are X.Y.Z)"
+            exit 1
+          fi
+          if [[ ! "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$V' is not semver"
+            exit 1
+          fi
+          if git ls-remote --tags origin "refs/tags/v$V" | grep -q .; then
+            echo "::error::tag v$V already exists in this repository"
+            exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+  # Build every component at the release tag, without tagging anything yet.
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: [EduIDE-Cloud, EduIDE, EduIDE-Landing-Page]
+    steps:
+      - name: Dispatch the component build
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TRAIN_TOKEN || secrets.GITHUB_TOKEN }}
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          wf=$([[ "${{ matrix.repo }}" == "EduIDE-Landing-Page" ]] && echo docker-build.yml || echo build.yml)
+          gh workflow run "$wf" --repo "EduIDE/${{ matrix.repo }}" --ref main -f image_tag="$V"
+          echo "dispatched $wf on ${{ matrix.repo }} with image_tag=$V"
+
+      - name: Wait for it
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TRAIN_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sleep 20
+          for _ in $(seq 1 120); do
+            read -r run_id status conclusion < <(
+              gh run list --repo "EduIDE/${{ matrix.repo }}" --limit 1 \
+                --json databaseId,status,conclusion \
+                --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"')
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" != "success" ]]; then
+                echo "::error::${{ matrix.repo }} build ${run_id} concluded ${conclusion}"
+                exit 1
+              fi
+              echo "${{ matrix.repo }} build ${run_id} succeeded"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "::error::${{ matrix.repo }} build did not finish in an hour"; exit 1
+
+  # Nothing may claim to pin a tag that was never pushed.
+  verify-images:
+    needs: [validate, build]
+    if: ${{ always() && needs.validate.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install crane
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin crane
+          echo '${{ secrets.GITHUB_TOKEN }}' | crane auth login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+      - name: Every expected image exists, for both architectures
+        env:
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -uo pipefail
+          missing=0; single=0; n=0
+          for img in $CLOUD_IMAGES $IDE_IMAGES $OTHER_IMAGES; do
+            n=$((n + 1))
+            ref="ghcr.io/eduide/${img}:${V}"
+            if ! manifest=$(crane manifest "$ref" 2>/dev/null); then
+              if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+                echo "  would need  $ref"
+              else
+                echo "::error::missing $ref"; missing=$((missing + 1))
+              fi
+              continue
+            fi
+            arches=$(jq -r '[.manifests[]?.platform.architecture] | sort | join(",")' <<<"$manifest")
+            if [[ "$arches" != *amd64* || "$arches" != *arm64* ]]; then
+              echo "::error::$ref is not multi-arch (has: ${arches:-none})"; single=$((single + 1))
+            else
+              echo "  ok  $ref  [$arches]"
+            fi
+          done
+          echo "checked $n images"
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then exit 0; fi
+          [[ $missing -eq 0 && $single -eq 0 ]] || exit 1
+
+  # Only now do immutable tags appear.
+  tag-components:
+    needs: [validate, verify-images]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repo: [EduIDE-Cloud, EduIDE, EduIDE-Landing-Page]
+    steps:
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TRAIN_TOKEN || secrets.GITHUB_TOKEN }}
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          pre=""
+          [[ "$V" == *-* ]] && pre="--prerelease"
+          gh release create "v$V" --repo "EduIDE/${{ matrix.repo }}" \
+            --title "v$V" --generate-notes $pre \
+            --notes "Images for this release were built and verified before the tag was created."
+
+  publish-charts:
+    needs: [validate, verify-images]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TRAIN_TOKEN || secrets.GITHUB_TOKEN }}
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - name: Bump both charts and tag
+        env:
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          for c in eduide eduide-cluster; do
+            sed -i -E "s/^version: .*/version: ${V}/"       "charts/$c/Chart.yaml"
+            sed -i -E "s/^appVersion: .*/appVersion: \"${V}\"/" "charts/$c/Chart.yaml"
+          done
+          git config user.name  "eduide-release-train"
+          git config user.email "noreply@github.com"
+          git commit -qam "release: ${V}"
+          git tag -a "v${V}" -m "EduIDE ${V}"
+          git push origin HEAD:main "v${V}"
+      - name: Publish
+        env:
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo '${{ secrets.GITHUB_TOKEN }}' | helm registry login ghcr.io -u '${{ github.actor }}' --password-stdin
+          mkdir -p dist
+          for c in eduide-cluster eduide; do
+            helm package "charts/$c" --destination dist
+            helm push "dist/${c}-${V}.tgz" oci://ghcr.io/eduide/charts
+          done
+
+  summary:
+    needs: [validate, verify-images, tag-components, publish-charts]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          {
+            echo "## EduIDE ${V}"
+            echo ""
+            if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+              echo "Dry run. Nothing was built, tagged or published."
+            else
+              echo '```bash'
+              echo "helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster --version ${V} -n eduide-system --create-namespace"
+              echo "helm install eduide oci://ghcr.io/eduide/charts/eduide --version ${V} -n <namespace>"
+              echo '```'
+              echo ""
+              echo "Bump \`spec.platform.chartVersion\` in the relevant \`environments/*/env.yaml\` to roll this out. Production is never deployed automatically."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
