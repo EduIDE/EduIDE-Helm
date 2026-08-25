@@ -1,0 +1,225 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v3.16.3
+  DEPLOYMENT_REPO: EduIDE/EduIDE-deployment
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Syntax, and the bump every chart change needs. `helm push` in release.yml
+  # silently skips a version that already exists, so a forgotten bump is a no-op
+  # rather than an error - which is exactly how the chart READMEs drifted five
+  # PRs behind. Catch it here instead.
+  # ---------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: helm lint
+        run: |
+          set -euo pipefail
+          for chart in charts/*/; do
+            echo "::group::helm lint $chart"
+            helm lint "$chart"
+            echo "::endgroup::"
+          done
+
+      - name: Chart version must be bumped when a chart changes
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          git fetch --quiet origin "${{ github.base_ref }}"
+          failed=0
+          for chart in charts/*/; do
+            name="$(basename "$chart")"
+            if git diff --quiet "$base"...HEAD -- "$chart"; then
+              continue
+            fi
+            old="$(git show "$base:$chart/Chart.yaml" 2>/dev/null | awk '/^version:/{print $2; exit}')" || old=""
+            new="$(awk '/^version:/{print $2; exit}' "$chart/Chart.yaml")"
+            if [[ -z "$old" ]]; then
+              echo "  $name: new chart at $new"
+            elif [[ "$old" == "$new" ]]; then
+              echo "::error file=$chart/Chart.yaml::$name changed but version is still $old. Bump it - release.yml skips versions that already exist, so this would publish nothing."
+              failed=1
+            else
+              echo "  $name: $old -> $new"
+            fi
+          done
+          exit $failed
+
+  # ---------------------------------------------------------------------------
+  # Validate rendered output against real Kubernetes and CRD schemas.
+  # ---------------------------------------------------------------------------
+  kubeconform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Install kubeconform
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin kubeconform
+
+      - name: Validate rendered manifests
+        run: |
+          set -euo pipefail
+          # Gateway API and theia.cloud are not in the default schema set.
+          #
+          # HTTPRoute is skipped deliberately. templates/httproute-instances.yaml
+          # ships `rules: []` on purpose - the operator patches rules in at
+          # runtime to publish each new session. The CRDs-catalog schema declares
+          # minItems: 1 on spec.rules and so rejects it, but the upstream Gateway
+          # API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on that
+          # field. The catalog is stricter than what the cluster enforces, so this
+          # is a false positive rather than a defect in the chart.
+          # Revisit when the gateway templates are restructured; validating against
+          # schemas converted from the real CRDs would let us drop the skip.
+          SCHEMAS=(
+            -schema-location default
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          )
+          failed=0
+          for chart in charts/*/; do
+            echo "::group::kubeconform $(basename "$chart")"
+            helm template test "$chart" \
+              | kubeconform -strict -summary -ignore-missing-schemas -skip HTTPRoute "${SCHEMAS[@]}" || failed=1
+            echo "::endgroup::"
+          done
+          exit $failed
+
+  # ---------------------------------------------------------------------------
+  # The highest-value job: what will this PR actually do to the five live
+  # environments? Renders every one on base and head and posts the diff.
+  #
+  # Phase 1a wires this to the current values files in EduIDE-deployment.
+  # When those become environments/<name>/env.yaml it switches to render-values.sh.
+  # ---------------------------------------------------------------------------
+  render-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout head
+        uses: actions/checkout@v4
+        with:
+          path: head
+          fetch-depth: 0
+
+      - name: Checkout base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          path: base
+
+      - name: Checkout environment values
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DEPLOYMENT_REPO }}
+          path: deployment
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      # Both renders use the HEAD copy of the script, pointed at each side's
+      # charts. Using each side's own script would fold script changes into the
+      # diff; the job exists to show what the CHARTS do differently.
+      - name: Render base
+        id: base
+        continue-on-error: true
+        run: ./head/scripts/render-envs.sh "$PWD/out-base" "$PWD/deployment" "$PWD/base/charts"
+
+      - name: Render head
+        run: ./head/scripts/render-envs.sh "$PWD/out-head" "$PWD/deployment" "$PWD/head/charts"
+
+      - name: Diff
+        id: diff
+        run: |
+          set -uo pipefail
+          if [[ "${{ steps.base.outcome }}" != "success" ]]; then
+            echo "Base did not render (new chart, or base is broken); skipping diff." > diff.txt
+          else
+            diff -ru out-base out-head > diff.txt || true
+          fi
+          lines=$(wc -l < diff.txt | tr -d ' ')
+          echo "lines=$lines" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Rendered diff across all environments"
+            echo ""
+            if [[ "$lines" -eq 0 ]]; then
+              echo "No change to any rendered manifest."
+              echo ""
+              echo "For a pure refactor this is the result you want."
+            else
+              echo "<details><summary>${lines} lines changed</summary>"
+              echo ""
+              echo '```diff'
+              head -c 60000 diff.txt
+              echo '```'
+              echo ""
+              echo "</details>"
+            fi
+          } > summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('summary.md', 'utf8');
+            const marker = '## Rendered diff across all environments';
+            const {owner, repo} = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.rest.issues.listComments({owner, repo, issue_number});
+            const mine = comments.data.find(c => c.body.startsWith(marker) && c.user.type === 'Bot');
+            if (mine) {
+              await github.rest.issues.updateComment({owner, repo, comment_id: mine.id, body});
+            } else {
+              await github.rest.issues.createComment({owner, repo, issue_number, body});
+            }
+
+  # ---------------------------------------------------------------------------
+  # helm-docs regenerates the chart READMEs from values.yaml comments. They are
+  # currently several PRs stale, which is what happens when it is only ever run
+  # by hand from a Theia task.
+  # ---------------------------------------------------------------------------
+  docs-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run helm-docs
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2
+      - name: Check for drift
+        run: |
+          set -euo pipefail
+          if ! git diff --exit-code -- charts; then
+            echo "::error::chart READMEs are out of date. Run helm-docs and commit the result."
+            exit 1
+          fi

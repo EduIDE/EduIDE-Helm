@@ -5,7 +5,6 @@
 # - IfNotPresent
 # - Never
 imagePullPolicy: Always
-
 # -- General information about the deployed app
 # @default -- (see details below)
 app:
@@ -13,16 +12,8 @@ app:
   # as a spam migitation. This id is public. Please choose an random generated string.
   # Use service.authToken instead.
   id: asdfghjkl
-
   # -- The name of the application that may be displayed e.g. on the landing pages
   name: Theia Blueprint
-
-# -- Values related to certificates/Cert-manager
-# @default -- (see details below)
-issuer:
-  # -- EMail address of the certificate issuer.
-  email: mmorlock@example.com
-
 # -- Information about the demo application to be installed
 # @default -- (see details below)
 demoApplication:
@@ -30,17 +21,13 @@ demoApplication:
   install: true
   # -- The name of docker image to be used
   name: theiacloud/theia-cloud-demo:1.2.0-next
-
   # -- Optional: Override the imagePullPolicy for the main application's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
-
   # -- the image pull secret. Leave empty if registry is public
   pullSecret: ""
-
   # -- Limit in minutes
   timeout: "30"
-
   # -- Values that are used by the monitor
   # @default -- (see details below)
   monitor:
@@ -56,20 +43,14 @@ demoApplication:
       # -- Minutes of inactivity that lead to a warning displayed to the user
       # Make greater than timeoutAfter to disable
       notifyAfter: 25
-
 # -- You may adjust the hostname below.
 # @default -- (see details below)
 hosts:
-  # -- Use paths configures that all services should run on the same host but on different paths.
-  # true uses paths
-  # false uses an explicit host for each service
-  usePaths: false
-
   # -- Configuration for the hostnames. Contains the baseHost and afixes for all services
   # @default -- (see details below)
   configuration:
     # -- baseHost configures the host for all services.
-    # Depending on hosts.usePaths the services will be prepended as a subdomain or appended as a path
+    # Service names are prepended as subdomains, e.g. service.<landing>.<baseHost>
     baseHost: 192.168.39.173.nip.io
     # -- afix of the REST service
     service: servicex
@@ -77,7 +58,6 @@ hosts:
     landing: trynow
     # -- afix for deployed instances
     instance: instances
-
   # -- all additional wildcard hostnames that may be required in the launched Theia-applications, e.g.
   # "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews.
   # Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from
@@ -87,36 +67,28 @@ hosts:
   # These are required to configure TLS (if enabled via gateway.tls == true)
   # I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured.
   allWildcardInstances: []
-
 # -- Values related to the landing page
 # @default -- (see details below)
 landingPage:
   # -- Whether the landing page shall be enabled
   enabled: true
-
   # -- the landing page image to use
   image: theiacloud/theia-cloud-landing-page:1.2.0-next
-
   # -- Optional: Override the imagePullPolicy for the landing page's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
-
   # -- Optional: the image pull secret
   imagePullSecret:
-
   # -- Values related to Sentry on the landing page.
   # @default -- (see details below)
   sentry:
     # -- Whether to set SENTRY_ENABLE=true in the landing page deployment.
     enable: true
-
   # -- the app id to launch
   appDefinition: "theia-cloud-demo"
-
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage.
   ephemeralStorage: true
-
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain
@@ -130,11 +102,11 @@ landingPage:
   # further-app-definition:
   #   label: "Further App Definition"
   additionalApps:
-    # different-app-definition:
-    #   label: "Different App Definition"
-    #   image: "different-app-definition"
-    # further-app-definition:
-    #   label: "Further App Definition"
+  # different-app-definition:
+  #   label: "Different App Definition"
+  #   image: "different-app-definition"
+  # further-app-definition:
+  #   label: "Further App Definition"
 
   # -- Should showing info title and text below the launch button be disabled
   # true hides the info title and text
@@ -146,97 +118,85 @@ landingPage:
   # -- Optional: If specified with a value, this overrides the title of the info text shown on the landing page.
   # Empty values are ignored. Use `disableInfo` to deactivate showing the info completely.
   infoTitle:
-
   # -- Optional: If specified with a value, this overrides the message shown to the user while the session is started.
   # Empty values are ignored and the default text is used.
   loadingText:
-
   # -- The logo of the application that should be displayed on the landing pages
   logo: logos/theiablueprint.svg
-
   # -- Set a base64 encoded svg image that should be displayed on the landing pages.
   # If this is given, the logo value above is ignored.
   # On Linux, you can directly generate the base64 string when applying the chart like this:
   # --set landingPage.logoData=$(cat path/to/file.svg | base64 -w 0 -)
   # Another way is to directly add the base64 string to the values file.
   logoData:
-
   # -- The file extension of the logo. Must be set to match the logo respectively the logoData.
   # This is required because browsers cannot show a binary image (e.g. png) with a svg ending
   # and vice-versa.
   logoFileExtension: "svg"
-
   # -- Optional: Customize footer links on the landing page
   # All footer link configurations are optional. If not provided, default values will be used.
   # @default -- (see details below)
   footerLinks:
-    # # -- Optional: Attribution section (bottom left of footer)
-    # attribution:
-    #   # -- Text to display (e.g., "Built by TUM AET Team")
-    #   text: "Built by TUM AET Team 👨‍💻"
-    #   # -- URL to link to (e.g., team website)
-    #   url: "https://aet.cit.tum.de/"
-    #   # -- Version string to display (e.g., "v1.0.0")
-    #   version: "v1.0.0"
-    #
-    # # -- Optional: Bug report link
-    # bugReport:
-    #   # -- Link text (e.g., "Report a bug")
-    #   text: "Report a bug"
-    #   # -- URL for bug reports (e.g., GitHub issues)
-    #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
-    #   # -- Optional: Link target (_blank or _self)
-    #   target: "_blank"
-    #   # -- Optional: Link rel attribute
-    #   rel: "noreferrer"
-    #
-    # # -- Optional: Feature request link
-    # featureRequest:
-    #   # -- Link text (e.g., "Request a feature")
-    #   text: "Request a feature"
-    #   # -- URL for feature requests (e.g., GitHub issues)
-    #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
-    #   # -- Optional: Link target (_blank or _self)
-    #   target: "_blank"
-    #   # -- Optional: Link rel attribute
-    #   rel: "noreferrer"
-    #
-    # # -- Optional: About link
-    # about:
-    #   # -- Link text (e.g., "About")
-    #   text: "About"
-    #   # -- URL for about page
-    #   url: "https://theia-cloud.io/"
-    #   # -- Optional: Link target (_blank or _self)
-    #   target: "_blank"
-    #   # -- Optional: Link rel attribute
-    #   rel: "noreferrer"
-
+  # # -- Optional: Attribution section (bottom left of footer)
+  # attribution:
+  #   # -- Text to display (e.g., "Built by TUM AET Team")
+  #   text: "Built by TUM AET Team 👨‍💻"
+  #   # -- URL to link to (e.g., team website)
+  #   url: "https://aet.cit.tum.de/"
+  #   # -- Version string to display (e.g., "v1.0.0")
+  #   version: "v1.0.0"
+  #
+  # # -- Optional: Bug report link
+  # bugReport:
+  #   # -- Link text (e.g., "Report a bug")
+  #   text: "Report a bug"
+  #   # -- URL for bug reports (e.g., GitHub issues)
+  #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
+  #   # -- Optional: Link target (_blank or _self)
+  #   target: "_blank"
+  #   # -- Optional: Link rel attribute
+  #   rel: "noreferrer"
+  #
+  # # -- Optional: Feature request link
+  # featureRequest:
+  #   # -- Link text (e.g., "Request a feature")
+  #   text: "Request a feature"
+  #   # -- URL for feature requests (e.g., GitHub issues)
+  #   url: "https://github.com/eclipse-theia/theia-cloud/issues"
+  #   # -- Optional: Link target (_blank or _self)
+  #   target: "_blank"
+  #   # -- Optional: Link rel attribute
+  #   rel: "noreferrer"
+  #
+  # # -- Optional: About link
+  # about:
+  #   # -- Link text (e.g., "About")
+  #   text: "About"
+  #   # -- URL for about page
+  #   url: "https://theia-cloud.io/"
+  #   # -- Optional: Link target (_blank or _self)
+  #   target: "_blank"
+  #   # -- Optional: Link rel attribute
+  #   rel: "noreferrer"
 # -- Values related to Keycloak
 # @default -- (see details below)
 keycloak:
   # -- Whether keycloak authentication shall be used
   enable: false
-
   # -- The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints.
   adminGroup: "theia-cloud/admin"
-
   # -- Key cloak auth URL. Only has to be specified when enable: true
   authUrl: "https://keycloak.url/auth/"
-
   # -- The Keycloak Realm. Only has to be specified when enable: true
   realm: "TheiaCloud"
-
   # -- The client-id. Only has to be specified when enable: true
   clientId: "theia-cloud"
-
   # -- The oaid client secret. In case you configure your keycloak client as confidential,
   # then you may specifiy the secret here.
   # If you stick with our default public client, you may leave below value. For public clients
   # keycloak does not generate a client-secret, but in order to make oath2-proxy happy,
   # we will pass a value
   clientSecret: "publicbutoauth2proxywantsasecret"
-
   # -- The cookie secret. This should not be public! Only has to be specified when enable: true
   # See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret
   # for how to generate a strong cookie secret.
@@ -276,87 +236,68 @@ oauth2Proxy:
 
   # Allowed redirect domains for OAuth2 Proxy (controls whitelist_domains).
   # When empty, defaults are used:
-  #   if hosts.usePaths: [ "<baseHost>:*", "<keycloak host>:*" ]
-  #   else: [ "<instance>:*", "<keycloak host>:*" ]
+  #   [ "<instance>:*", "<keycloak host>:*" ]
   whitelistDomains: []
-
   # Cookie domains for OAuth2 Proxy.
   # When empty, defaults are used:
-  #   if hosts.usePaths: [ "<baseHost>" ]
-  #   else: [ "<instance>.<baseHost>" ]
+  #   [ "<instance>.<baseHost>" ]
   cookieDomains: []
-
 # -- Values related to the operator
 # @default -- (see details below)
 operator:
   # -- The operator image
   image: theiacloud/theia-cloud-operator:1.2.0-next
-
   # -- Optional: Override the imagePullPolicy for the operator's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
-
   # -- Optional: the image pull secret
   imagePullSecret:
-
   # -- Values related to Sentry on the operator.
   # @default -- (see details below)
   sentry:
     # -- Whether to set SENTRY_ENABLE=true in the operator deployment.
     enable: true
-
   # -- Whether theia applications shall be started eager. This means that the application is already
   # running without a user. When a user requests a new session, one of the already launched ones
   # is assigned.
   #
   # Currently only false is fully supported.
   eagerStart: false
-
   # -- Select your cloud provider. Possible values:
   # - K8S      Plain Kubernetes
   # - MINIKUBE Local deployment on Minikube
   cloudProvider: "K8S"
-
   # -- Whether Theia Cloud shall limit network speed. This might not be fully supported
   # on all cloud provider/in all clusters. Possible values:
   # - K8SANNOTATION                   Set via kubernetes annotations (kubernetes.io/egress-bandwidth and kubernetes.io/ingress-bandwidth)
   # - WONDERSHAPER                    Set via wondershaper init container
   # - K8SANNOTATIONANDWONDERSHAPER    Set Kubernetes annotations and use wondershaper init container
   bandwidthLimiter: "K8SANNOTATION"
-
   # -- If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container
   wondershaperImage: theiacloud/theia-cloud-wondershaper:1.2.0-next
-
   # -- Set the number of active sessions a single user can launch
   sessionsPerUser: "1"
-
   # -- The name of the storage class for persistent volume claims for workspaces.
   # This storage class must be present on the cluster.
   # Most cloud providers offer a default storage class without additional configuration.
   storageClassName: "default"
-
   # -- The amount of requested storage for each persistent volume claim (PVC) for workspaces.
   # This is directly passed to created PVCs and must be a valid Kubernetes quantity.
   # See https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/
   requestedStorage: "250Mi"
-
   # -- Number of operator instances to create
   replicas: 1
-
   # -- Options to influence the operator's leader election
   # @default -- (see details below)
   leaderElection:
     leaseDuration: 6
     renewDeadline: 4
     retryPeriod: 1
-
   # -- Configures the timeout in milliseconds when a watcher for either AppDefinitions, Workspaces, or Sessions is assumed to be not working.
   # When this is detected the operator instance will stop and a new operator will set up fresh watchers.
   maxWatchIdleTime: "3600000"
-
   # -- Whether the operator should stop in cases where an exception is not handled
   continueOnException: false
-
   # -- Build cache configuration
   buildCache:
     # -- Whether to enable build caching
@@ -367,14 +308,12 @@ operator:
     bazelUrl: ""
     # -- Whether sessions are allowed to push to the build cache.
     enablePush: false
-
   # -- Dependency cache configuration (Reposilite)
   dependencyCache:
     # -- Whether to enable the dependency cache
     enabled: false
     # -- The URL of the dependency cache server.
     url: ""
-
   # -- Allows to override the operator's log4j configuration
   # @default -- (see details below)
   logging:
@@ -401,42 +340,33 @@ operator:
 
   # -- The version to use of the quay.io/oauth2-proxy/oauth2-proxy image
   oAuth2ProxyVersion: "v7.12.0"
-
 # -- Values of the Theia Cloud REST service
 # @default -- (see details below)
 service:
   # -- The service authentication token used in the communication between website and REST-API
   # for spam mitigation. This token is public. Please choose a random generated string.
   authToken: asdfghjkl
-
   # -- Reference to an existing Kubernetes Secret containing the bearer token for admin API token protected endpoints.
   # The chart does not create or manage this Secret.
   adminApiTokenSecret:
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
-
   # -- The image to use
   image: theiacloud/theia-cloud-service:1.2.0-next
-
   # -- Optional: Override the imagePullPolicy for the service's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
-
   # -- Optional: the image pull secret
   imagePullSecret:
-
   # -- Values related to Sentry on the service.
   # @default -- (see details below)
   sentry:
     # -- Whether to set SENTRY_ENABLE=true in the service deployment.
     enable: true
-
   # -- service port (default: 8081)
   port: 8081
-
   # -- protocol of the REST-API
   protocol: https
-
 # -- Gateway API configuration (Envoy Gateway by default)
 gateway:
   # -- Master switch for Gateway API resources.
@@ -474,13 +404,10 @@ gateway:
   #  "*.webview.": webview-ws-cert-secret
   # -- HTTPRoute request timeout for service-route (Envoy default can be 15s)
   serviceRouteRequestTimeout: "60s"
-
 operatorrole:
   name: operator-api-access
-
 servicerole:
   name: service-api-access
-
 # -- Values to influence the monitor initialization on the operator
 # @default -- (see details below)
 monitor:
@@ -493,7 +420,6 @@ monitor:
     enable: true
     # -- Minutes between re-pinging the pods
     interval: 1
-
 # -- Values to configure preloading of images on Kubernetes nodes.
 # @default -- (see details below)
 preloading:

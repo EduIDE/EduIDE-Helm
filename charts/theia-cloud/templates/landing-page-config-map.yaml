@@ -23,11 +23,7 @@ data:
       giteaIssuerUrl: "",
       giteaClientId: "",
       {{- end }}
-      {{- if .Values.hosts.usePaths }}
-      serviceUrl: "{{ tpl (.Values.service.protocol | toString) . }}://{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}/{{ tpl (.Values.hosts.configuration.service | toString) . }}",
-      {{- else }}
-      serviceUrl: "{{ tpl (.Values.service.protocol | toString) . }}://{{ tpl (.Values.hosts.configuration.service | toString) . }}.{{ tpl (.Values.hosts.configuration.baseHost | toString) . }}",
-      {{- end }}
+      serviceUrl: "{{ include "theia-cloud.url.service" . }}",
       appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
       additionalApps: [
         {{- range $key, $val := .Values.landingPage.additionalApps }}
