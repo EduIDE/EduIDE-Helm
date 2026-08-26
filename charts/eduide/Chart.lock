@@ -1,0 +1,9 @@
+dependencies:
+- name: eduide-shared-cache
+  repository: oci://ghcr.io/eduide/charts
+  version: 0.5.3
+- name: theia-workspace-garbage-collector
+  repository: oci://ghcr.io/eduide/charts
+  version: 0.1.0
+digest: sha256:b17d9558356c541259bf6d69b0d86c10e324bd7bc53ea54d2050c705d0f9b5b6
+generated: "2026-08-26T17:09:32.134187+02:00"

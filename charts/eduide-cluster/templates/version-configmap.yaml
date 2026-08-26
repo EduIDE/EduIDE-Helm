@@ -1,0 +1,17 @@
+{{/*
+  Marker a tenant release can look for to tell whether this cluster has been
+  bootstrapped, and with which version. Without it the first sign of a missing
+  bootstrap is the operator crash-looping on absent CRDs.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eduide-cluster-version
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: eduide-cluster
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  platformVersion: {{ .Chart.Version | quote }}
+  appVersion: {{ .Chart.AppVersion | quote }}

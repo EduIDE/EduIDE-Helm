@@ -1,0 +1,29 @@
+{{- if .Values.monitoring.enabled }}
+{{- /*
+A PodMonitor naming no namespaces watches nothing, so it is not rendered at all
+rather than created as a no-op. The list is derived by bootstrap-cluster.yml
+from the environments on the cluster; an empty one means every environment
+opted out, which is a supported state. A bare `helm install eduide-cluster`
+lands here too, and must not fail.
+*/}}
+{{- if .Values.monitoring.targetNamespaces }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: theia-cloud-service
+  namespace: {{ .Values.monitoring.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: service
+  namespaceSelector:
+    matchNames:
+      {{- range .Values.monitoring.targetNamespaces }}
+      - {{ . }}
+      {{- end }}
+  podMetricsEndpoints:
+    - port: http
+      interval: 15s
+      path: /q/metrics
+{{- end }}
+{{- end }}

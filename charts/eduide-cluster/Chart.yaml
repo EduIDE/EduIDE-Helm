@@ -1,0 +1,8 @@
+apiVersion: v2
+name: eduide-cluster
+description: |
+  Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
+  cert-manager issuers. Install once per cluster, before any eduide release.
+type: application
+version: 2.0.0
+appVersion: "1.2.0"

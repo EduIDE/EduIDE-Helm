@@ -1,0 +1,46 @@
+apiVersion: v2
+name: eduide
+description: |
+  EduIDE tenant release: operator, REST service, landing page and routes for one
+  environment. Requires eduide-cluster to be installed on the cluster first.
+# A chart can be either an 'application' or a 'library' chart.
+#
+# Application charts are a collection of templates that can be packaged into versioned archives
+# to be deployed.
+#
+# Library charts provide useful utilities or functions for the chart developer. They're included as
+# a dependency of application charts to inject those utilities and functions into the rendering
+# pipeline. Library charts do not define any templates and therefore cannot be deployed.
+type: application
+# This is the chart version. This version number should be incremented each time you make changes
+# to the chart and its templates, including the app version.
+# Versions are expected to follow Semantic Versioning (https://semver.org/)
+version: 2.0.0
+# This is the version number of the application being deployed. This version number should be
+# incremented each time you make changes to the application. Versions are not expected to
+# follow Semantic Versioning. They should reflect the version the application is using.
+# It is recommended to use it with quotes.
+appVersion: "1.2.0"
+
+# The two components that release on their own cadence and are genuinely
+# optional. Everything else the chart needs is a template in this chart, not a
+# dependency - vendoring the rest is what removed the three-way Chart.lock /
+# Chart.yaml / HEAD version drift.
+#
+# eduide-shared-cache was called theia-shared-cache until 0.5.0. The umbrella it
+# replaces still pinned theia-shared-cache 0.3.1, months after the rename, which
+# is why the name is spelled out here with a current version.
+dependencies:
+  # No alias. An alias becomes .Chart.Name inside the subchart, and this one
+  # builds resource names and label values from it - a camelCase alias renders
+  # `sharedCache-redis`, which the API server rejects because RFC 1123 names are
+  # lowercase only.
+  - name: eduide-shared-cache
+    version: "0.5.3"
+    repository: "oci://ghcr.io/eduide/charts"
+    condition: eduide-shared-cache.enabled
+  - name: theia-workspace-garbage-collector
+    version: "0.1.0"
+    repository: "oci://ghcr.io/eduide/charts"
+    condition: theia-workspace-garbage-collector.enabled
+

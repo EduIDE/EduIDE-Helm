@@ -1,0 +1,151 @@
+{{- if .Values.landingPage.enabled }}
+{{- $root := . }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: landing-page-config
+  namespace: {{ .Release.Namespace }}
+data:
+  config.js: |
+    window.theiaCloudConfig = {
+      serviceAuthToken: "{{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . }}",
+      appName: "{{ tpl (.Values.app.name | toString) . }}",
+      useEphemeralStorage: {{ tpl (.Values.landingPage.ephemeralStorage | toString) . }},
+      useKeycloak: {{ tpl (.Values.keycloak.enable | toString) . }},
+      keycloakAuthUrl: "{{ tpl (.Values.keycloak.authUrl | toString) . }}",
+      keycloakRealm: "{{ tpl (.Values.keycloak.realm | toString) . }}",
+      keycloakClientId: "{{ tpl (.Values.keycloak.clientId | toString) . }}",
+      useGiteaOidc: {{ tpl (.Values.gitea.enable | toString) . }},
+      {{- if .Values.gitea.enable }}
+      giteaIssuerUrl: "{{ tpl (.Values.gitea.issuerUrl | toString) . }}",
+      giteaClientId: "{{ tpl (.Values.gitea.clientId | toString) . }}",
+      {{- else }}
+      giteaIssuerUrl: "",
+      giteaClientId: "",
+      {{- end }}
+      serviceUrl: "{{ include "theia-cloud.url.service" . }}",
+      appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
+      {{- /*
+      The app list is derived from appDefinitions.apps: every entry carrying a
+      `landingPage` key is offered, in the order it is declared there. That is
+      the same map the AppDefinitions and the preloading DaemonSet come from, so
+      the page cannot advertise an app that was never deployed - which is what
+      happened when this was a separate hand-maintained map.
+      landingPage.additionalApps still wins if set, as an escape hatch.
+      */}}
+      {{- $apps := .Values.landingPage.additionalApps }}
+      {{- if not $apps }}
+      {{- $apps = dict }}
+      {{- $ctx := . }}
+      {{- range $n := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
+      {{- $a := index $ctx.Values.appDefinitions.apps $n }}
+      {{- if $a.landingPage }}{{ $apps = set $apps $n $a.landingPage }}{{ end }}
+      {{- end }}
+      {{- end }}
+      additionalApps: [
+        {{- range $key, $val := $apps }}
+        {{- $image := (get $val "image" | default (get $val "Image")) }}
+        {
+          serviceAuthToken: {{ $key | quote}},
+          appName: {{ $val.label | quote }},
+          {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
+          visible: {{ get $val "visible" }},
+          {{- end }}
+          {{- if $image }}
+          image: {{ tpl ($image | toString) $root | quote }},
+          {{- end }}
+          {{- if $val.buildSystems }}
+          buildSystems: [
+            {{- range $val.buildSystems }}
+            { id: {{ .id | quote }}{{- if .label }}, label: {{ .label | quote }}{{- end }} },
+            {{- end }}
+          ],
+          {{- end }}
+        },
+        {{- end }}
+      ],
+      // We force PNG because we are forcing logo.png in the deployment
+      logoFileExtension: "png",
+      disableInfo: {{ tpl (.Values.landingPage.disableInfo | toString) . }},
+      {{- if .Values.landingPage.infoText }}
+      infoText: "{{ tpl (.Values.landingPage.infoText | toString) . }}",
+      {{- end }}
+      {{- if .Values.landingPage.infoTitle }}
+      infoTitle: "{{ tpl (.Values.landingPage.infoTitle | toString) . }}",
+      {{- end }}
+      {{- if .Values.landingPage.loadingText }}
+      loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
+      {{- end }}
+      sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
+      {{- if .Values.landingPage.footerLinks }}
+      footerLinks: {
+        {{- if .Values.landingPage.footerLinks.attribution }}
+        attribution: {
+          {{- if .Values.landingPage.footerLinks.attribution.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.attribution.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.attribution.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.attribution.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.attribution.version }}
+          version: "{{ tpl (.Values.landingPage.footerLinks.attribution.version | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.bugReport }}
+        bugReport: {
+          {{- if .Values.landingPage.footerLinks.bugReport.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.bugReport.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.bugReport.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.bugReport.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.bugReport.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.bugReport.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.featureRequest }}
+        featureRequest: {
+          {{- if .Values.landingPage.footerLinks.featureRequest.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.featureRequest.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.featureRequest.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+        {{- if .Values.landingPage.footerLinks.about }}
+        about: {
+          {{- if .Values.landingPage.footerLinks.about.text }}
+          text: "{{ tpl (.Values.landingPage.footerLinks.about.text | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.url }}
+          url: "{{ tpl (.Values.landingPage.footerLinks.about.url | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.target }}
+          target: "{{ tpl (.Values.landingPage.footerLinks.about.target | toString) . }}",
+          {{- end }}
+          {{- if .Values.landingPage.footerLinks.about.rel }}
+          rel: "{{ tpl (.Values.landingPage.footerLinks.about.rel | toString) . }}",
+          {{- end }}
+        },
+        {{- end }}
+      },
+      {{- end }}
+      sentryEnvironment: "{{ .Release.Namespace }}",
+    };
+
+  {{- if .Values.landingPage.logoData }}
+  logo.png: {{ .Values.landingPage.logoData }}
+  {{- end }}
+{{- end }}

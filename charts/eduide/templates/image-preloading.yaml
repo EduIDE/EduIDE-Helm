@@ -1,0 +1,104 @@
+{{ if .Values.preloading.enable -}}
+
+{{- /*
+The list is derived from appDefinitions.apps, their sidecars and the landing
+page, with preloading.images appended. Nothing has to be listed by hand, so the
+preloaded set cannot disagree with what the installation actually offers - the
+old hand-written, index-addressed list is why production offered c-templates
+while preloading everything except c-templates.
+*/ -}}
+{{- $images := include "eduide.preloadImages" . | fromJsonArray -}}
+{{- if and (not $images) .Values.demoApplication.install -}}
+  {{- $images = list .Values.demoApplication.name -}}
+{{- end -}}
+{{- if not $images -}}
+{{- fail "preloading.enable is true but no images resolved: set appDefinitions.apps, or preloading.images, or disable preloading" -}}
+{{- end -}}
+
+{{- /* Set image pull policy to local variable for increase readability. */ -}}
+{{- $imagePullPolicy := tpl (.Values.imagePullPolicy | toString) . -}}
+{{- if .Values.preloading.imagePullPolicy -}}
+  {{- $imagePullPolicy = tpl ($.Values.preloading.imagePullPolicy | toString) . -}}
+{{- end -}}
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-preloading
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: image-preloading
+    app.kubernetes.io/name: image-preloading
+    app.kubernetes.io/part-of: theia-cloud
+spec:
+  selector:
+    matchLabels:
+      app: image-preloading
+      app.kubernetes.io/name: image-preloading
+      app.kubernetes.io/part-of: theia-cloud
+  template:
+    metadata:
+      labels:
+        app: image-preloading
+        app.kubernetes.io/name: image-preloading
+        app.kubernetes.io/part-of: theia-cloud
+      annotations:
+        helm.sh/revision: {{ .Release.Revision | quote }}
+    spec:
+      # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
+      terminationGracePeriodSeconds: 0
+      initContainers:
+      {{- range $index, $entry := $images }}
+      {{- $imageRef := "" }}
+      {{- $isMap := kindIs "map" $entry }}
+      {{- if $isMap }}
+        {{- $imageRef = tpl ($entry.image | toString) $ }}
+      {{- else }}
+        {{- $imageRef = tpl ($entry | toString) $ }}
+      {{- end }}
+      {{- $useShell := true }}
+      {{- $customCmd := list }}
+      {{- $customArgs := list }}
+      {{- $hasArgsKey := false }}
+      {{- if $isMap }}
+        {{- if or $entry.command (hasKey $entry "args") }}
+          {{- $useShell = false }}
+        {{- end }}
+        {{- with $entry.command }}
+          {{- $customCmd = . }}
+        {{- end }}
+        {{- if hasKey $entry "args" }}
+          {{- $hasArgsKey = true }}
+          {{- $customArgs = $entry.args }}
+        {{- end }}
+      {{- end }}
+      - name: image-preload-{{ $index }}
+        image: {{ $imageRef | quote }}
+        imagePullPolicy: {{ $imagePullPolicy }}
+        {{- if $useShell }}
+        command: ["/bin/sh", "-c"]
+        args:
+        - {{ printf "echo 'Loaded image %s'; exit 0" $imageRef | quote }}
+        {{- else }}
+        {{- with $customCmd }}
+        command:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if $hasArgsKey }}
+        args:
+          {{- toYaml $customArgs | nindent 10 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      # Run the pause container to make the Pod go into the Running state without consuming resources
+      containers:
+      - name: run
+        image: registry.k8s.io/pause:3.9
+        resources:
+          limits:
+            cpu: 1m
+            memory: 8M
+          requests:
+            cpu: 1m
+            memory: 8M
+{{- end }}

@@ -1,0 +1,37 @@
+{{- if and .Values.managedCertificates.enabled (gt (len .Values.managedCertificates.certificates) 0) }}
+{{- range $cert := .Values.managedCertificates.certificates }}
+{{- /*
+A certificate may cover one hostname or many. The real installations use one
+certificate per cluster covering every environment's landing, service and
+instance host, so `dnsNames` is the useful shape and `hostname` is kept as the
+single-name shorthand.
+
+Only names that actually have a listener can be included: cert-manager solves
+HTTP-01 by serving a token on port 80 for each name, and a name with no listener
+answers 404 and leaves the whole order pending - which blocks the certificate
+for every other name on it too.
+*/}}
+{{- $names := $cert.dnsNames | default (list $cert.hostname) }}
+{{- if not $names }}
+{{- fail (printf "managedCertificates.certificates %q has neither hostname nor dnsNames" $cert.name) }}
+{{- end }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $cert.name }}
+  namespace: {{ default $.Values.gateway.namespace $cert.namespace }}
+spec:
+  secretName: {{ $cert.secretName }}
+  commonName: {{ (first $names) | quote }}
+  dnsNames:
+    {{- range $names }}
+    - {{ . | quote }}
+    {{- end }}
+  issuerRef:
+    kind: {{ $.Values.managedCertificates.issuerRef.kind }}
+    name: {{ $.Values.managedCertificates.issuerRef.name }}
+  privateKey:
+    rotationPolicy: Never
+{{- end }}
+{{- end }}

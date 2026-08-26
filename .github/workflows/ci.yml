@@ -31,6 +31,9 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
 
+      - name: AGENTS.md does not reference missing paths
+        run: ./scripts/check-agents-md.sh
+
       - name: helm lint
         run: |
           set -euo pipefail
@@ -39,6 +42,9 @@ jobs:
             helm lint "$chart"
             echo "::endgroup::"
           done
+
+      - name: App definitions, landing page and preloading agree
+        run: ./scripts/test-app-consistency.sh
 
       - name: Chart version must be bumped when a chart changes
         if: github.event_name == 'pull_request'
@@ -103,7 +109,9 @@ jobs:
           failed=0
           for chart in charts/*/; do
             echo "::group::kubeconform $(basename "$chart")"
+            ./scripts/resolve-deps.sh "$chart"
             helm template test "$chart" \
+              --set keycloak.allowUnauthenticated=true \
               | kubeconform -strict -summary -ignore-missing-schemas -skip HTTPRoute "${SCHEMAS[@]}" || failed=1
             echo "::endgroup::"
           done

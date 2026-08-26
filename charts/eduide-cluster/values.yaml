@@ -1,0 +1,131 @@
+# Cluster-scoped half of EduIDE. Installed ONCE per cluster.
+#
+# The tenant chart (eduide) is installed once per environment and owns
+# nothing in here. Splitting them is what removes the race where three
+# concurrent tenant deploys all reinstalled the same cluster-scoped
+# objects into the default namespace.
+
+issuerca:
+  # -- whether to install the CA certificate signer
+  enable: true
+  # -- name for the issuer preparing a self signed CA certificate
+  name: theia-cloud-ca-certificate-signer
+
+issuerprod:
+  # -- whether to install the let's encrypt production cluster issuer
+  enable: false
+  # -- name for the let's encrypt production cluster issuer
+  name: letsencrypt-prod
+  # -- ACME solver list for cert-manager (required when `issuerprod.enable=true`)
+  solvers: []
+
+issuerstaging:
+  # -- name for the self signed cluster issuer
+  name: theia-cloud-selfsigned-issuer
+
+issuer:
+  # -- email used to issue let's encrypt certificates
+  email: mmorlock@example.com
+
+operatorrole:
+  # -- name for the operator's cluster role
+  name: operator-api-access
+
+servicerole:
+  # -- name for the services' cluster role
+  name: service-api-access
+
+certmanager:
+  # -- the namespace where the cert-manager is installed
+  namespace: cert-manager
+
+# --- CRDs and the conversion webhook ---
+conversion:
+  # -- The image of the webhook container
+  image: theiacloud/theia-cloud-conversion-webhook:1.2.0-next
+  # -- The location of where the certificates are mounted into the container (needs to match with application.properties)
+  certMountPath: /etc/webhook/certs
+  # -- The certificate reload period in seconds
+  certReloadPeriod: 604800
+
+# -- The cluster issuer to use for the certificate
+clusterIssuer: theia-cloud-selfsigned-issuer
+
+# --------------------------------------------------------------------------
+# The shared Gateway. One per cluster, one listener set per environment.
+#
+# This was a chart of its own in EduIDE-deployment until 2.0.0. It belongs here:
+# a Gateway is cluster-scoped, and keeping chart source in the deployment repo
+# meant the cluster half of an install was not versioned with the rest.
+#
+# `gateway.listeners` is filled in by the Bootstrap cluster workflow, derived
+# from the environments that claim this cluster. Do not write it by hand - that
+# is what deployments/shared-gateway/values.yaml was, and adding an environment
+# meant remembering to edit a second file.
+# --------------------------------------------------------------------------
+gateway:
+  name: theia-shared-gateway
+  namespace: eduide-system
+  className: envoy
+  labels: {}
+  annotations: {}
+  addresses: []
+  allowedRoutes:
+    namespaces:
+      from: All
+  listeners: []
+gatewayClass:
+  create: false
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  labels: {}
+  annotations: {}
+  parametersRef: {}
+envoyProxy:
+  create: false
+  name: theia-shared-gateway
+  namespace: envoy-gateway-system
+  labels: {}
+  annotations: {}
+  spec: {}
+managedCertificates:
+  enabled: false
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  # -- Each entry takes either `hostname` (one name) or `dnsNames` (a list).
+  # `bootstrap-cluster.yml` fills this in from the environments on the cluster,
+  # so a new environment gets its certificate names without a second edit -
+  # which is how test3 ran for 184 days on a certificate that only covered
+  # test1, test2 and staging.
+  certificates: []
+gatewayAcmeIssuer:
+  enabled: false
+  name: letsencrypt-prod-gateway
+  email: ''
+  privateKeySecretName: letsencrypt-prod-gateway-priv-key
+  server: https://acme-v02.api.letsencrypt.org/directory
+  serviceType: ClusterIP
+wildcardTLSSecret:
+  create: false
+  name: static-theia-cert
+  namespace: eduide-system
+  certificate: ''
+  key: ''
+
+# --------------------------------------------------------------------------
+# PodMonitors and Grafana dashboards for Rancher's monitoring stack.
+#
+# Cluster-scoped like the Gateway: the PodMonitors live in Rancher's namespace
+# and name every namespace they watch. That list was hand-written and had gone
+# stale - it still named `theia` and `theia-staging`, which no longer exist.
+# Bootstrap derives it from the environments on this cluster instead.
+# --------------------------------------------------------------------------
+monitoring:
+  # -- Create the PodMonitors and dashboards. Set to false by
+  # `bootstrap-cluster.yml` when no environment on the cluster opts in, so an
+  # all-opted-out cluster is a supported state rather than a render failure.
+  enabled: true
+  namespace: cattle-monitoring-system
+  dashboardNamespace: cattle-dashboards
+  targetNamespaces: []
+  sessionNamespaces: []

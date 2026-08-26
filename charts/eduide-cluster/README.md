@@ -1,0 +1,60 @@
+# eduide-cluster
+
+![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+
+Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
+cert-manager issuers. Install once per cluster, before any eduide release.
+
+*This chart was tested with Helm version v3.17.0.*
+*Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
+
+## Values
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| certmanager.namespace | string | `"cert-manager"` | the namespace where the cert-manager is installed |
+| clusterIssuer | string | `"theia-cloud-selfsigned-issuer"` | The cluster issuer to use for the certificate |
+| conversion.certMountPath | string | `"/etc/webhook/certs"` | The location of where the certificates are mounted into the container (needs to match with application.properties) |
+| conversion.certReloadPeriod | int | `604800` | The certificate reload period in seconds |
+| conversion.image | string | `"theiacloud/theia-cloud-conversion-webhook:1.2.0-next"` | The image of the webhook container |
+| envoyProxy.annotations | object | `{}` |  |
+| envoyProxy.create | bool | `false` |  |
+| envoyProxy.labels | object | `{}` |  |
+| envoyProxy.name | string | `"theia-shared-gateway"` |  |
+| envoyProxy.namespace | string | `"envoy-gateway-system"` |  |
+| envoyProxy.spec | object | `{}` |  |
+| gateway | object | `{"addresses":[],"allowedRoutes":{"namespaces":{"from":"All"}},"annotations":{},"className":"envoy","labels":{},"listeners":[],"name":"theia-shared-gateway","namespace":"eduide-system"}` | ------------------------------------------------------------------------ |
+| gatewayAcmeIssuer.email | string | `""` |  |
+| gatewayAcmeIssuer.enabled | bool | `false` |  |
+| gatewayAcmeIssuer.name | string | `"letsencrypt-prod-gateway"` |  |
+| gatewayAcmeIssuer.privateKeySecretName | string | `"letsencrypt-prod-gateway-priv-key"` |  |
+| gatewayAcmeIssuer.server | string | `"https://acme-v02.api.letsencrypt.org/directory"` |  |
+| gatewayAcmeIssuer.serviceType | string | `"ClusterIP"` |  |
+| gatewayClass.annotations | object | `{}` |  |
+| gatewayClass.controllerName | string | `"gateway.envoyproxy.io/gatewayclass-controller"` |  |
+| gatewayClass.create | bool | `false` |  |
+| gatewayClass.labels | object | `{}` |  |
+| gatewayClass.parametersRef | object | `{}` |  |
+| issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
+| issuerca.enable | bool | `true` | whether to install the CA certificate signer |
+| issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |
+| issuerprod.enable | bool | `false` | whether to install the let's encrypt production cluster issuer |
+| issuerprod.name | string | `"letsencrypt-prod"` | name for the let's encrypt production cluster issuer |
+| issuerprod.solvers | list | `[]` | ACME solver list for cert-manager (required when `issuerprod.enable=true`) |
+| issuerstaging.name | string | `"theia-cloud-selfsigned-issuer"` | name for the self signed cluster issuer |
+| managedCertificates.certificates | list | `[]` | Each entry takes either `hostname` (one name) or `dnsNames` (a list). `bootstrap-cluster.yml` fills this in from the environments on the cluster, so a new environment gets its certificate names without a second edit - which is how test3 ran for 184 days on a certificate that only covered test1, test2 and staging. |
+| managedCertificates.enabled | bool | `false` |  |
+| managedCertificates.issuerRef.kind | string | `"ClusterIssuer"` |  |
+| managedCertificates.issuerRef.name | string | `"letsencrypt-prod"` |  |
+| monitoring | object | `{"dashboardNamespace":"cattle-dashboards","enabled":true,"namespace":"cattle-monitoring-system","sessionNamespaces":[],"targetNamespaces":[]}` | ------------------------------------------------------------------------ |
+| monitoring.enabled | bool | `true` | Create the PodMonitors and dashboards. Set to false by `bootstrap-cluster.yml` when no environment on the cluster opts in, so an all-opted-out cluster is a supported state rather than a render failure. |
+| operatorrole.name | string | `"operator-api-access"` | name for the operator's cluster role |
+| servicerole.name | string | `"service-api-access"` | name for the services' cluster role |
+| wildcardTLSSecret.certificate | string | `""` |  |
+| wildcardTLSSecret.create | bool | `false` |  |
+| wildcardTLSSecret.key | string | `""` |  |
+| wildcardTLSSecret.name | string | `"static-theia-cert"` |  |
+| wildcardTLSSecret.namespace | string | `"eduide-system"` |  |
+
+----------------------------------------------
+Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)
