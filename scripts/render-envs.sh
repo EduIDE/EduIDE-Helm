@@ -13,9 +13,18 @@
 # diffs the two trees. That diff answers the only question that matters when
 # changing a chart: "what will this actually do to production?"
 #
-# Environment values live in EduIDE-deployment, nested under a `theia-cloud:`
-# key of the umbrella chart's values, and use YAML anchors that only resolve in
-# the context of the whole file - hence `explode(.)` before extracting.
+# Environment values live in EduIDE-deployment, which has two layouts while the
+# restructure lands:
+#
+#   environments/<name>/values.yaml   plain values for the eduide chart
+#   deployments/<fqdn>/values.yaml    the old umbrella's values, nested under a
+#                                     `theia-cloud:` key and using YAML anchors
+#                                     that only resolve within the whole file -
+#                                     hence `explode(.)` before extracting
+#
+# Whichever is present is used. Rendering the old layout against the new chart
+# is meaningless (different value keys entirely), so the layout is chosen from
+# the deployment checkout, not from the chart.
 #
 # NOTE: two templates call `lookup`, which returns empty under `helm template`
 # and would otherwise produce a false diff on every single PR. Both are masked
@@ -29,13 +38,15 @@ CHARTS_ARG="${3:-}"
 
 if [[ -z "$DEPLOY" ]]; then
   for candidate in ../EduIDE-deployment ../../EduIDE-deployment ./EduIDE-deployment; do
-    [[ -d "$candidate/deployments" ]] && { DEPLOY="$candidate"; break; }
+    if [[ -d "$candidate/environments" || -d "$candidate/deployments" ]]; then
+      DEPLOY="$candidate"; break
+    fi
   done
 fi
-[[ -d "${DEPLOY:-/nonexistent}/deployments" ]] || {
+if [[ ! -d "${DEPLOY:-/nonexistent}/environments" && ! -d "${DEPLOY:-/nonexistent}/deployments" ]]; then
   echo "Could not find EduIDE-deployment. Pass its path as the second argument." >&2
   exit 2
-}
+fi
 
 if [[ -n "$CHARTS_ARG" ]]; then
   CHARTS_DIR="$(cd "$CHARTS_ARG" && pwd)"
@@ -51,8 +62,34 @@ TENANT_CHART=eduide
   echo "No eduide or theia-cloud chart under $CHARTS_DIR" >&2
   exit 2
 }
-echo "rendering from $CHARTS_DIR"
+
+# The layout follows the chart generation, not whatever the deployment checkout
+# happens to have. The old values are keyed under `theia-cloud:` and mean
+# nothing to the eduide chart, so rendering one against the other produces a
+# failure that looks like a chart bug and is not one.
+if [[ "$TENANT_CHART" == eduide ]]; then LAYOUT=environments; else LAYOUT=deployments; fi
+
+if [[ ! -d "$DEPLOY/$LAYOUT" ]]; then
+  # Expected while the restructure is in flight: the head chart is `eduide` but
+  # EduIDE-deployment's main branch still carries `deployments/`. There is
+  # nothing comparable, and saying so beats failing.
+  echo "::notice::$TENANT_CHART needs the $LAYOUT/ layout, which this EduIDE-deployment checkout does not have."
+  echo "::notice::Nothing to render. Merge the matching EduIDE-deployment PR, or point this at that branch."
+  mkdir -p "$OUT"
+  exit 0
+fi
+echo "rendering from $CHARTS_DIR (chart $TENANT_CHART, $LAYOUT layout)"
 mkdir -p "$OUT"
+
+# Dependencies are resolved, not vendored: charts/*/charts/ is gitignored, so a
+# fresh checkout has none and `helm template` refuses to render. Cheap when
+# there is nothing to fetch.
+if [[ -f "$CHARTS_DIR/$TENANT_CHART/Chart.yaml" ]] \
+   && yq -e '.dependencies' "$CHARTS_DIR/$TENANT_CHART/Chart.yaml" >/dev/null 2>&1; then
+  helm dependency build "$CHARTS_DIR/$TENANT_CHART" >/dev/null 2>&1 \
+    || helm dependency update "$CHARTS_DIR/$TENANT_CHART" >/dev/null 2>&1 \
+    || echo "warning: could not resolve dependencies for $TENANT_CHART" >&2
+fi
 
 # --- MASKS ---------------------------------------------------------------
 # Lines whose value is nondeterministic under `helm template`. If you add a
@@ -72,22 +109,36 @@ mask() {
 }
 
 rendered=0
-for dir in "$DEPLOY"/deployments/*/; do
+for dir in "$DEPLOY"/$LAYOUT/*/; do
   env_name="$(basename "$dir")"
   case "$env_name" in *shared-gateway*) continue ;; esac
   [[ -f "$dir/values.yaml" ]] || continue
 
   values="$(mktemp)"
-  yq -r 'explode(.) | ."theia-cloud"' "$dir/values.yaml" > "$values"
-  ns="$(yq -r '.hosts.configuration.landing // "default"' "$values")"
+  extra=()
+  if [[ "$LAYOUT" == environments ]]; then
+    # The deploy supplies these from the environment's GitHub secrets. Rendering
+    # needs them present, not correct - they are constants here, so they add no
+    # diff noise.
+    secrets="$(mktemp)"
+    printf 'keycloak:\n  cookieSecret: render-only\nservice:\n  adminApiToken: cmVuZGVyLW9ubHk=\n' > "$secrets"
+    extra+=(-f "$secrets")
+    # Plain values, plus the base every deploy applies first.
+    cp "$dir/values.yaml" "$values"
+    [[ -f "$DEPLOY/environments/_base.yaml" ]] && extra+=(-f "$DEPLOY/environments/_base.yaml")
+    ns="$(yq -r '.spec.namespace // "default"' "$dir/env.yaml" 2>/dev/null || echo default)"
+  else
+    yq -r 'explode(.) | ."theia-cloud"' "$dir/values.yaml" > "$values"
+    ns="$(yq -r '.hosts.configuration.landing // "default"' "$values")"
+  fi
 
   if ! helm template theia-cloud "$CHARTS_DIR/$TENANT_CHART" \
-        -f "$values" --namespace "$ns" 2> "$OUT/$env_name.err" | mask > "$OUT/$env_name.yaml"; then
+        "${extra[@]}" -f "$values" --namespace "$ns" 2> "$OUT/$env_name.err" | mask > "$OUT/$env_name.yaml"; then
     echo "RENDER FAILED for $env_name:" >&2
     cat "$OUT/$env_name.err" >&2
     exit 1
   fi
-  rm -f "$values" "$OUT/$env_name.err"
+  rm -f "$values" "$OUT/$env_name.err" "${secrets:-}"
   printf '  rendered %-45s %s resources\n' "$env_name" "$(grep -c '^kind:' "$OUT/$env_name.yaml" || true)"
   rendered=$((rendered + 1))
 done

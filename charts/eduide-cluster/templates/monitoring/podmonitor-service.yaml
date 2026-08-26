@@ -1,7 +1,12 @@
 {{- if .Values.monitoring.enabled }}
-{{- if not .Values.monitoring.targetNamespaces }}
-{{- fail "monitoring.enabled is true but monitoring.targetNamespaces is empty: this PodMonitor would watch nothing" }}
-{{- end }}
+{{- /*
+A PodMonitor naming no namespaces watches nothing, so it is not rendered at all
+rather than created as a no-op. The list is derived by bootstrap-cluster.yml
+from the environments on the cluster; an empty one means every environment
+opted out, which is a supported state. A bare `helm install eduide-cluster`
+lands here too, and must not fail.
+*/}}
+{{- if .Values.monitoring.targetNamespaces }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -20,4 +25,5 @@ spec:
     - port: http
       interval: 15s
       path: /q/metrics
+{{- end }}
 {{- end }}

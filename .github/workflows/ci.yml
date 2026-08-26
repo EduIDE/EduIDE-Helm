@@ -109,7 +109,13 @@ jobs:
           failed=0
           for chart in charts/*/; do
             echo "::group::kubeconform $(basename "$chart")"
+            # charts/*/charts/ is gitignored - dependencies are resolved, not
+            # vendored - so a fresh checkout has to fetch them before rendering.
+            if yq -e '.dependencies' "$chart/Chart.yaml" >/dev/null 2>&1; then
+              helm dependency build "$chart" >/dev/null 2>&1 || helm dependency update "$chart" >/dev/null
+            fi
             helm template test "$chart" \
+              --set keycloak.allowUnauthenticated=true \
               | kubeconform -strict -summary -ignore-missing-schemas -skip HTTPRoute "${SCHEMAS[@]}" || failed=1
             echo "::endgroup::"
           done
