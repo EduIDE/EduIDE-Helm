@@ -43,12 +43,10 @@
 */}}
 {{- define "eduide.preflightKeycloak" -}}
 {{- $kc := .Values.keycloak -}}
-{{- if not .Values.gitea.enable }}
 {{- $placeholder := or (eq ($kc.authUrl | toString) "https://keycloak.url/auth/")
                        (eq ($kc.realm | toString) "TheiaCloud")
                        (eq ($kc.clientId | toString) "theia-cloud") -}}
 {{- if and $placeholder (not $kc.allowUnauthenticated) }}
 {{- fail (printf "keycloak is left at the chart's placeholder values (authUrl=%s realm=%s clientId=%s). Configure them, or set keycloak.allowUnauthenticated=true to install without a working identity provider." $kc.authUrl $kc.realm $kc.clientId) }}
-{{- end }}
 {{- end }}
 {{- end -}}
