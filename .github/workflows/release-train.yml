@@ -169,37 +169,64 @@ jobs:
             --title "v$V" --generate-notes $pre \
             --notes "Images for this release were built and verified before the tag was created."
 
+  # The version bump is a reviewed commit, not something this workflow makes.
+  # A workflow that pushes to main triggers the workflows that watch main, and
+  # release automation able to trigger itself is a bad thing to own. This job
+  # therefore CHECKS the charts are already at the requested version and fails
+  # with instructions if they are not.
   publish-charts:
     needs: [validate, verify-images]
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.RELEASE_TRAIN_TOKEN || secrets.GITHUB_TOKEN }}
       - uses: azure/setup-helm@v4
         with:
           version: v3.16.3
-      - name: Bump both charts and tag
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: The charts must already be at this version
         env:
           V: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
+          fail=0
           for c in eduide eduide-cluster; do
-            sed -i -E "s/^version: .*/version: ${V}/"       "charts/$c/Chart.yaml"
-            sed -i -E "s/^appVersion: .*/appVersion: \"${V}\"/" "charts/$c/Chart.yaml"
+            cv=$(yq -r '.version' "charts/$c/Chart.yaml")
+            av=$(yq -r '.appVersion' "charts/$c/Chart.yaml")
+            if [[ "$cv" != "$V" ]]; then
+              echo "::error file=charts/$c/Chart.yaml::version is '$cv', expected '$V'"
+              fail=1
+            fi
+            if [[ "$av" != "$V" ]]; then
+              echo "::error file=charts/$c/Chart.yaml::appVersion is '$av', expected '$V'"
+              fail=1
+            fi
           done
-          git config user.name  "eduide-release-train"
-          git config user.email "noreply@github.com"
-          git commit -qam "release: ${V}"
-          git tag -a "v${V}" -m "EduIDE ${V}"
-          git push origin HEAD:main "v${V}"
-      - name: Publish
+          if [[ $fail -ne 0 ]]; then
+            echo "::error::Bump the charts in a reviewed pull request first, then re-run. See README: Cutting a release."
+            exit 1
+          fi
+          echo "both charts are at $V"
+
+      - name: Tag this repository
         env:
           V: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          echo '${{ secrets.GITHUB_TOKEN }}' | helm registry login ghcr.io -u '${{ github.actor }}' --password-stdin
+          git tag -a "v${V}" -m "EduIDE ${V}"
+          git push origin "v${V}"
+
+      - name: Publish both charts
+        env:
+          V: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           mkdir -p dist
           for c in eduide-cluster eduide; do
             helm package "charts/$c" --destination dist

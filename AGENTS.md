@@ -70,7 +70,13 @@ render-diff fills with false changes and stops being read.
 `Release train` cuts a version across all four repositories. It builds, then
 verifies every image exists and is multi-arch, and only then tags — because a
 failure after tagging strands immutable tags on repositories whose images were
-never published. See `docs/releasing.md`.
+never published.
+
+**It does not bump the chart version.** That is a reviewed pull request; the
+workflow checks the charts are already at the requested version and fails
+otherwise. Do not make automation push to `main`: it triggers the workflows
+watching `main`. Full procedure in the README, and as a skill in
+`.claude/skills/cut-a-release.md`.
 
 ## Conventions
 
