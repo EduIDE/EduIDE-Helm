@@ -498,28 +498,40 @@ appDefinitions:
       minInstances: 3
       landingPage:
         label: Java 17
+        # Deployable and startable by name, but not offered in the drop-down -
+        # the -templates variant is what students pick.
+        visible: false
     java-17-templates-latest:
       image: eduide/java-17-templates
       requestsCpu: 500m
       limitsMemory: 3000M
       landingPage:
-        label: Java 17 (Templates)
+        label: Java 17
+        # A -templates image exists to offer a build-system choice. Dropping
+        # this list is what makes the picker disappear from the landing page.
+        buildSystems:
+          - { id: maven, label: Maven }
+          - { id: gradle, label: Gradle }
     c-latest:
       image: eduide/c
       landingPage:
         label: C
+        visible: false
     c-templates-latest:
       image: eduide/c-templates
       landingPage:
-        label: C (Templates)
+        label: C
+        buildSystems:
+          - { id: bazel, label: Bazel }
+          - { id: make, label: Make }
     javascript-latest:
       image: eduide/javascript
       landingPage:
-        label: JavaScript
+        label: Javascript
     ocaml-latest:
       image: eduide/ocaml
       landingPage:
-        label: OCaml
+        label: Ocaml
     python-latest:
       image: eduide/python
       landingPage:
