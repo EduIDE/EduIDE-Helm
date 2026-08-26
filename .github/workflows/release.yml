@@ -102,12 +102,26 @@ jobs:
 
           OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
-          PREVIEW_SUFFIX="pr-${PR_NUMBER}"
           mkdir -p dist
 
+          # A preview version has to be valid semver, and it has to sort below
+          # the release it previews so `helm upgrade` never picks one up by
+          # accident.
+          #
+          # Appending ".pr-24" only worked while every chart version was already
+          # a prerelease: 1.4.0-next.7.pr-24 parses, because the dot just adds
+          # another prerelease identifier. 2.0.0.pr-24 does not - a release
+          # version needs the hyphen that starts the prerelease part. Bumping to
+          # a clean 2.0.0 is what surfaced this.
+          #
+          # The sha keeps successive pushes on one PR distinguishable.
+          SHA7="$(git rev-parse --short=7 HEAD)"
           to_preview_version() {
             local base="$1"
-            printf '%s.%s' "$base" "$PREVIEW_SUFFIX"
+            case "$base" in
+              *-*) printf '%s.pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;  # already a prerelease
+              *)   printf '%s-pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;
+            esac
           }
 
           charts=(
