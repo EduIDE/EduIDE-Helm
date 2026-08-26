@@ -151,3 +151,27 @@ configured.
 
 Do not parse `helm template` output with `2>&1`. That warning lands in the YAML
 and anything downstream reads it as a broken document.
+
+## Preflight checks must stay silent offline
+
+`helm template`, the render diff and CI all run without a cluster. A preflight
+that fires there breaks all three. `lookup` returns empty both offline and when
+the thing is genuinely missing, so it cannot tell them apart alone - look up the
+`kube-system` namespace first, and only check anything if that comes back.
+
+The earlier version keyed off `.Release.IsInstall`, which is true under
+`helm template` too. It went unnoticed because the define was never invoked from
+any template. Both are fixed; the includes are at the top of `operator.yaml`,
+which every install renders.
+
+## The oauth2 ConfigMaps are not gated on keycloak.enable
+
+They cannot be: the operator mounts `oauth2-proxy-config`, `oauth2-templates`
+and `oauth2-emails` into every session pod by literal name. So a chart left at
+the default `keycloak.authUrl` ships a live proxy pointed at
+`https://keycloak.url/auth/realms/TheiaCloud`, and sessions fail at the proxy
+instead of running unauthenticated.
+
+`eduide.preflightKeycloak` refuses to render on the placeholder values.
+An installation that genuinely has no identity provider yet sets
+`keycloak.allowUnauthenticated: true`.

@@ -67,6 +67,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | imageRegistry | string | `"ghcr.io/eduide"` | The container registry every EduIDE image is pulled from. |
 | keycloak | object | (see details below) | Values related to Keycloak |
 | keycloak.adminGroup | string | `"theia-cloud/admin"` | The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints. |
+| keycloak.allowUnauthenticated | bool | `false` | Install even though the Keycloak values below are still the chart's placeholders. The oauth2-proxy ConfigMaps render regardless of `enable` (the operator mounts them into every session by literal name), so leaving the placeholders means a proxy pointed at a host that does not exist and sessions that fail rather than run unauthenticated. Only set this for an installation that is deliberately not exposed yet. |
 | keycloak.authUrl | string | `"https://keycloak.url/auth/"` | Key cloak auth URL. Only has to be specified when enable: true |
 | keycloak.clientId | string | `"theia-cloud"` | The client-id. Only has to be specified when enable: true |
 | keycloak.clientSecret | string | `"publicbutoauth2proxywantsasecret"` | The oaid client secret. In case you configure your keycloak client as confidential, then you may specifiy the secret here. If you stick with our default public client, you may leave below value. For public clients keycloak does not generate a client-secret, but in order to make oath2-proxy happy, we will pass a value |
@@ -96,6 +97,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | monitor.activityTracker.enable | bool | `true` | Should the activityTracker module be enabled |
 | monitor.activityTracker.interval | int | `1` | Minutes between re-pinging the pods |
 | monitor.enable | bool | `true` | Should the monitor be enabled |
+| monitoring | object | `{"enabled":true}` | Whether this installation is scraped by Prometheus and appears on the dashboards.  The PodMonitor objects themselves are in `eduide-cluster`, not here. They have to be created in Rancher's own namespace to be discovered, and one PodMonitor per tenant writing into a shared namespace would collide on names. So the cluster chart owns the objects and this flag decides whether this release's namespace is in the list they watch - `bootstrap-cluster.yml` reads it when it derives that list.  Turning it off means this environment stops being scraped. Nothing else about the release changes; `monitor.enable` below is a different thing entirely (the operator's own session activity tracker). |
 | oauth2Proxy | object | `{"cookieDomains":[],"sslInsecureSkipVerify":false,"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
 | oauth2Proxy.sslInsecureSkipVerify | bool | `false` | Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider (sets ssl_insecure_skip_verify). Defaults to false to enforce certificate validation. Set to true only when the provider uses a self-signed or otherwise untrusted certificate. |
 | operator | object | (see details below) | Values related to the operator |

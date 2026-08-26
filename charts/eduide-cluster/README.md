@@ -47,6 +47,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | managedCertificates.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | managedCertificates.issuerRef.name | string | `"letsencrypt-prod"` |  |
 | monitoring | object | `{"dashboardNamespace":"cattle-dashboards","enabled":true,"namespace":"cattle-monitoring-system","sessionNamespaces":[],"targetNamespaces":[]}` | ------------------------------------------------------------------------ |
+| monitoring.enabled | bool | `true` | Create the PodMonitors and dashboards. Set to false by `bootstrap-cluster.yml` when no environment on the cluster opts in, so an all-opted-out cluster is a supported state rather than a render failure. |
 | operatorrole.name | string | `"operator-api-access"` | name for the operator's cluster role |
 | servicerole.name | string | `"service-api-access"` | name for the services' cluster role |
 | wildcardTLSSecret.certificate | string | `""` |  |

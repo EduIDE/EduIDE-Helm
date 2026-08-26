@@ -116,6 +116,9 @@ wildcardTLSSecret:
 # Bootstrap derives it from the environments on this cluster instead.
 # --------------------------------------------------------------------------
 monitoring:
+  # -- Create the PodMonitors and dashboards. Set to false by
+  # `bootstrap-cluster.yml` when no environment on the cluster opts in, so an
+  # all-opted-out cluster is a supported state rather than a render failure.
   enabled: true
   namespace: cattle-monitoring-system
   dashboardNamespace: cattle-dashboards

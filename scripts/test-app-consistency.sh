@@ -22,7 +22,8 @@ ok()  { printf '  PASS  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '        %s\n' "$2"; FAILED=1; }
 
 render() {
-  helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false "$@" 2>/dev/null
+  helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false \
+    --set keycloak.allowUnauthenticated=true "$@" 2>/dev/null
 }
 
 echo "=== app definitions, landing page and preloading agree ==="

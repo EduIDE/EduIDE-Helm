@@ -203,6 +203,13 @@ landingPage:
 keycloak:
   # -- Whether keycloak authentication shall be used
   enable: false
+  # -- Install even though the Keycloak values below are still the chart's
+  # placeholders. The oauth2-proxy ConfigMaps render regardless of `enable`
+  # (the operator mounts them into every session by literal name), so leaving
+  # the placeholders means a proxy pointed at a host that does not exist and
+  # sessions that fail rather than run unauthenticated. Only set this for an
+  # installation that is deliberately not exposed yet.
+  allowUnauthenticated: false
   # -- The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints.
   adminGroup: "theia-cloud/admin"
   # -- Key cloak auth URL. Only has to be specified when enable: true
@@ -546,6 +553,22 @@ preloading:
   # -- Optional: Override the imagePullPolicy for the image preloading containers.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
+
+# -- Whether this installation is scraped by Prometheus and appears on the
+# dashboards.
+#
+# The PodMonitor objects themselves are in `eduide-cluster`, not here. They have
+# to be created in Rancher's own namespace to be discovered, and one PodMonitor
+# per tenant writing into a shared namespace would collide on names. So the
+# cluster chart owns the objects and this flag decides whether this release's
+# namespace is in the list they watch - `bootstrap-cluster.yml` reads it when it
+# derives that list.
+#
+# Turning it off means this environment stops being scraped. Nothing else about
+# the release changes; `monitor.enable` below is a different thing entirely (the
+# operator's own session activity tracker).
+monitoring:
+  enabled: true
 
 # -- The Gradle build cache and Maven proxy. Optional: nothing reaches it
 # unless operator.enableBuildCaching or operator.enableDependencyCaching is also
