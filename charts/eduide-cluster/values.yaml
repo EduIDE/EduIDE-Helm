@@ -92,6 +92,11 @@ managedCertificates:
   issuerRef:
     kind: ClusterIssuer
     name: letsencrypt-prod
+  # -- Each entry takes either `hostname` (one name) or `dnsNames` (a list).
+  # `bootstrap-cluster.yml` fills this in from the environments on the cluster,
+  # so a new environment gets its certificate names without a second edit -
+  # which is how test3 ran for 184 days on a certificate that only covered
+  # test1, test2 and staging.
   certificates: []
 gatewayAcmeIssuer:
   enabled: false

@@ -42,7 +42,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | issuerprod.name | string | `"letsencrypt-prod"` | name for the let's encrypt production cluster issuer |
 | issuerprod.solvers | list | `[]` | ACME solver list for cert-manager (required when `issuerprod.enable=true`) |
 | issuerstaging.name | string | `"theia-cloud-selfsigned-issuer"` | name for the self signed cluster issuer |
-| managedCertificates.certificates | list | `[]` |  |
+| managedCertificates.certificates | list | `[]` | Each entry takes either `hostname` (one name) or `dnsNames` (a list). `bootstrap-cluster.yml` fills this in from the environments on the cluster, so a new environment gets its certificate names without a second edit - which is how test3 ran for 184 days on a certificate that only covered test1, test2 and staging. |
 | managedCertificates.enabled | bool | `false` |  |
 | managedCertificates.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | managedCertificates.issuerRef.name | string | `"letsencrypt-prod"` |  |
