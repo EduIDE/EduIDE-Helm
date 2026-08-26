@@ -25,11 +25,8 @@ bad() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '        %s\n' "
 # a fresh checkout has none and `helm template` refuses outright. Resolve once
 # up front rather than leaving this script only working where someone happened
 # to have run `helm dependency update` by hand.
-if yq -e '.dependencies' "$CHART/Chart.yaml" >/dev/null 2>&1; then
-  helm dependency build "$CHART" >/dev/null 2>&1 \
-    || helm dependency update "$CHART" >/dev/null 2>&1 \
-    || { echo "  could not resolve dependencies for $CHART"; exit 1; }
-fi
+"$(dirname "${BASH_SOURCE[0]}")/resolve-deps.sh" "$CHART" >/dev/null || {
+  echo "could not resolve chart dependencies" >&2; exit 1; }
 
 render() {
   helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false \

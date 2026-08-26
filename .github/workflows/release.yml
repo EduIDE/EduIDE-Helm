@@ -62,6 +62,7 @@ jobs:
               continue
             fi
 
+            ./scripts/resolve-deps.sh "charts/${chart}"
             helm package "charts/${chart}" --destination dist
             helm push "${artifact}" "${OCI_PREFIX}"
             helm show chart "${ref}" --version "${version}" >/dev/null
@@ -142,6 +143,9 @@ jobs:
 
             sed -i "s/^version: .*/version: ${preview_version}/" "${work_dir}/Chart.yaml"
 
+            # The copy under dist/ needs its own dependencies: helm package
+            # reads charts/ from the directory it is given, not from the source.
+            ./scripts/resolve-deps.sh "$work_dir"
             helm package "$work_dir" --destination dist
             helm push "${artifact}" "${OCI_PREFIX}"
             helm show chart "${ref}" --version "${preview_version}" >/dev/null

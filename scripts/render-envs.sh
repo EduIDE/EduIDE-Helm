@@ -81,15 +81,13 @@ fi
 echo "rendering from $CHARTS_DIR (chart $TENANT_CHART, $LAYOUT layout)"
 mkdir -p "$OUT"
 
-# Dependencies are resolved, not vendored: charts/*/charts/ is gitignored, so a
-# fresh checkout has none and `helm template` refuses to render. Cheap when
-# there is nothing to fetch.
-if [[ -f "$CHARTS_DIR/$TENANT_CHART/Chart.yaml" ]] \
-   && yq -e '.dependencies' "$CHARTS_DIR/$TENANT_CHART/Chart.yaml" >/dev/null 2>&1; then
-  helm dependency build "$CHARTS_DIR/$TENANT_CHART" >/dev/null 2>&1 \
-    || helm dependency update "$CHARTS_DIR/$TENANT_CHART" >/dev/null 2>&1 \
-    || echo "warning: could not resolve dependencies for $TENANT_CHART" >&2
-fi
+# charts/*/charts/ is gitignored, so a fresh checkout has no dependencies and
+# `helm template` refuses to render. render-diff renders two chart trees, so
+# both need resolving; the base tree may predate the dependencies entirely,
+# which is why a failure there is not fatal.
+"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/resolve-deps.sh" \
+  "$CHARTS_DIR/$TENANT_CHART" >/dev/null 2>&1 \
+  || echo "warning: could not resolve dependencies for $CHARTS_DIR/$TENANT_CHART" >&2
 
 # --- MASKS ---------------------------------------------------------------
 # Lines whose value is nondeterministic under `helm template`. If you add a

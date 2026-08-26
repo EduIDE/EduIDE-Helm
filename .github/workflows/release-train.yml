@@ -229,6 +229,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           mkdir -p dist
           for c in eduide-cluster eduide; do
+            ./scripts/resolve-deps.sh "charts/$c"
             helm package "charts/$c" --destination dist
             helm push "dist/${c}-${V}.tgz" oci://ghcr.io/eduide/charts
           done

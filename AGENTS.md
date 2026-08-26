@@ -152,6 +152,18 @@ configured.
 Do not parse `helm template` output with `2>&1`. That warning lands in the YAML
 and anything downstream reads it as a broken document.
 
+## Always resolve dependencies before touching a chart
+
+`charts/*/charts/` is gitignored - dependencies are resolved, not vendored,
+which is what stops Chart.lock, Chart.yaml and HEAD drifting apart the way they
+used to. The cost is that a fresh checkout has none, and `helm template`,
+`helm package` and `helm dependency list` all refuse outright rather than
+degrading.
+
+That was rediscovered four times in one afternoon: the kubeconform job,
+`render-envs.sh`, `test-app-consistency.sh` and the PR preview publish. Call
+`scripts/resolve-deps.sh <chart>` first; every caller does.
+
 ## Preflight checks must stay silent offline
 
 `helm template`, the render diff and CI all run without a cluster. A preflight
