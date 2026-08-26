@@ -1,0 +1,43 @@
+{{- /*
+The operator restarts a session's sidecar pods when an AppDefinition's sidecar
+set changes. It needs delete on pods in its own namespace to do that.
+
+This was the only template in the theia-cloud-combined umbrella. Because it was
+not part of any release the umbrella pulled, the deploy workflow used to adopt
+it with an inline `kubectl annotate meta.helm.sh/release-name=...` on every run.
+It is a normal template now and that hack is gone.
+*/ -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator-sidecar-pod-restart
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: operator
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    # deletecollection is intentionally kept for batch sidecar-pod restart cleanup operations.
+    verbs: ["get", "list", "watch", "delete", "deletecollection"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator-sidecar-pod-restart
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: operator
+subjects:
+  - kind: ServiceAccount
+    name: operator-api-service-account
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: operator-sidecar-pod-restart

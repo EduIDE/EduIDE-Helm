@@ -111,5 +111,45 @@ for pair in "cloud:eduide-cloud/operator" "landingPage:eduidec-landing-page"; do
 done
 
 echo
+echo "=== the dependency cache adds no routing ==="
+
+# The cache subchart has its own `gateway:` table, and so does this chart. Helm
+# coalesces the parent's into it, which it announces as
+#   warning: cannot overwrite table with non table for
+#   eduide-shared-cache.gateway.parentRefs
+# The subchart's map wins, so its HTTPRoutes stay off and only this chart's
+# three routes render. That is the behaviour being relied on, so assert it:
+# if coalescing ever starts propagating `gateway.enabled: true` down, the cache
+# would publish routes for hostnames nobody configured.
+with_cache=$(render --set eduide-shared-cache.enabled=true \
+  | yq -r 'select(.kind=="HTTPRoute") | .metadata.name' 2>/dev/null | grep -vE '^(---|null)$' | sort)
+without=$(render | yq -r 'select(.kind=="HTTPRoute") | .metadata.name' 2>/dev/null \
+  | grep -vE '^(---|null)$' | sort)
+if [[ "$with_cache" == "$without" ]]; then
+  ok "enabling the cache adds no HTTPRoute"
+else
+  bad "the cache added routes" "$(comm -23 <(echo "$with_cache") <(echo "$without") | tr '\n' ' ')"
+fi
+
+echo
+echo "=== rendered names are valid Kubernetes names ==="
+
+# RFC 1123: lowercase alphanumerics and dashes. Easy to break from a values file
+# without noticing, because helm template happily renders an invalid name and
+# only the API server rejects it. A camelCase dependency alias did exactly this:
+# it becomes .Chart.Name in the subchart, which built `sharedCache-redis`.
+for extra in "" "--set eduide-shared-cache.enabled=true"; do
+  # shellcheck disable=SC2086
+  names=$(render $extra | yq -r '.metadata.name' 2>/dev/null | grep -vE '^(---|null)$' | sort -u)
+  bad_names=$(grep -vE '^[a-z0-9]([-a-z0-9]*[a-z0-9])?$' <<<"$names" || true)
+  label="${extra:-defaults}"
+  if [[ -z "$bad_names" ]]; then
+    ok "$(wc -l <<<"$names" | tr -d ' ') names valid (${label})"
+  else
+    bad "invalid resource names (${label})" "$(tr '\n' ' ' <<<"$bad_names")"
+  fi
+done
+
+echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
 exit $FAILED

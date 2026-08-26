@@ -31,14 +31,16 @@ appVersion: "1.2.0"
 # replaces still pinned theia-shared-cache 0.3.1, months after the rename, which
 # is why the name is spelled out here with a current version.
 dependencies:
+  # No alias. An alias becomes .Chart.Name inside the subchart, and this one
+  # builds resource names and label values from it - a camelCase alias renders
+  # `sharedCache-redis`, which the API server rejects because RFC 1123 names are
+  # lowercase only.
   - name: eduide-shared-cache
-    alias: sharedCache
     version: "0.5.3"
     repository: "oci://ghcr.io/eduide/charts"
-    condition: sharedCache.enabled
+    condition: eduide-shared-cache.enabled
   - name: theia-workspace-garbage-collector
-    alias: garbageCollector
     version: "0.1.0"
     repository: "oci://ghcr.io/eduide/charts"
-    condition: garbageCollector.enabled
+    condition: theia-workspace-garbage-collector.enabled
 

@@ -415,7 +415,7 @@ gateway:
   # Example for a centralized shared gateway:
   # parentRefs:
   #   - name: theia-shared-gateway
-  #     namespace: gateway-system
+  #     namespace: eduide-system
   parentRefs: []
   # -- HTTPS listener port
   httpsPort: 443
@@ -550,11 +550,11 @@ preloading:
 # -- The Gradle build cache and Maven proxy. Optional: nothing reaches it
 # unless operator.enableBuildCaching or operator.enableDependencyCaching is also
 # turned on, so enabling this alone deploys a cache with no clients.
-sharedCache:
+eduide-shared-cache:
   enabled: false
 
 # -- Reaps workspaces whose sessions are long gone.
-garbageCollector:
+theia-workspace-garbage-collector:
   enabled: true
   image:
     # The garbage collector has never been released with a version tag - GHCR

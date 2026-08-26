@@ -124,3 +124,30 @@ per-commit SHAs - and its own chart defaults to `latest`. A released chart must
 not install whatever was built most recently, and `helm upgrade` would see no
 diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
 Replace it with a semver tag when that repo starts releasing.
+
+## Dependency aliases must be lowercase
+
+An `alias:` becomes `.Chart.Name` inside the subchart, and charts build resource
+names and label values from it. `alias: sharedCache` rendered
+`sharedCache-redis`, which the API server rejects - RFC 1123 names are lowercase
+only, and `helm template` renders it happily. The dependencies are declared
+under their real names for that reason, so the values keys are
+`eduide-shared-cache:` and `theia-workspace-garbage-collector:`.
+`test-app-consistency.sh` checks every rendered name.
+
+## One expected warning from `helm template`
+
+```
+warning: cannot overwrite table with non table for eduide-shared-cache.gateway.parentRefs
+```
+
+Both this chart and the cache subchart have a top-level `gateway:` table, and
+this chart's `parentRefs` is a list where the subchart's is a map. Helm
+coalesces the parent's table down and says so. The subchart's map wins, its
+HTTPRoutes stay off, and only this chart's three routes render -
+`test-app-consistency.sh` asserts exactly that, so the day the behaviour
+changes it fails rather than quietly publishing routes for hostnames nobody
+configured.
+
+Do not parse `helm template` output with `2>&1`. That warning lands in the YAML
+and anything downstream reads it as a broken document.

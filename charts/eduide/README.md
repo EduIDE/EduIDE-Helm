@@ -12,8 +12,8 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/eduide/charts | sharedCache(eduide-shared-cache) | 0.5.3 |
-| oci://ghcr.io/eduide/charts | garbageCollector(theia-workspace-garbage-collector) | 0.1.0 |
+| oci://ghcr.io/eduide/charts | eduide-shared-cache | 0.5.3 |
+| oci://ghcr.io/eduide/charts | theia-workspace-garbage-collector | 0.1.0 |
 
 ## Values
 
@@ -36,7 +36,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | demoApplication.name | string | `"theiacloud/theia-cloud-demo:1.2.0-next"` | The name of docker image to be used |
 | demoApplication.pullSecret | string | `""` | the image pull secret. Leave empty if registry is public |
 | demoApplication.timeout | string | `"30"` | Limit in minutes |
-| garbageCollector | object | `{"enabled":true,"image":{"tag":"599557839e5c5893eb0c20785dac671ae70f7e8a"}}` | Reaps workspaces whose sessions are long gone. |
+| eduide-shared-cache | object | `{"enabled":false}` | The Gradle build cache and Maven proxy. Optional: nothing reaches it unless operator.enableBuildCaching or operator.enableDependencyCaching is also turned on, so enabling this alone deploys a cache with no clients. |
 | gateway | object | `{"className":"envoy","create":true,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
 | gateway.className | string | `"envoy"` | GatewayClassName to use (Envoy Gateway default is typically "envoy") |
 | gateway.create | bool | `true` | Whether to render a Gateway resource in the release namespace. Set to false when using a centralized shared Gateway in another namespace. |
@@ -46,7 +46,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | gateway.instancesRouteName | string | `"theia-cloud-demo-ws-route"` | Name of the HTTPRoute that is updated to publish new Theia application instances |
 | gateway.instancesWildcardSecretNames | object | `{}` | Additional wildcard hostnames and optional dedicated TLS secret names Only accepts wildcard hostnames that are configured in `hosts.allWildcardInstances`. |
 | gateway.name | string | `"theia-cloud-gateway"` | Name of the Gateway resource |
-| gateway.parentRefs | list | `[]` | Optional explicit parentRefs for HTTPRoutes. If empty, routes attach to `gateway.name` in the same namespace.  Example for a centralized shared gateway: parentRefs:   - name: theia-shared-gateway     namespace: gateway-system |
+| gateway.parentRefs | list | `[]` | Optional explicit parentRefs for HTTPRoutes. If empty, routes attach to `gateway.name` in the same namespace.  Example for a centralized shared gateway: parentRefs:   - name: theia-shared-gateway     namespace: eduide-system |
 | gateway.routes.enabled | bool | `true` | Whether to render HTTPRoute resources. |
 | gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
 | gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
@@ -143,8 +143,8 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | service.sentry | object | (see details below) | Values related to Sentry on the service. |
 | service.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the service deployment. |
 | servicerole.name | string | `"service-api-access"` |  |
-| sharedCache | object | `{"enabled":false}` | The Gradle build cache and Maven proxy. Optional: nothing reaches it unless operator.enableBuildCaching or operator.enableDependencyCaching is also turned on, so enabling this alone deploys a cache with no clients. |
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
+| theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"599557839e5c5893eb0c20785dac671ae70f7e8a"}}` | Reaps workspaces whose sessions are long gone. |
 | versions | object | (see details below) | Image versions, one per source repository. Every image the chart deploys derives its tag from one of these three, so a release is three numbers rather than nineteen image strings scattered across environment values files. |
 | versions.cloud | string | `"1.2.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. |
 | versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
