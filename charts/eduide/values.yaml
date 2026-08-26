@@ -1,3 +1,22 @@
+# -- Image versions, one per source repository. Every image the chart deploys
+# derives its tag from one of these three, so a release is three numbers rather
+# than nineteen image strings scattered across environment values files.
+# @default -- (see details below)
+versions:
+  # -- The IDE images from the EduIDE repository (java-17, c, python, ...).
+  # Empty falls through to the chart's appVersion, which is what a release sets,
+  # so a plain `helm install --version 2.0.0` pins every IDE image to the tag
+  # that release published.
+  ide: ""
+  # -- EduIDE-Cloud: the operator and the REST service. Released independently
+  # of the IDE images, so it carries its own version.
+  cloud: "1.2.0"
+  # -- EduIDE-Landing-Page. Released independently as well.
+  landingPage: "1.2.0"
+
+# -- The container registry every EduIDE image is pulled from.
+imageRegistry: ghcr.io/eduide
+
 # -- The default imagePullPolicy for containers of theia cloud.
 # Can be overridden for individual components by specifying the imagePullPolicy variable there.
 # Possible values:
@@ -72,8 +91,9 @@ hosts:
 landingPage:
   # -- Whether the landing page shall be enabled
   enabled: true
-  # -- the landing page image to use
-  image: theiacloud/theia-cloud-landing-page:1.2.0-next
+  # -- the landing page image to use. Templated, so the tag follows
+  # versions.landingPage unless the whole string is overridden.
+  image: '{{ .Values.imageRegistry }}/eduidec-landing-page:{{ .Values.versions.landingPage }}'
   # -- Optional: Override the imagePullPolicy for the landing page's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
@@ -85,7 +105,7 @@ landingPage:
     # -- Whether to set SENTRY_ENABLE=true in the landing page deployment.
     enable: true
   # -- the app id to launch
-  appDefinition: "theia-cloud-demo"
+  appDefinition: "java-17-templates-latest"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage.
   ephemeralStorage: true
@@ -245,8 +265,9 @@ oauth2Proxy:
 # -- Values related to the operator
 # @default -- (see details below)
 operator:
-  # -- The operator image
-  image: theiacloud/theia-cloud-operator:1.2.0-next
+  # -- The operator image. Templated, so the tag follows versions.cloud unless
+  # the whole string is overridden.
+  image: '{{ .Values.imageRegistry }}/eduide-cloud/operator:{{ .Values.versions.cloud }}'
   # -- Optional: Override the imagePullPolicy for the operator's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
@@ -346,13 +367,20 @@ service:
   # -- The service authentication token used in the communication between website and REST-API
   # for spam mitigation. This token is public. Please choose a random generated string.
   authToken: asdfghjkl
-  # -- Reference to an existing Kubernetes Secret containing the bearer token for admin API token protected endpoints.
-  # The chart does not create or manage this Secret.
+  # -- The Kubernetes Secret holding the bearer token for admin API token
+  # protected endpoints. Set `create: true` and supply `adminApiToken` to have
+  # the chart manage it, or leave `create: false` and reference one you created
+  # yourself.
   adminApiTokenSecret:
+    create: false
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
-  # -- The image to use
-  image: theiacloud/theia-cloud-service:1.2.0-next
+  # -- Base64-encoded admin API token. Only read when adminApiTokenSecret.create
+  # is true. Comes from a deployment secret, never from a file in git.
+  adminApiToken: ""
+  # -- The image to use. Templated, so the tag follows versions.cloud unless
+  # the whole string is overridden.
+  image: '{{ .Values.imageRegistry }}/eduide-cloud/service:{{ .Values.versions.cloud }}'
   # -- Optional: Override the imagePullPolicy for the service's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
@@ -420,20 +448,123 @@ monitor:
     enable: true
     # -- Minutes between re-pinging the pods
     interval: 1
+# -- The IDE applications this installation offers.
+#
+# This map is the single source of truth for three things that used to be
+# configured separately and drifted apart: the AppDefinition custom resources,
+# the app list the landing page shows, and the set of images preloaded onto
+# every node. Adding a language is one entry here, not three edits in two
+# repositories.
+#
+# Each key is the AppDefinition name. `image` is a repository without a tag -
+# the tag comes from versions.ide (or the chart's appVersion), so a release
+# moves every IDE image at once. An entry with a `landingPage` key is offered in
+# the landing page drop-down; one without is deployable but hidden.
+# @default -- (see details below)
+appDefinitions:
+  # -- Applied to every app that does not state its own. Only the four scaling
+  # and sizing values genuinely differ between languages.
+  defaults:
+    uid: 101
+    port: 3000
+    mountPath: /home/project
+    timeout: 1440
+    requestsCpu: 200m
+    requestsMemory: 500M
+    limitsMemory: 2400M
+    limitsCpu: "2"
+    minInstances: 0
+    maxInstances: 1000
+    downlinkLimit: 30000
+    uplinkLimit: 30000
+    imagePullPolicy: IfNotPresent
+    options:
+      dataBridgeEnabled: "true"
+      dataBridgePort: "16281"
+  # -- The applications. Key is the AppDefinition name.
+  apps:
+    java-17-latest:
+      image: eduide/java-17
+      requestsCpu: 500m
+      limitsMemory: 3000M
+      # Java is the common case, so some instances are kept warm.
+      minInstances: 3
+      landingPage:
+        label: Java 17
+    java-17-templates-latest:
+      image: eduide/java-17-templates
+      requestsCpu: 500m
+      limitsMemory: 3000M
+      landingPage:
+        label: Java 17 (Templates)
+    c-latest:
+      image: eduide/c
+      landingPage:
+        label: C
+    c-templates-latest:
+      image: eduide/c-templates
+      landingPage:
+        label: C (Templates)
+    javascript-latest:
+      image: eduide/javascript
+      landingPage:
+        label: JavaScript
+    ocaml-latest:
+      image: eduide/ocaml
+      landingPage:
+        label: OCaml
+    python-latest:
+      image: eduide/python
+      landingPage:
+        label: Python
+    rust-latest:
+      image: eduide/rust
+      landingPage:
+        label: Rust
+
 # -- Values to configure preloading of images on Kubernetes nodes.
 # @default -- (see details below)
 preloading:
   # -- Is image preloading enabled.
   enable: true
-  # -- Images to preload. Each item is either an image reference string or a map:
+  # -- Extra images to preload, on top of the ones derived automatically.
+  #
+  # Leave this empty. The chart preloads every appDefinitions.apps image, every
+  # sidecar image and the landing page image without being told, so the list
+  # cannot fall out of step with what the installation actually offers. It used
+  # to be written out by hand per environment and addressed by array index,
+  # which is how production ended up offering c-templates while preloading
+  # everything except c-templates.
+  #
+  # Each item is either an image reference string or a map:
   # `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly),
   # or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used,
   # the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image).
-  # If the list is empty and demoApplication.install == true, demoApplication.name is automatically added.
   images: []
+  # -- Set to false to preload only preloading.images and nothing derived.
+  deriveFromApps: true
   # -- Optional: Override the imagePullPolicy for the image preloading containers.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
+
+# -- The Gradle build cache and Maven proxy. Optional: nothing reaches it
+# unless operator.enableBuildCaching or operator.enableDependencyCaching is also
+# turned on, so enabling this alone deploys a cache with no clients.
+sharedCache:
+  enabled: false
+
+# -- Reaps workspaces whose sessions are long gone.
+garbageCollector:
+  enabled: true
+  image:
+    # The garbage collector has never been released with a version tag - GHCR
+    # holds only `latest`, `main` and per-commit SHAs. Its own chart defaults to
+    # `latest`, which would mean a release of this chart installs whatever was
+    # built most recently, and `helm upgrade` would see no diff when it changed.
+    # Pinned to the commit that `latest` pointed at on 2026-08-25 so a 2.0.0
+    # install is reproducible. Replace this with a semver tag once the
+    # workspace-garbage-collector repo cuts a release.
+    tag: "599557839e5c5893eb0c20785dac671ae70f7e8a"
 
 # -- Skip the check that eduide-cluster is installed on this cluster.
 # Only useful for rendering against a cluster that intentionally lacks it.

@@ -11,15 +11,50 @@ The installable EduIDE platform. Two charts, published as OCI artifacts to
 ```bash
 # once per cluster
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version 1.0.0-rc0 -n eduide-system --create-namespace
+  --version 2.0.0 -n eduide-system --create-namespace
 
 # once per environment
 helm install eduide oci://ghcr.io/eduide/charts/eduide \
-  --version 1.0.0-rc0 -n test1 -f my-values.yaml
+  --version 2.0.0 -n eduide-test1 -f my-values.yaml
 ```
 
 Both charts always carry the same version. `docs/charts.md` explains why the
 split exists and what it is safe to change.
+
+## What one install pins
+
+A bare `--version 2.0.0` with no overrides pins every image. Nothing floats.
+
+| Value | Source repository | Default |
+|---|---|---|
+| `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
+| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.2.0` |
+| `versions.landingPage` | EduIDE-Landing-Page | `1.2.0` |
+
+The three release on their own cadence, so each has its own knob and an
+override names exactly one. A blanket tag would be wrong: a pull request only
+builds the images of the repo it came from, so pointing everything at `pr-451`
+puts the rest of the namespace into `ImagePullBackOff`.
+
+## Adding a language
+
+One entry in `appDefinitions.apps`:
+
+```yaml
+appDefinitions:
+  apps:
+    haskell-latest:
+      image: eduide/haskell        # tag comes from versions.ide
+      landingPage:
+        label: Haskell             # omit this key to deploy it but hide it
+```
+
+That single map drives the AppDefinition custom resource, the landing page's
+app list, and the set of images preloaded onto every node. It used to be three
+hand-maintained lists across two repositories, the preload one addressed by
+array index - which is how production came to offer `c-templates` while
+preloading everything except `c-templates`.
+`scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.
@@ -113,23 +148,26 @@ on GitHub. Consume with an explicit `--version`; never `--devel`.
 | Thing | Form | Example |
 |---|---|---|
 | git tag | `vX.Y.Z` | `v2.3.0` |
-| chart `version` and `appVersion` | `X.Y.Z` | `2.3.0` |
-| image tag | `X.Y.Z` | `2.3.0` |
+| chart `version` | `X.Y.Z` | `2.0.0` |
+| chart `appVersion` | the EduIDE IDE image version | `1.2.0` |
+| image tag | `X.Y.Z` | `1.2.0` |
 
-`appVersion` and the image tag are the same string, so a chart says exactly
-which images it runs.
+`appVersion` is the tag of the IDE images, so a chart says exactly which IDEs it
+runs. The operator, REST service and landing page carry their own versions in
+`versions.cloud` and `versions.landingPage`, because they release on a different
+cadence and a one-line landing page fix should not rebuild fifteen
+multi-gigabyte IDE images.
 
-The four repositories move together. A one-line landing page fix rebuilds
-everything — that is the price of a version number that means something. If a
-component's cadence ever diverges enough to hurt, the alternative is a bill of
-materials pinning each component in the chart values, with `appVersion` demoted
-to a label.
+The chart version is the platform version and is what an environment pins.
 
 ## Checklist
 
 ```
 [ ] dry run is clean
-[ ] both Chart.yaml files at X.Y.Z, version AND appVersion
+[ ] both Chart.yaml files at the same `version`
+[ ] `appVersion` set to the EduIDE release the IDE images were published under
+[ ] `versions.cloud` and `versions.landingPage` set to their releases
+[ ] scripts/test-app-consistency.sh passes (no floating tags, three consumers agree)
 [ ] helm-docs run, READMEs committed
 [ ] bump PR reviewed and merged
 [ ] release train run with dry_run: false

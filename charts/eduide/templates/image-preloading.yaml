@@ -1,16 +1,18 @@
 {{ if .Values.preloading.enable -}}
 
 {{- /*
-If the image preloading list is empty and the demo application is installed,
-add the demo application image to the list.
-If the list is not empty, it was explicitly overridden by the user and used as is.
-Initialize the $images variable because otherwise it is scoped to the if/else
+The list is derived from appDefinitions.apps, their sidecars and the landing
+page, with preloading.images appended. Nothing has to be listed by hand, so the
+preloaded set cannot disagree with what the installation actually offers - the
+old hand-written, index-addressed list is why production offered c-templates
+while preloading everything except c-templates.
 */ -}}
-{{- $images := list -}}
-{{- if and (not .Values.preloading.images) .Values.demoApplication.install -}}
+{{- $images := include "eduide.preloadImages" . | fromJsonArray -}}
+{{- if and (not $images) .Values.demoApplication.install -}}
   {{- $images = list .Values.demoApplication.name -}}
-{{- else -}}
-  {{- $images = .Values.preloading.images -}}
+{{- end -}}
+{{- if not $images -}}
+{{- fail "preloading.enable is true but no images resolved: set appDefinitions.apps, or preloading.images, or disable preloading" -}}
 {{- end -}}
 
 {{- /* Set image pull policy to local variable for increase readability. */ -}}

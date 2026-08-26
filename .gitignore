@@ -1,1 +1,5 @@
 .DS_Store
+
+# Resolved by `helm dependency update`. Chart.lock is committed; the archives
+# it pins are not - they are pulled at build and publish time.
+charts/*/charts/

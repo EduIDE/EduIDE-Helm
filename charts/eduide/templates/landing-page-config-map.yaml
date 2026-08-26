@@ -25,8 +25,25 @@ data:
       {{- end }}
       serviceUrl: "{{ include "theia-cloud.url.service" . }}",
       appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
+      {{- /*
+      The app list is derived from appDefinitions.apps: every entry carrying a
+      `landingPage` key is offered, in the order it is declared there. That is
+      the same map the AppDefinitions and the preloading DaemonSet come from, so
+      the page cannot advertise an app that was never deployed - which is what
+      happened when this was a separate hand-maintained map.
+      landingPage.additionalApps still wins if set, as an escape hatch.
+      */}}
+      {{- $apps := .Values.landingPage.additionalApps }}
+      {{- if not $apps }}
+      {{- $apps = dict }}
+      {{- $ctx := . }}
+      {{- range $n := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
+      {{- $a := index $ctx.Values.appDefinitions.apps $n }}
+      {{- if $a.landingPage }}{{ $apps = set $apps $n $a.landingPage }}{{ end }}
+      {{- end }}
+      {{- end }}
       additionalApps: [
-        {{- range $key, $val := .Values.landingPage.additionalApps }}
+        {{- range $key, $val := $apps }}
         {{- $image := (get $val "image" | default (get $val "Image")) }}
         {
           serviceAuthToken: {{ $key | quote}},

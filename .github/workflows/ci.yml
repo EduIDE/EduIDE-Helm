@@ -43,6 +43,9 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: App definitions, landing page and preloading agree
+        run: ./scripts/test-app-consistency.sh
+
       - name: Chart version must be bumped when a chart changes
         if: github.event_name == 'pull_request'
         run: |

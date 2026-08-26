@@ -89,3 +89,38 @@ watching `main`. Full procedure in the README, and as a skill in
   `minItems: 1` on `spec.rules`, but the upstream Gateway API CRD does not, and
   `httproute-instances.yaml` ships `rules: []` deliberately for the operator to
   patch.
+
+## appDefinitions.apps is the single source of truth
+
+Three things derive from it: the AppDefinition custom resources, the app list
+the landing page offers, and the images the preloading DaemonSet pulls onto
+every node. **Never write a preload list, and never add an app in two places.**
+
+They used to be three hand-maintained lists across two repositories, the
+preload one addressed by array index, with production's list one shorter than
+test's. Production offered `c-templates` while preloading everything except
+`c-templates`. `scripts/test-app-consistency.sh` asserts they agree and CI runs
+it; it also fails on any floating tag in a default render.
+
+## One version knob per source repository
+
+`versions.ide` (EduIDE), `versions.cloud` (EduIDE-Cloud), `versions.landingPage`
+(EduIDE-Landing-Page). `versions.ide` empty means the chart's `appVersion`, so
+`helm install --version X` with no overrides pins every image to that release.
+
+A deploy override names exactly one. Never set a blanket tag - a pull request
+only builds the images of the repo it came from, so the rest of the namespace
+goes into `ImagePullBackOff`.
+
+The three image values are plain strings rendered through `tpl`, so they can
+interpolate `.Values.versions.*` without any template change. Keep it that way:
+turning them into `{registry, repository, tag}` maps would break every values
+file for no gain.
+
+## The garbage collector is pinned to a commit, not a version
+
+Its repository has never cut a release - GHCR holds only `latest`, `main` and
+per-commit SHAs - and its own chart defaults to `latest`. A released chart must
+not install whatever was built most recently, and `helm upgrade` would see no
+diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
+Replace it with a semver tag when that repo starts releasing.

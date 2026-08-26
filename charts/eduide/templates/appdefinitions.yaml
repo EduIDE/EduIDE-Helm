@@ -1,0 +1,100 @@
+{{- /*
+One AppDefinition per entry in appDefinitions.apps. The same map drives the
+landing page's app list and the preloading DaemonSet, so the three cannot
+disagree.
+
+Sorted by name so the rendered output is stable and a helm diff shows real
+changes rather than reordering.
+*/ -}}
+{{- $ctx := . -}}
+{{- $d := .Values.appDefinitions.defaults | default dict -}}
+{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
+{{- $app := index $ctx.Values.appDefinitions.apps $name }}
+{{- if not $app.image }}
+{{- fail (printf "appDefinitions.apps.%s has no image" $name) }}
+{{- end }}
+{{- /*
+minInstances and maxInstances are bootstrap defaults only. Both are required by
+the CRD and a CEL rule enforces min <= max, so they cannot simply be omitted;
+but the admin scaling API mutates them on the live resource, and Helm must not
+reset that on every upgrade. The lookup reads back what is there. It returns
+empty under `helm template`, which is why both fields are masked in the render
+diff - see AGENTS.md.
+*/ -}}
+{{- $live := (lookup "theia.cloud/v1beta11" "AppDefinition" $ctx.Release.Namespace $name).spec | default dict }}
+{{- $min := $app.minInstances | default $d.minInstances | default 0 }}
+{{- if hasKey $live "minInstances" }}{{ $min = get $live "minInstances" }}{{ end }}
+{{- $max := $app.maxInstances | default $d.maxInstances | default 10 }}
+{{- if hasKey $live "maxInstances" }}{{ $max = get $live "maxInstances" }}{{ end }}
+---
+apiVersion: theia.cloud/v1beta11
+kind: AppDefinition
+metadata:
+  name: {{ $name }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    app.kubernetes.io/instance: {{ $ctx.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $ctx.Release.Service }}
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: app-definition
+  annotations:
+    helm.sh/revision: {{ $ctx.Release.Revision | quote }}
+spec:
+  name: {{ $name }}
+  image: {{ include "eduide.appImage" (dict "app" $app "ctx" $ctx) }}
+  imagePullPolicy: {{ $app.imagePullPolicy | default $d.imagePullPolicy | default "IfNotPresent" }}
+  uid: {{ $app.uid | default $d.uid | default 101 }}
+  port: {{ $app.port | default $d.port | default 3000 }}
+  {{- /* The route this app's sessions are exposed through. Taken from the
+  gateway values rather than repeated, so renaming the route cannot orphan an
+  AppDefinition. */}}
+  ingressname: {{ tpl ($ctx.Values.gateway.instancesRouteName | toString) $ctx }}
+  ingressHostnamePrefixes:
+    {{- range ($app.ingressHostnamePrefixes | default $d.ingressHostnamePrefixes | default (list "*.webview.")) }}
+    - {{ . | quote }}
+    {{- end }}
+  minInstances: {{ $min }}
+  maxInstances: {{ $max }}
+  requestsMemory: {{ $app.requestsMemory | default $d.requestsMemory }}
+  requestsCpu: {{ $app.requestsCpu | default $d.requestsCpu }}
+  limitsMemory: {{ $app.limitsMemory | default $d.limitsMemory }}
+  limitsCpu: {{ $app.limitsCpu | default $d.limitsCpu | quote }}
+  downlinkLimit: {{ $app.downlinkLimit | default $d.downlinkLimit | default 30000 }}
+  uplinkLimit: {{ $app.uplinkLimit | default $d.uplinkLimit | default 30000 }}
+  mountPath: {{ $app.mountPath | default $d.mountPath | default "/home/project" }}
+  timeout: {{ $app.timeout | default $d.timeout | default 1440 }}
+  monitor:
+    port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 3000 }}
+    activityTracker:
+      timeoutAfter: {{ ((($app.monitor).activityTracker).timeoutAfter) | default ((($d.monitor).activityTracker).timeoutAfter) | default 60 }}
+      notifyAfter: {{ ((($app.monitor).activityTracker).notifyAfter) | default ((($d.monitor).activityTracker).notifyAfter) | default 55 }}
+  {{- with ($app.options | default $d.options) }}
+  options:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $app.sidecars }}
+  sidecars:
+    {{- range . }}
+    - name: {{ .name }}
+      image: {{ include "eduide.appImage" (dict "app" . "ctx" $ctx) }}
+      port: {{ .port | default 5000 }}
+      {{- with .languages }}
+      languages:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .cpuLimit }}
+      cpuLimit: {{ . }}
+      {{- end }}
+      {{- with .memoryLimit }}
+      memoryLimit: {{ . }}
+      {{- end }}
+      {{- with .cpuRequest }}
+      cpuRequest: {{ . }}
+      {{- end }}
+      {{- with .memoryRequest }}
+      memoryRequest: {{ . }}
+      {{- end }}
+      mountWorkspace: {{ if hasKey . "mountWorkspace" }}{{ .mountWorkspace }}{{ else }}true{{ end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

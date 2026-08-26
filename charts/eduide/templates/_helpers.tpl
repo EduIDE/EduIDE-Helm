@@ -55,3 +55,64 @@ section name, so non-alphanumerics collapse to hyphens and it is capped at 63.
 {{- define "theia-cloud.gateway.wildcardListenerName" -}}
 {{- printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" .wildcard "-") | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+The tag every IDE image carries. versions.ide wins if set, otherwise the
+chart's appVersion, so `helm install --version 2.0.0` with no overrides pins
+every IDE image to the tag that release published.
+*/}}
+{{- define "eduide.ideTag" -}}
+{{- .Values.versions.ide | default .Chart.AppVersion -}}
+{{- end -}}
+
+{{/*
+One app's fully qualified image. `image` is a bare repository; a value that
+already carries a tag or a digest is passed through untouched so an environment
+can pin one app without restructuring anything.
+Call with (dict "app" $app "ctx" $).
+*/}}
+{{- define "eduide.appImage" -}}
+{{- $app := .app -}}
+{{- $ctx := .ctx -}}
+{{- $repo := $app.image | toString -}}
+{{- if or (contains "@sha256:" $repo) (regexMatch ".*:[^/]+$" $repo) -}}
+{{- $repo -}}
+{{- else -}}
+{{- $tag := $app.imageTag | default (include "eduide.ideTag" $ctx) -}}
+{{- if contains "/" $repo -}}
+{{- if hasPrefix $ctx.Values.imageRegistry $repo -}}
+{{- printf "%s:%s" $repo $tag -}}
+{{- else -}}
+{{- printf "%s/%s:%s" $ctx.Values.imageRegistry $repo $tag -}}
+{{- end -}}
+{{- else -}}
+{{- printf "%s/%s:%s" $ctx.Values.imageRegistry $repo $tag -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Every image this installation needs on every node: one per app, one per
+sidecar, plus the landing page. Derived rather than listed, so it cannot
+disagree with what the installation offers.
+*/}}
+{{- define "eduide.preloadImages" -}}
+{{- $out := list -}}
+{{- if .Values.preloading.deriveFromApps -}}
+{{- if .Values.landingPage.enabled -}}
+{{- $out = append $out (tpl (.Values.landingPage.image | toString) .) -}}
+{{- end -}}
+{{- $ctx := . -}}
+{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) -}}
+{{- $app := index $ctx.Values.appDefinitions.apps $name -}}
+{{- $out = append $out (include "eduide.appImage" (dict "app" $app "ctx" $ctx)) -}}
+{{- range $sc := ($app.sidecars | default list) -}}
+{{- $out = append $out (include "eduide.appImage" (dict "app" $sc "ctx" $ctx)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- range $extra := (.Values.preloading.images | default list) -}}
+{{- $out = append $out $extra -}}
+{{- end -}}
+{{- $out | toJson -}}
+{{- end -}}

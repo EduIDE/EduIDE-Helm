@@ -1,12 +1,19 @@
 # eduide
 
-![Version: 1.0.0-rc0](https://img.shields.io/badge/Version-1.0.0--rc0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0-next](https://img.shields.io/badge/AppVersion-1.4.0--next-informational?style=flat-square)
+![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
 
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
+
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+| oci://ghcr.io/eduide/charts | sharedCache(eduide-shared-cache) | 0.5.3 |
+| oci://ghcr.io/eduide/charts | garbageCollector(theia-workspace-garbage-collector) | 0.1.0 |
 
 ## Values
 
@@ -15,6 +22,9 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | app | object | (see details below) | General information about the deployed app |
 | app.id | Deprecated | `"asdfghjkl"` | The app id which is used in the communication between website and REST-API as a spam migitation. This id is public. Please choose an random generated string. Use service.authToken instead. |
 | app.name | string | `"Theia Blueprint"` | The name of the application that may be displayed e.g. on the landing pages |
+| appDefinitions | object | (see details below) | The IDE applications this installation offers.  This map is the single source of truth for three things that used to be configured separately and drifted apart: the AppDefinition custom resources, the app list the landing page shows, and the set of images preloaded onto every node. Adding a language is one entry here, not three edits in two repositories.  Each key is the AppDefinition name. `image` is a repository without a tag - the tag comes from versions.ide (or the chart's appVersion), so a release moves every IDE image at once. An entry with a `landingPage` key is offered in the landing page drop-down; one without is deployable but hidden. |
+| appDefinitions.apps | object | `{"c-latest":{"image":"eduide/c","landingPage":{"label":"C"}},"c-templates-latest":{"image":"eduide/c-templates","landingPage":{"label":"C (Templates)"}},"java-17-latest":{"image":"eduide/java-17","landingPage":{"label":"Java 17"},"limitsMemory":"3000M","minInstances":3,"requestsCpu":"500m"},"java-17-templates-latest":{"image":"eduide/java-17-templates","landingPage":{"label":"Java 17 (Templates)"},"limitsMemory":"3000M","requestsCpu":"500m"},"javascript-latest":{"image":"eduide/javascript","landingPage":{"label":"JavaScript"}},"ocaml-latest":{"image":"eduide/ocaml","landingPage":{"label":"OCaml"}},"python-latest":{"image":"eduide/python","landingPage":{"label":"Python"}},"rust-latest":{"image":"eduide/rust","landingPage":{"label":"Rust"}}}` | The applications. Key is the AppDefinition name. |
+| appDefinitions.defaults | object | `{"downlinkLimit":30000,"imagePullPolicy":"IfNotPresent","limitsCpu":"2","limitsMemory":"2400M","maxInstances":1000,"minInstances":0,"mountPath":"/home/project","options":{"dataBridgeEnabled":"true","dataBridgePort":"16281"},"port":3000,"requestsCpu":"200m","requestsMemory":"500M","timeout":1440,"uid":101,"uplinkLimit":30000}` | Applied to every app that does not state its own. Only the four scaling and sizing values genuinely differ between languages. |
 | demoApplication | object | (see details below) | Information about the demo application to be installed |
 | demoApplication.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the main application's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | demoApplication.install | bool | `true` | Should the demo application be installed |
@@ -26,6 +36,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | demoApplication.name | string | `"theiacloud/theia-cloud-demo:1.2.0-next"` | The name of docker image to be used |
 | demoApplication.pullSecret | string | `""` | the image pull secret. Leave empty if registry is public |
 | demoApplication.timeout | string | `"30"` | Limit in minutes |
+| garbageCollector | object | `{"enabled":true,"image":{"tag":"599557839e5c5893eb0c20785dac671ae70f7e8a"}}` | Reaps workspaces whose sessions are long gone. |
 | gateway | object | `{"className":"envoy","create":true,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
 | gateway.className | string | `"envoy"` | GatewayClassName to use (Envoy Gateway default is typically "envoy") |
 | gateway.create | bool | `true` | Whether to render a Gateway resource in the release namespace. Set to false when using a centralized shared Gateway in another namespace. |
@@ -53,6 +64,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | hosts.configuration.landing | string | `"trynow"` | afix of the landing page |
 | hosts.configuration.service | string | `"servicex"` | afix of the REST service |
 | imagePullPolicy | string | `"Always"` | The default imagePullPolicy for containers of theia cloud. Can be overridden for individual components by specifying the imagePullPolicy variable there. Possible values: - Always - IfNotPresent - Never |
+| imageRegistry | string | `"ghcr.io/eduide"` | The container registry every EduIDE image is pulled from. |
 | keycloak | object | (see details below) | Values related to Keycloak |
 | keycloak.adminGroup | string | `"theia-cloud/admin"` | The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints. |
 | keycloak.authUrl | string | `"https://keycloak.url/auth/"` | Key cloak auth URL. Only has to be specified when enable: true |
@@ -63,12 +75,12 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | keycloak.realm | string | `"TheiaCloud"` | The Keycloak Realm. Only has to be specified when enable: true |
 | landingPage | object | (see details below) | Values related to the landing page |
 | landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name The value contains the label shown in the UI and may optionally contain an image override that is forwarded to the landing page config.  Example: different-app-definition:   label: "Different App Definition"   image: "different-app-definition"   visible: false further-app-definition:   label: "Further App Definition" |
-| landingPage.appDefinition | string | `"theia-cloud-demo"` | the app id to launch |
+| landingPage.appDefinition | string | `"java-17-templates-latest"` | the app id to launch |
 | landingPage.disableInfo | bool | `false` | Should showing info title and text below the launch button be disabled true hides the info title and text false shows the info title and text |
 | landingPage.enabled | bool | `true` | Whether the landing page shall be enabled |
 | landingPage.ephemeralStorage | bool | `true` | If set to true no persisted storage is used when creating sessions on the landing page. Set to false if you want to use persisted storage. |
 | landingPage.footerLinks | string | (see details below) | Optional: Customize footer links on the landing page All footer link configurations are optional. If not provided, default values will be used. |
-| landingPage.image | string | `"theiacloud/theia-cloud-landing-page:1.2.0-next"` | the landing page image to use |
+| landingPage.image | string | `"{{ .Values.imageRegistry }}/eduidec-landing-page:{{ .Values.versions.landingPage }}"` | the landing page image to use. Templated, so the tag follows versions.landingPage unless the whole string is overridden. |
 | landingPage.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the landing page's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | landingPage.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | landingPage.infoText | string | `nil` | Optional: If specified with a value, this overrides the info text shown on the landing page. Empty values are ignored. Use `disableInfo` to deactivate showing the info completely. |
@@ -99,7 +111,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.dependencyCache.enabled | bool | `false` | Whether to enable the dependency cache |
 | operator.dependencyCache.url | string | `""` | The URL of the dependency cache server. |
 | operator.eagerStart | bool | `false` | Whether theia applications shall be started eager. This means that the application is already running without a user. When a user requests a new session, one of the already launched ones is assigned.  Currently only false is fully supported. |
-| operator.image | string | `"theiacloud/theia-cloud-operator:1.2.0-next"` | The operator image |
+| operator.image | string | `"{{ .Values.imageRegistry }}/eduide-cloud/operator:{{ .Values.versions.cloud }}"` | The operator image. Templated, so the tag follows versions.cloud unless the whole string is overridden. |
 | operator.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the operator's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | operator.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | operator.leaderElection | object | (see details below) | Options to influence the operator's leader election |
@@ -115,13 +127,15 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.wondershaperImage | string | `"theiacloud/theia-cloud-wondershaper:1.2.0-next"` | If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container |
 | operatorrole.name | string | `"operator-api-access"` |  |
 | preloading | object | (see details below) | Values to configure preloading of images on Kubernetes nodes. |
+| preloading.deriveFromApps | bool | `true` | Set to false to preload only preloading.images and nothing derived. |
 | preloading.enable | bool | `true` | Is image preloading enabled. |
 | preloading.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the image preloading containers. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
-| preloading.images | list | `[]` | Images to preload. Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). If the list is empty and demoApplication.install == true, demoApplication.name is automatically added. |
+| preloading.images | list | `[]` | Extra images to preload, on top of the ones derived automatically.  Leave this empty. The chart preloads every appDefinitions.apps image, every sidecar image and the landing page image without being told, so the list cannot fall out of step with what the installation actually offers. It used to be written out by hand per environment and addressed by array index, which is how production ended up offering c-templates while preloading everything except c-templates.  Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). |
 | service | object | (see details below) | Values of the Theia Cloud REST service |
-| service.adminApiTokenSecret | object | `{"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | Reference to an existing Kubernetes Secret containing the bearer token for admin API token protected endpoints. The chart does not create or manage this Secret. |
+| service.adminApiToken | string | `""` | Base64-encoded admin API token. Only read when adminApiTokenSecret.create is true. Comes from a deployment secret, never from a file in git. |
+| service.adminApiTokenSecret | object | `{"create":false,"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | The Kubernetes Secret holding the bearer token for admin API token protected endpoints. Set `create: true` and supply `adminApiToken` to have the chart manage it, or leave `create: false` and reference one you created yourself. |
 | service.authToken | string | `"asdfghjkl"` | The service authentication token used in the communication between website and REST-API for spam mitigation. This token is public. Please choose a random generated string. |
-| service.image | string | `"theiacloud/theia-cloud-service:1.2.0-next"` | The image to use |
+| service.image | string | `"{{ .Values.imageRegistry }}/eduide-cloud/service:{{ .Values.versions.cloud }}"` | The image to use. Templated, so the tag follows versions.cloud unless the whole string is overridden. |
 | service.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the service's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | service.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | service.port | int | `8081` | service port (default: 8081) |
@@ -129,7 +143,12 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | service.sentry | object | (see details below) | Values related to Sentry on the service. |
 | service.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the service deployment. |
 | servicerole.name | string | `"service-api-access"` |  |
+| sharedCache | object | `{"enabled":false}` | The Gradle build cache and Maven proxy. Optional: nothing reaches it unless operator.enableBuildCaching or operator.enableDependencyCaching is also turned on, so enabling this alone deploys a cache with no clients. |
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
+| versions | object | (see details below) | Image versions, one per source repository. Every image the chart deploys derives its tag from one of these three, so a release is three numbers rather than nineteen image strings scattered across environment values files. |
+| versions.cloud | string | `"1.2.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. |
+| versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
+| versions.landingPage | string | `"1.2.0"` | EduIDE-Landing-Page. Released independently as well. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

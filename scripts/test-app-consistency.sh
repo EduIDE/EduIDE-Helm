@@ -1,0 +1,115 @@
+#!/usr/bin/env bash
+# The three consumers of appDefinitions.apps must agree.
+#
+# An installation offers an app in three places: the AppDefinition custom
+# resource that makes it deployable, the landing page entry that lets a student
+# pick it, and the preloading DaemonSet that pulls its image onto every node.
+# These used to be three hand-maintained lists in two repositories, addressed by
+# array index. Production ended up offering c-templates while preloading
+# everything except c-templates - students picking it waited for a cold
+# multi-gigabyte pull.
+#
+# They are all derived from one map now. This asserts the derivation, so a
+# template change cannot quietly reintroduce the skew.
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHART="$ROOT/charts/eduide"
+FAILED=0
+
+ok()  { printf '  PASS  %s\n' "$1"; }
+bad() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '        %s\n' "$2"; FAILED=1; }
+
+render() {
+  helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false "$@" 2>/dev/null
+}
+
+echo "=== app definitions, landing page and preloading agree ==="
+
+OUT=$(render) || { echo "  chart does not render"; exit 1; }
+
+declared=$(yq -r '.appDefinitions.apps | keys | .[]' "$CHART/values.yaml" | sort)
+defs=$(yq -r 'select(.kind=="AppDefinition") | .metadata.name' <<<"$OUT" | grep -v '^---$' | sort)
+
+if [[ "$declared" == "$defs" ]]; then
+  ok "$(wc -l <<<"$defs" | tr -d ' ') AppDefinitions, one per declared app"
+else
+  bad "AppDefinitions do not match the declared apps" "$(diff <(echo "$declared") <(echo "$defs") | tr '\n' ' ')"
+fi
+
+# Every image an AppDefinition references, and every sidecar image, has to be
+# on the node before a session starts.
+app_images=$(yq -r 'select(.kind=="AppDefinition") | .spec.image, (.spec.sidecars // [])[].image' <<<"$OUT" \
+                | grep -v '^---$' | sort -u)
+preloaded=$(yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
+                   | .spec.template.spec.initContainers[].image' <<<"$OUT" | grep -v '^---$' | sort -u)
+
+missing=$(comm -23 <(echo "$app_images") <(echo "$preloaded"))
+if [[ -z "$missing" ]]; then
+  ok "every app and sidecar image is preloaded"
+else
+  bad "images offered but not preloaded" "$(tr '\n' ' ' <<<"$missing")"
+fi
+
+# The landing page must not advertise an app that was never deployed.
+offered=$(yq -r 'select(.kind=="ConfigMap" and (.metadata.name|test("landing")))
+                 | .data | to_entries[0].value' <<<"$OUT" \
+          | sed -n '/additionalApps: \[/,/^ *\],/p' \
+          | grep -oE 'serviceAuthToken: "[^"]+"' | sed 's/.*"\(.*\)"/\1/' | sort -u)
+if [[ -z "$offered" ]]; then
+  bad "landing page offers no apps at all" ""
+else
+  orphan=$(comm -23 <(echo "$offered") <(echo "$defs"))
+  if [[ -z "$orphan" ]]; then
+    ok "$(wc -l <<<"$offered" | tr -d ' ') apps offered, all of them deployed"
+  else
+    bad "landing page offers apps with no AppDefinition" "$(tr '\n' ' ' <<<"$orphan")"
+  fi
+fi
+
+# The landing page's own default app has to be one of them, or the page loads
+# pointing at nothing.
+default=$(yq -r '.landingPage.appDefinition' "$CHART/values.yaml")
+if grep -qx "$default" <<<"$defs"; then
+  ok "landingPage.appDefinition '$default' exists"
+else
+  bad "landingPage.appDefinition '$default' has no AppDefinition" ""
+fi
+
+echo
+echo "=== versions ==="
+
+# A release is `helm install --version X` with no overrides. Every EduIDE image
+# must then carry a tag that release published, not a floating one.
+APP_VERSION=$(yq -r '.appVersion' "$CHART/Chart.yaml")
+floating=$(grep -oE "ghcr\.io/eduide/[^ \";']+" <<<"$OUT" | sort -u | grep -E ':(latest|main|next)$')
+if [[ -z "$floating" ]]; then
+  ok "no floating tags in a default render"
+else
+  bad "default render uses floating tags" "$(tr '\n' ' ' <<<"$floating")"
+fi
+
+ide=$(grep -oE "ghcr\.io/eduide/eduide/[^ \";']+" <<<"$OUT" | sort -u)
+wrong=$(grep -v ":${APP_VERSION}\$" <<<"$ide")
+if [[ -z "$wrong" ]]; then
+  ok "every IDE image defaults to appVersion ${APP_VERSION}"
+else
+  bad "IDE images not on appVersion ${APP_VERSION}" "$(tr '\n' ' ' <<<"$wrong")"
+fi
+
+# Cloud and landing page release on their own cadence, so they must be
+# overridable without touching anything else.
+for pair in "cloud:eduide-cloud/operator" "landingPage:eduidec-landing-page"; do
+  key="${pair%%:*}"; repo="${pair##*:}"
+  got=$(render --set "versions.${key}=9.9.9" | grep -oE "ghcr\.io/eduide/${repo}:[^ \";']+" | sort -u)
+  if [[ "$got" == "ghcr.io/eduide/${repo}:9.9.9" ]]; then
+    ok "versions.${key} overrides ${repo} independently"
+  else
+    bad "versions.${key} did not take effect" "$got"
+  fi
+done
+
+echo
+[[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
+exit $FAILED
