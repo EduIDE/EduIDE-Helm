@@ -32,6 +32,14 @@ spec:
     hostname: {{ $listener.hostname | quote }}
     {{- end }}
     {{- if eq $protocol "HTTPS" }}
+    {{- /*
+    An HTTPS listener with no secret renders certificateRefs with an empty name.
+    Nothing rejects that: the Gateway is accepted and simply never programs TLS
+    for the hostname, so the first symptom is a connection failure in a browser.
+    */}}
+    {{- if not $listener.tlsSecretName }}
+    {{- fail (printf "gateway listener %q is HTTPS but has no tlsSecretName" $listener.name) }}
+    {{- end }}
     tls:
       mode: Terminate
       certificateRefs:
