@@ -102,8 +102,27 @@ mkdir -p "$OUT"
 mask() {
   sed -E \
     -e 's/^([[:space:]]*redis-password:).*/\1 <masked>/' \
+    -e 's/^([[:space:]]*prometheusPassword:).*/\1 <masked>/' \
     -e 's/^([[:space:]]*minInstances:).*/\1 <masked>/' \
     -e 's/^([[:space:]]*maxInstances:).*/\1 <masked>/'
+}
+
+# Rendering the same input twice must produce the same output. This is what
+# actually keeps the mask list honest: prometheusPassword was a second
+# randAlphaNum in the same subchart as redis-password, was never masked, and put
+# a spurious secret change in every single render diff - which is how a diff
+# stops being read.
+assert_deterministic() {
+  local chart="$1" name="$2"; shift 2
+  local a b
+  a="$(helm template determinism-check "$chart" "$@" 2>/dev/null | mask)"
+  b="$(helm template determinism-check "$chart" "$@" 2>/dev/null | mask)"
+  if [[ "$a" != "$b" ]]; then
+    echo "RENDER IS NONDETERMINISTIC for ${name}:" >&2
+    diff <(printf '%s' "$a") <(printf '%s' "$b") | grep '^[<>]' | head -6 | sed 's/^/    /' >&2
+    echo "  A template gained a lookup or a random value. Add it to mask() above." >&2
+    return 1
+  fi
 }
 
 rendered=0
@@ -129,6 +148,8 @@ for dir in "$DEPLOY"/$LAYOUT/*/; do
     yq -r 'explode(.) | ."theia-cloud"' "$dir/values.yaml" > "$values"
     ns="$(yq -r '.hosts.configuration.landing // "default"' "$values")"
   fi
+
+  assert_deterministic "$CHARTS_DIR/$TENANT_CHART" "$env_name" "${extra[@]}" -f "$values" --namespace "$ns" || exit 1
 
   if ! helm template theia-cloud "$CHARTS_DIR/$TENANT_CHART" \
         "${extra[@]}" -f "$values" --namespace "$ns" 2> "$OUT/$env_name.err" | mask > "$OUT/$env_name.yaml"; then
