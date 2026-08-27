@@ -34,7 +34,12 @@ env:
   # it is never published. Listing it here would fail every release; leaving it
   # implicit would let the gap rot unnoticed.
   CLOUD_IMAGES: "eduide-cloud/operator eduide-cloud/service eduide-cloud/conversion-webhook"
-  IDE_IMAGES: "eduide/base eduide/c eduide/c-templates eduide/haskell eduide/java-17 eduide/java-17-templates eduide/javascript eduide/ocaml eduide/python eduide/rust"
+  # IDE_IMAGES is deliberately absent. It is read from EduIDE's build matrix at
+  # run time, because a hand-kept copy drifts the moment someone adds an image.
+  # This list was written when there were ten; java-25 and java-25-templates
+  # landed days later. A release would then have verified ten of twelve and
+  # passed, while pinning two tags that were never pushed - which is precisely
+  # the failure this job exists to prevent.
   OTHER_IMAGES: "eduidec-landing-page"
 
 jobs:
@@ -120,9 +125,30 @@ jobs:
             | sudo tar -xz -C /usr/local/bin crane
           echo '${{ secrets.GITHUB_TOKEN }}' | crane auth login ghcr.io -u '${{ github.actor }}' --password-stdin
 
+      - name: Read the IDE images from EduIDE's build matrix
+        id: ide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          gh api repos/EduIDE/EduIDE/contents/.github/workflows/build.yml --jq '.content' | base64 -d > build.yml
+          # Matrix entries are `eduide/eduide/<name>`; the registry path drops
+          # the leading org segment.
+          imgs=$(yq -r '[.jobs.images.strategy.matrix.include[]["image-name"]] | .[]' build.yml | sed 's|^eduide/||' | tr '\n' ' ')
+          base=$(yq -r '.jobs.base.with["image-name"]' build.yml | sed 's|^eduide/||')
+          if [[ -z "${imgs// /}" || -z "$base" || "$base" == "null" ]]; then
+            echo "::error::could not read EduIDE's build matrix; refusing to verify an incomplete image set"
+            exit 1
+          fi
+          echo "images=${base} ${imgs}" >> "$GITHUB_OUTPUT"
+          echo "::notice::EduIDE publishes: ${base} ${imgs}"
+
       - name: Every expected image exists, for both architectures
         env:
           V: ${{ needs.validate.outputs.version }}
+          IDE_IMAGES: ${{ steps.ide.outputs.images }}
         run: |
           set -uo pipefail
           missing=0; single=0; n=0
