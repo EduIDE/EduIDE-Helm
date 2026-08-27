@@ -50,12 +50,6 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | gateway.routes.enabled | bool | `true` | Whether to render HTTPRoute resources. |
 | gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
 | gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
-| gitea | object | (see details below) | Values related to Gitea / generic OIDC authentication. Mutually exclusive with keycloak (a single oauth2-proxy provider is supported per session). |
-| gitea.clientId | string | `"theia-cloud"` | The client-id. Only has to be specified when enable: true |
-| gitea.clientSecret | string | `""` | The client secret configured for the OIDC application in Gitea. Must be provided (rendering fails when gitea.enable is true and this is empty). |
-| gitea.cookieSecret | string | `""` | The cookie secret. This should not be public! Must be provided when enable: true (rendering fails when gitea.enable is true and this is empty). See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret for how to generate a strong cookie secret. |
-| gitea.enable | bool | `false` | Whether Gitea / generic OIDC authentication shall be used |
-| gitea.issuerUrl | string | `"https://gitea.example.com"` | The Gitea base URL used as the OIDC issuer. Only has to be specified when enable: true. This must be the issuer base URL without a trailing slash and without a realms path, e.g. "https://gitea.example.com". |
 | hosts | object | (see details below) | You may adjust the hostname below. |
 | hosts.allWildcardInstances | list | `[]` | all additional wildcard hostnames that may be required in the launched Theia-applications, e.g. "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews. Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from all app definitions need to be added. IMPORTANT: If this gets updated, the helm chart needs to be re-installed because helm upgrade will not properly update this at the moment. These are required to configure TLS (if enabled via gateway.tls == true) I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured. |
 | hosts.configuration | object | (see details below) | Configuration for the hostnames. Contains the baseHost and afixes for all services |
