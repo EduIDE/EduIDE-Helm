@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.1.0](https://img.shields.io/badge/Version-2.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -37,9 +37,9 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | demoApplication.pullSecret | string | `""` | the image pull secret. Leave empty if registry is public |
 | demoApplication.timeout | string | `"30"` | Limit in minutes |
 | eduide-shared-cache | object | `{"enabled":false}` | The Gradle build cache and Maven proxy. Optional: nothing reaches it unless operator.enableBuildCaching or operator.enableDependencyCaching is also turned on, so enabling this alone deploys a cache with no clients. |
-| gateway | object | `{"className":"envoy","create":true,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
+| gateway | object | `{"className":"envoy","create":false,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
 | gateway.className | string | `"envoy"` | GatewayClassName to use (Envoy Gateway default is typically "envoy") |
-| gateway.create | bool | `true` | Whether to render a Gateway resource in the release namespace. Set to false when using a centralized shared Gateway in another namespace. |
+| gateway.create | bool | `false` | Create a Gateway in this namespace.  Leave this false. The supported model is one shared Gateway per cluster, installed by the eduide-cluster chart, which every environment attaches to through `gateway.parentRefs` below. That is what every real installation uses and the only path that is tested.  Setting this true renders a Gateway whose HTTPS listeners reference the Secrets `ws-cert-secret`, `service-cert-secret` and `landing-page-cert-secret` - which NEITHER CHART CREATES. You would have to create all three yourself. The listeners sit at Programmed=False until you do, and nothing in `helm status` explains why. |
 | gateway.enabled | bool | `true` | Master switch for Gateway API resources. |
 | gateway.httpEnabled | bool | `false` | Whether to create an HTTP listener on port 80 (useful for plain HTTP or external redirects) |
 | gateway.httpsPort | int | `443` | HTTPS listener port |
@@ -51,7 +51,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
 | gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
 | hosts | object | (see details below) | You may adjust the hostname below. |
-| hosts.allWildcardInstances | list | `[]` | all additional wildcard hostnames that may be required in the launched Theia-applications, e.g. "*.webview." which leads to "*.webview.ws.192.168.39.173.nip.io" to expose webviews. Please note that this means that this usually means that all "ingressHostnamePrefixes" patterns from all app definitions need to be added. IMPORTANT: If this gets updated, the helm chart needs to be re-installed because helm upgrade will not properly update this at the moment. These are required to configure TLS (if enabled via gateway.tls == true) I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured. |
+| hosts.allWildcardInstances | list | `["*.webview."]` | Hostname prefixes that session webviews are served from, relative to the instance host. Sessions render previews, notebooks and embedded docs on these, so with an empty list webviews 404 - the session itself still starts, so this is discovered by a user rather than by the installer.  Every AppDefinition already defaults to the matching `ingressHostnamePrefixes: ["*.webview."]`, so this default makes the two agree. It has two consequences you must plan for:    DNS   `*.webview.instance.<host>` must resolve.   TLS   you need a WILDCARD certificate for it. ACME cannot issue a wildcard         over HTTP-01, so either configure a DNS-01 solver         (`gatewayAcmeIssuer.solvers` in the eduide-cluster chart) or obtain         the certificate separately and supply it as a Secret.  Set to [] only if you genuinely do not want webviews. |
 | hosts.configuration | object | (see details below) | Configuration for the hostnames. Contains the baseHost and afixes for all services |
 | hosts.configuration.baseHost | string | `"192.168.39.173.nip.io"` | baseHost configures the host for all services. Service names are prepended as subdomains, e.g. service.<landing>.<baseHost> |
 | hosts.configuration.instance | string | `"instances"` | afix for deployed instances |
@@ -85,7 +85,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.logoData | string | `nil` | set landingPage.logoData=$(cat path/to/file.svg | base64 -w 0 -) Another way is to directly add the base64 string to the values file. |
 | landingPage.logoFileExtension | string | `"svg"` | The file extension of the logo. Must be set to match the logo respectively the logoData. This is required because browsers cannot show a binary image (e.g. png) with a svg ending and vice-versa. |
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
-| landingPage.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the landing page deployment. |
+| landingPage.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
 | monitor | object | (see details below) | Values to influence the monitor initialization on the operator |
 | monitor.activityTracker | object | (see details below) | Values to influence the activityTracker module |
 | monitor.activityTracker.enable | bool | `true` | Should the activityTracker module be enabled |
@@ -117,7 +117,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.replicas | int | `1` | Number of operator instances to create |
 | operator.requestedStorage | string | `"250Mi"` | The amount of requested storage for each persistent volume claim (PVC) for workspaces. This is directly passed to created PVCs and must be a valid Kubernetes quantity. See https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/ |
 | operator.sentry | object | (see details below) | Values related to Sentry on the operator. |
-| operator.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the operator deployment. |
+| operator.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the operator deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
 | operator.sessionsPerUser | string | `"1"` | Set the number of active sessions a single user can launch |
 | operator.storageClassName | string | `"default"` | The name of the storage class for persistent volume claims for workspaces. This storage class must be present on the cluster. Most cloud providers offer a default storage class without additional configuration. |
 | operator.wondershaperImage | string | `"theiacloud/theia-cloud-wondershaper:1.2.0-next"` | If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container |
@@ -129,7 +129,9 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | preloading.images | list | `[]` | Extra images to preload, on top of the ones derived automatically.  Leave this empty. The chart preloads every appDefinitions.apps image, every sidecar image and the landing page image without being told, so the list cannot fall out of step with what the installation actually offers. It used to be written out by hand per environment and addressed by array index, which is how production ended up offering c-templates while preloading everything except c-templates.  Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). |
 | service | object | (see details below) | Values of the Theia Cloud REST service |
 | service.adminApiToken | string | `""` | Base64-encoded admin API token. Only read when adminApiTokenSecret.create is true. Comes from a deployment secret, never from a file in git. |
-| service.adminApiTokenSecret | object | `{"create":false,"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | The Kubernetes Secret holding the bearer token for admin API token protected endpoints. Set `create: true` and supply `adminApiToken` to have the chart manage it, or leave `create: false` and reference one you created yourself. |
+| service.adminApiTokenSecret | object | `{"create":false,"external":false,"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | The Kubernetes Secret holding the bearer token for admin API token protected endpoints. Set `create: true` and supply `adminApiToken` to have the chart manage it, or leave `create: false` and reference one you created yourself. |
+| service.adminApiTokenSecret.create | bool | `false` | Have the chart create the Secret from `adminApiToken` below. |
+| service.adminApiTokenSecret.external | bool | `false` | Set true if you created the Secret yourself, outside the chart. Leaving both this and `create` false means the admin API is simply not exposed - which is a valid way to run, and is the default. |
 | service.authToken | string | `"asdfghjkl"` | The service authentication token used in the communication between website and REST-API for spam mitigation. This token is public. Please choose a random generated string. |
 | service.image | string | `"{{ .Values.imageRegistry }}/eduide-cloud/service:{{ .Values.versions.cloud }}"` | The image to use. Templated, so the tag follows versions.cloud unless the whole string is overridden. |
 | service.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the service's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
@@ -137,7 +139,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | service.port | int | `8081` | service port (default: 8081) |
 | service.protocol | string | `"https"` | protocol of the REST-API |
 | service.sentry | object | (see details below) | Values related to Sentry on the service. |
-| service.sentry.enable | bool | `true` | Whether to set SENTRY_ENABLE=true in the service deployment. |
+| service.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the service deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
 | servicerole.name | string | `"service-api-access"` |  |
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
 | theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"599557839e5c5893eb0c20785dac671ae70f7e8a"}}` | Reaps workspaces whose sessions are long gone. |

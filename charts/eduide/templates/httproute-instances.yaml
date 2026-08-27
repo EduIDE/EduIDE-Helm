@@ -14,7 +14,7 @@ spec:
   parentRefs:
 {{ include "theia-cloud.gateway.parentRefs" . | nindent 2 }}
   hostnames:
-  - {{ include "theia-cloud.host.instance" . }}
+  - {{ include "theia-cloud.host.instance" . | quote }}
   {{- include "theia-cloud.host.wildcardInstances" . | trim | nindent 2 }}
   rules: []
 {{- end }}

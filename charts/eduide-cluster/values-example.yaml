@@ -1,0 +1,129 @@
+# A worked example for `eduide-cluster`: the cluster-scoped half of EduIDE,
+# installed once per cluster.
+#
+#   helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
+#     --version 2.1.0 -n eduide-system --create-namespace \
+#     -f values-example.yaml
+#
+# Replace eduide.example.edu throughout. This example assumes ONE environment;
+# add four more listeners and three more dnsNames per additional one.
+#
+# Before this will work, the cluster needs: cert-manager, the Gateway API CRDs,
+# a Gateway controller (Envoy Gateway is what EduIDE is tested with), and a
+# LoadBalancer. See the administrator documentation.
+
+# ---------------------------------------------------------------------------
+# The shared Gateway
+# ---------------------------------------------------------------------------
+gateway:
+  create: true
+  # Four listeners per environment. The `<prefix>-` part is yours to choose and
+  # must be unique on the cluster, but each name must match a
+  # `gateway.parentRefs[].sectionName` in that environment's eduide values.
+  listeners:
+    - name: prod-landing
+      hostname: eduide.example.edu
+      tlsSecretName: eduide-tls
+
+    - name: prod-service
+      hostname: service.eduide.example.edu
+      tlsSecretName: eduide-tls
+
+    - name: prod-instances
+      hostname: instance.eduide.example.edu
+      tlsSecretName: eduide-tls
+
+    # Sessions serve previews and embedded docs from here. This is a WILDCARD,
+    # and it needs its own certificate - see below.
+    - name: prod-webview
+      hostname: "*.webview.instance.eduide.example.edu"
+      tlsSecretName: eduide-webview-tls
+
+    # cert-manager answers HTTP-01 challenges on plain port 80, so each
+    # non-wildcard hostname it renews needs one of these alongside its HTTPS
+    # listener. Drop them if you supply certificates some other way.
+    - name: acme-landing
+      hostname: eduide.example.edu
+      protocol: HTTP
+      port: 80
+    - name: acme-service
+      hostname: service.eduide.example.edu
+      protocol: HTTP
+      port: 80
+    - name: acme-instances
+      hostname: instance.eduide.example.edu
+      protocol: HTTP
+      port: 80
+
+# ---------------------------------------------------------------------------
+# Certificates
+# ---------------------------------------------------------------------------
+# cert-manager issues the three non-wildcard hostnames over HTTP-01.
+managedCertificates:
+  enabled: true
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod-gateway
+  certificates:
+    - name: eduide-tls
+      secretName: eduide-tls
+      dnsNames:
+        - eduide.example.edu
+        - service.eduide.example.edu
+        - instance.eduide.example.edu
+
+# The ACME issuer those certificates use.
+gatewayAcmeIssuer:
+  enabled: true
+  email: platform@example.edu
+
+  # THE WILDCARD PROBLEM, AND YOUR TWO OPTIONS.
+  #
+  # `*.webview.instance.eduide.example.edu` cannot be issued over HTTP-01 - ACME
+  # does not permit wildcards that way. So either:
+  #
+  # (a) give cert-manager a DNS-01 solver, and add the wildcard to
+  #     managedCertificates above like any other name. Uncomment and adapt:
+  #
+  # solvers:
+  #   - dns01:
+  #       cloudflare:
+  #         apiTokenSecretRef: { name: cloudflare-api-token, key: token }
+  #     selector:
+  #       dnsNames: ["*.webview.instance.eduide.example.edu"]
+  #   - http01:
+  #       gatewayHTTPRoute:
+  #         parentRefs:
+  #           - group: gateway.networking.k8s.io
+  #             kind: Gateway
+  #             name: theia-shared-gateway
+  #             namespace: eduide-system
+  #
+  # (b) obtain the wildcard certificate some other way - a commercial CA, or
+  #     your institution's certificate service - and supply it below.
+  solvers: []
+
+# Option (b): a wildcard certificate you obtained yourself, as base64.
+#
+#   cat wildcard.crt | base64 | tr -d '\n'
+#   cat wildcard.key | base64 | tr -d '\n'
+#
+# This must cover `*.webview.instance.<your host>` and match the
+# `tlsSecretName` on the webview listener above.
+wildcardTLSSecret:
+  create: false
+  name: eduide-webview-tls
+  certificate: ""
+  key: ""
+
+# ---------------------------------------------------------------------------
+# Monitoring - off unless you have somewhere for it to go
+# ---------------------------------------------------------------------------
+# Needs the Prometheus Operator CRDs, and both namespaces must already exist and
+# be watched by your Prometheus and Grafana. The defaults are Rancher's names.
+monitoring:
+  enabled: false
+  # namespace: monitoring
+  # dashboardNamespace: monitoring
+  # targetNamespaces: [eduide-prod]
+  # sessionNamespaces: [eduide-prod]

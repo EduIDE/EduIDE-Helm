@@ -4,8 +4,8 @@ metadata:
   name: service-config
   namespace: {{ .Release.Namespace }}
 data:
-  SERVICE_AUTH_TOKEN: {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . }}
-  APPID: {{ tpl (.Values.app.id | toString) . }}
+  SERVICE_AUTH_TOKEN: {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . | quote }}
+  APPID: {{ tpl (.Values.app.id | toString) . | quote }}
   SERVICE_PORT: {{ tpl (.Values.service.port | toString) . | quote }}
   KEYCLOAK_ENABLE: {{ tpl (.Values.keycloak.enable | toString) . | quote }}
   SENTRY_ENVIRONMENT: {{ .Release.Namespace }}
@@ -13,8 +13,8 @@ data:
   OTEL_METRICS_EXPORTER: none
   OTEL_LOGS_EXPORTER: none
   {{- if eq (tpl (.Values.keycloak.enable | toString) .) "true" }}
-  KEYCLOAK_ADMIN_GROUP: {{ tpl (.Values.keycloak.adminGroup | toString) . }}
+  KEYCLOAK_ADMIN_GROUP: {{ tpl (.Values.keycloak.adminGroup | toString) . | quote }}
   KEYCLOAK_SERVERURL: {{ tpl (.Values.keycloak.authUrl | toString) . }}realms/{{ tpl (.Values.keycloak.realm | toString) . }}
-  KEYCLOAK_CLIENTID: {{ tpl (.Values.keycloak.clientId | toString) . }}
-  KEYCLOAK_CLIENTSECRET: {{ tpl (.Values.keycloak.clientSecret | toString) . }}
+  KEYCLOAK_CLIENTID: {{ tpl (.Values.keycloak.clientId | toString) . | quote }}
+  KEYCLOAK_CLIENTSECRET: {{ tpl (.Values.keycloak.clientSecret | toString) . | quote }}
   {{- end }}

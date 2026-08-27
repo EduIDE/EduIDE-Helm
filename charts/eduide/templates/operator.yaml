@@ -1,5 +1,6 @@
 {{- include "eduide.preflight" . -}}
 {{- include "eduide.preflightKeycloak" . -}}
+{{- include "eduide.preflightGateway" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -47,17 +48,17 @@ spec:
           {{- end }}
           {{ if .Values.operator.eagerStart }}- "--eagerStart"{{ end }}
           - "--cloudProvider"
-          - {{ tpl (.Values.operator.cloudProvider | toString) . }}
+          - {{ tpl (.Values.operator.cloudProvider | toString) . | quote }}
           - "--bandwidthLimiter"
-          - {{ tpl (.Values.operator.bandwidthLimiter | toString) . }}
+          - {{ tpl (.Values.operator.bandwidthLimiter | toString) . | quote }}
           - "--wondershaperImage"
-          - {{ tpl (.Values.operator.wondershaperImage | toString) . }}
+          - {{ tpl (.Values.operator.wondershaperImage | toString) . | quote }}
           - "--serviceUrl"
           - {{ include "theia-cloud.url.service" . }}
           - "--sessionsPerUser"
           - "{{ tpl (.Values.operator.sessionsPerUser | toString) . }}"
           - "--serviceAuthToken"
-          - {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . }}
+          - {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . | quote }}
           - "--instancesHost"
           - "{{ include "theia-cloud.host.instance" . }}"
           - "--storageClassName"

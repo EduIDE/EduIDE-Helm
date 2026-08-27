@@ -35,7 +35,14 @@ spec:
         env:
         - name: SENTRY_ENABLE
           value: {{ tpl (.Values.service.sentry.enable | toString) . | quote }}
-      {{- if and .Values.service.adminApiTokenSecret.name .Values.service.adminApiTokenSecret.key }}
+      {{- /*
+      Only mount the token when something actually supplies it. This used to be
+      gated on the name and key alone, both of which have defaults, so a default
+      install always referenced a Secret that `create: false` meant nobody had
+      created - and the pod sat in CreateContainerConfigError forever, taking
+      every session launch with it.
+      */}}
+      {{- if and .Values.service.adminApiTokenSecret.name .Values.service.adminApiTokenSecret.key (or .Values.service.adminApiTokenSecret.create .Values.service.adminApiTokenSecret.external) }}
         - name: ADMIN_API_TOKEN
           valueFrom:
             secretKeyRef:

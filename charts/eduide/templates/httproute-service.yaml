@@ -8,7 +8,7 @@ spec:
   parentRefs:
 {{ include "theia-cloud.gateway.parentRefs" . | nindent 2 }}
   hostnames:
-  - {{ include "theia-cloud.host.service" . }}
+  - {{ include "theia-cloud.host.service" . | quote }}
   rules:
   - matches:
     - path:

@@ -108,9 +108,20 @@ jobs:
           )
           failed=0
           for chart in charts/*/; do
-            echo "::group::kubeconform $(basename "$chart")"
+            name="$(basename "$chart")"
+            echo "::group::kubeconform $name"
             ./scripts/resolve-deps.sh "$chart"
-            helm template test "$chart" \
+            # Render from the chart's own example where it has one. Bare
+            # defaults are not a valid install for eduide-cluster - it would
+            # render no Gateway, which the chart now refuses - so validating
+            # defaults would validate nothing. This also keeps the example files
+            # working, since a broken one fails here.
+            EXAMPLE=()
+            if [[ -f "$chart/values-example.yaml" ]]; then
+              EXAMPLE=(-f "$chart/values-example.yaml")
+              echo "using $name/values-example.yaml"
+            fi
+            helm template test "$chart" "${EXAMPLE[@]}" \
               --set keycloak.allowUnauthenticated=true \
               | kubeconform -strict -summary -ignore-missing-schemas -skip HTTPRoute "${SCHEMAS[@]}" || failed=1
             echo "::endgroup::"

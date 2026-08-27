@@ -42,6 +42,6 @@ data:
     {{- if gt (len $whitelistDomains) 0 }}
     whitelist_domains={{ toJson $whitelistDomains }}
     {{- else }}
-    whitelist_domains=["{{ tpl (.Values.hosts.configuration.instance | toString) . }}:*","{{ $keycloakHost }}:*"]
+    whitelist_domains=["{{ include "theia-cloud.host.instance" . }}:*","{{ $keycloakHost }}:*"]
     {{- end }}
     custom_templates_dir="/templates"
