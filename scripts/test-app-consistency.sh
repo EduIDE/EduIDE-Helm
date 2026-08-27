@@ -108,7 +108,7 @@ fi
 
 # Cloud and landing page release on their own cadence, so they must be
 # overridable without touching anything else.
-for pair in "cloud:eduide-cloud/operator" "landingPage:eduidec-landing-page"; do
+for pair in "cloud:eduide-cloud/operator" "landingPage:eduide-landing-page"; do
   key="${pair%%:*}"; repo="${pair##*:}"
   got=$(render --set "versions.${key}=9.9.9" | grep -oE "ghcr\.io/eduide/${repo}:[^ \";']+" | sort -u)
   if [[ "$got" == "ghcr.io/eduide/${repo}:9.9.9" ]]; then

@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.1.1](https://img.shields.io/badge/Version-2.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.1.2](https://img.shields.io/badge/Version-2.1.2-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -75,7 +75,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.enabled | bool | `true` | Whether the landing page shall be enabled |
 | landingPage.ephemeralStorage | bool | `true` | If set to true no persisted storage is used when creating sessions on the landing page. Set to false if you want to use persisted storage. |
 | landingPage.footerLinks | string | (see details below) | Optional: Customize footer links on the landing page All footer link configurations are optional. If not provided, default values will be used. |
-| landingPage.image | string | `"{{ .Values.imageRegistry }}/eduidec-landing-page:{{ .Values.versions.landingPage }}"` | the landing page image to use. Templated, so the tag follows versions.landingPage unless the whole string is overridden. |
+| landingPage.image | string | `"{{ .Values.imageRegistry }}/eduide-landing-page:{{ .Values.versions.landingPage }}"` | the landing page image to use. Templated, so the tag follows versions.landingPage unless the whole string is overridden. |
 | landingPage.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the landing page's docker image. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | landingPage.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | landingPage.infoText | string | `nil` | Optional: If specified with a value, this overrides the info text shown on the landing page. Empty values are ignored. Use `disableInfo` to deactivate showing the info completely. |
