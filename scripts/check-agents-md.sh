@@ -6,10 +6,14 @@
 # described a landing page removed months earlier. Nothing checked them, so
 # nothing noticed.
 #
-# A path in backticks must exist - unless the sentence says it does not, in
-# which case it must NOT exist. That second direction matters: these docs
-# deliberately name dead paths so nobody mistakes them for live code, and if
-# someone later creates one the doc has quietly become wrong again.
+# A path in backticks must exist - unless the sentence containing it says it
+# does not, in which case it must NOT exist. That second direction matters:
+# these docs deliberately name dead paths so nobody mistakes them for live code,
+# and if someone later creates one the doc has quietly become wrong again.
+#
+# Checking is per REFERENCE, not per path: a doc that says a file is gone in one
+# sentence and tells you to edit it in another is wrong, and evaluating the path
+# once would let the negated sentence excuse the live one.
 #
 # Only repo-relative, extension-bearing paths in backticks are checked. Prose is
 # not validated; this is a lint, not a proof.
@@ -20,9 +24,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOC="$ROOT/AGENTS.md"
 [[ -f "$DOC" ]] || { echo "no AGENTS.md here"; exit 0; }
 
-# A line asserting absence. Kept deliberately narrow so an ordinary sentence
-# that happens to contain "no" does not silence a real check.
-# Only true absence flips the check. "is dead", "retired" and "never built"
+# A sentence asserting absence. Deliberately narrow: "is dead" and "retired"
 # describe something that exists and does not work, which is a different claim.
 NEGATED='does not exist|do not exist|no longer exists|no longer exist|was removed|were removed|has no root'
 
@@ -36,29 +38,38 @@ interesting() {
   return 0
 }
 
-missing=0; resurrected=0; checked=0
-while IFS= read -r p; do
-  interesting "$p" || continue
-  checked=$((checked + 1))
+failed=0; checked=0
+# One line at a time, so each reference is judged in its own sentence.
+while IFS=: read -r lineno line; do
+  while IFS= read -r p; do
+    interesting "$p" || continue
 
-  # Every line mentioning this path; if any asserts absence, treat it as a
-  # deliberate reference to something dead.
-  if grep -nF -- "\`$p\`" "$DOC" | grep -qiE "$NEGATED"; then
-    if [[ -e "$ROOT/$p" ]]; then
-      echo "  now EXISTS but AGENTS.md says it does not: $p"
-      resurrected=1
+    # A parent-directory reference resolves against whatever happens to sit
+    # beside the checkout, so it passes locally and fails in CI - or worse, the
+    # reverse. Cross-repo paths belong in prose, not in backticks.
+    case "$p" in
+      ../*|*/../*)
+        echo "  line $lineno: leaves the repository: $p"
+        echo "             cross-repo paths cannot be checked; name the file without a path"
+        failed=1
+        continue ;;
+    esac
+
+    checked=$((checked + 1))
+    if grep -qiE "$NEGATED" <<<"$line"; then
+      if [[ -e "$ROOT/$p" ]]; then
+        echo "  line $lineno: says this does not exist, but it does: $p"
+        failed=1
+      fi
+    elif [[ ! -e "$ROOT/$p" ]]; then
+      echo "  line $lineno: missing: $p"
+      failed=1
     fi
-    continue
-  fi
+  done < <(grep -oE '`[A-Za-z0-9_./-]+`' <<<"$line" | tr -d '`')
+done < <(grep -n '`' "$DOC")
 
-  if [[ ! -e "$ROOT/$p" ]]; then
-    echo "  missing: $p"
-    missing=1
-  fi
-done < <(grep -oE '`[A-Za-z0-9_./-]+`' "$DOC" | tr -d '`' | sort -u)
-
-if [[ $missing -ne 0 || $resurrected -ne 0 ]]; then
+if [[ $failed -ne 0 ]]; then
   echo "AGENTS.md disagrees with the repository. Fix the doc or the path."
   exit 1
 fi
-echo "AGENTS.md: $checked referenced paths all check out"
+echo "AGENTS.md: $checked path references all check out"
