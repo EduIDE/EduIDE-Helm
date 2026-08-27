@@ -144,7 +144,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
 | theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"599557839e5c5893eb0c20785dac671ae70f7e8a"}}` | Reaps workspaces whose sessions are long gone. |
 | versions | object | (see details below) | Image versions, one per source repository. Every image the chart deploys derives its tag from one of these three, so a release is three numbers rather than nineteen image strings scattered across environment values files. |
-| versions.cloud | string | `"1.2.1"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. |
+| versions.cloud | string | `"1.2.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. |
 | versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
 | versions.landingPage | string | `"1.2.1"` | EduIDE-Landing-Page. Released independently as well. |
 
