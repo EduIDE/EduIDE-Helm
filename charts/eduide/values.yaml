@@ -12,7 +12,7 @@ versions:
   # of the IDE images, so it carries its own version.
   cloud: "1.2.0"
   # -- EduIDE-Landing-Page. Released independently as well.
-  landingPage: "1.2.0"
+  landingPage: "1.2.1"
 
 # -- The container registry every EduIDE image is pulled from.
 imageRegistry: ghcr.io/eduide
