@@ -1,9 +1,17 @@
 {{- if and .Values.gateway.enabled .Values.gateway.routes.enabled }}
 {{/*
-  rules is intentionally empty. The operator patches rules into this route at
-  runtime, one per live session. Adding a placeholder rule here would be
-  reconciled away, and a Go-template comment is used so the note does not end
-  up in the rendered manifest.
+  `rules` is deliberately ABSENT, not empty. The operator patches one rule per
+  live session into this route at runtime, so the chart must not state a value
+  for the field at all.
+
+  `rules: []` was wrong twice over. Gateway API v1.5 added `minItems: 1`, so the
+  API server rejects the create outright - v1.3 accepted it, which is why this
+  only surfaced on a newer cluster. And because Helm would then carry `rules: []`
+  as desired state, every `helm upgrade` would patch the live route back to zero
+  rules and cut routing to every running session until the operator caught up.
+
+  Omitting the field avoids both: nothing to reject, and no patch generated for
+  a field the chart does not own.
 */}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -16,5 +24,4 @@ spec:
   hostnames:
   - {{ include "theia-cloud.host.instance" . | quote }}
   {{- include "theia-cloud.host.wildcardInstances" . | trim | nindent 2 }}
-  rules: []
 {{- end }}
