@@ -109,7 +109,7 @@ landingPage:
   enabled: true
   # -- the landing page image to use. Templated, so the tag follows
   # versions.landingPage unless the whole string is overridden.
-  image: '{{ .Values.imageRegistry }}/eduidec-landing-page:{{ .Values.versions.landingPage }}'
+  image: '{{ .Values.imageRegistry }}/eduide-landing-page:{{ .Values.versions.landingPage }}'
   # -- Optional: Override the imagePullPolicy for the landing page's docker image.
   # If this is omitted or empty, the root at .Values.imagePullPolicy is used.
   imagePullPolicy:
