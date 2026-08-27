@@ -164,7 +164,11 @@ done
 
 # The cluster-scoped charts take no per-environment values.
 for chart in eduide-cluster; do
-  helm template "$chart" "$CHARTS_DIR/$chart" --namespace default | mask > "$OUT/_$chart.yaml"
+  # Same reason as the kubeconform job: bare defaults are not a valid install
+  # for the cluster chart, so render its example instead where one exists.
+  CEX=()
+  [[ -f "$CHARTS_DIR/$chart/values-example.yaml" ]] && CEX=(-f "$CHARTS_DIR/$chart/values-example.yaml")
+  helm template "$chart" "$CHARTS_DIR/$chart" "${CEX[@]}" --namespace default | mask > "$OUT/_$chart.yaml"
   printf '  rendered %-45s %s resources\n' "$chart" "$(grep -c '^kind:' "$OUT/_$chart.yaml" || true)"
   rendered=$((rendered + 1))
 done
