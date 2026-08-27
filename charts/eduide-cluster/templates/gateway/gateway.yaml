@@ -1,4 +1,7 @@
-{{- if gt (len .Values.gateway.listeners) 0 }}
+{{- if and .Values.gateway.create (eq (len .Values.gateway.listeners) 0) }}
+{{- fail "gateway.create is true but gateway.listeners is empty, so no Gateway would be created and nothing would route. See the worked example in values.yaml, or set gateway.create=false if you route some other way." }}
+{{- end }}
+{{- if and .Values.gateway.create (gt (len .Values.gateway.listeners) 0) }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

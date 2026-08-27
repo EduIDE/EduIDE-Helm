@@ -1,0 +1,120 @@
+# A worked example for `eduide`: one EduIDE installation, in its own namespace.
+#
+#   helm install eduide oci://ghcr.io/eduide/charts/eduide \
+#     --version 2.0.0 -n eduide-prod --create-namespace \
+#     -f values-example.yaml -f secrets.yaml
+#
+# Install `eduide-cluster` on the cluster first; this chart refuses to install
+# without it.
+#
+# Replace eduide.example.edu throughout. Keep secrets in a SEPARATE file that is
+# not in version control - never pass them with --set, which puts them in the
+# process list and in CI logs.
+
+# ---------------------------------------------------------------------------
+# Hostnames - four of them, and all four need DNS
+# ---------------------------------------------------------------------------
+#   eduide.example.edu                          the landing page
+#   service.eduide.example.edu                  the REST service
+#   instance.eduide.example.edu                 session ingress
+#   *.webview.instance.eduide.example.edu       session webviews
+hosts:
+  configuration:
+    baseHost: example.edu
+    landing: eduide
+    service: service.eduide
+    instance: instance.eduide
+  # Leave this as it is unless you do not want webviews at all. It needs the
+  # wildcard DNS record above and a wildcard certificate on the cluster's
+  # Gateway - see the eduide-cluster example.
+  allWildcardInstances: ["*.webview."]
+
+# ---------------------------------------------------------------------------
+# Routing - attach to the shared Gateway installed by eduide-cluster
+# ---------------------------------------------------------------------------
+# Each sectionName must match a listener name on that Gateway exactly, or the
+# route attaches to nothing and the failure is silent.
+gateway:
+  create: false
+  parentRefs:
+    - { name: theia-shared-gateway, namespace: eduide-system, sectionName: prod-landing }
+    - { name: theia-shared-gateway, namespace: eduide-system, sectionName: prod-service }
+    - { name: theia-shared-gateway, namespace: eduide-system, sectionName: prod-instances }
+    - { name: theia-shared-gateway, namespace: eduide-system, sectionName: prod-webview }
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+# The client needs redirect URIs for all four hostnames above. A wrong realm or
+# client id fails at login, not at install, so nothing here will catch it.
+keycloak:
+  enable: true
+  authUrl: https://sso.example.edu/
+  realm: your-realm
+  clientId: eduide
+  # cookieSecret goes in secrets.yaml - the chart's default is a placeholder
+  # published in a public repository and MUST be replaced.
+
+# No identity provider yet? Comment out the block above and uncomment this. It
+# means the installation has NO AUTHENTICATION; do not expose it.
+# keycloak:
+#   allowUnauthenticated: true
+
+# ---------------------------------------------------------------------------
+# Storage
+# ---------------------------------------------------------------------------
+operator:
+  # Session volumes. Must exist on your cluster; "default" is rarely right.
+  storageClassName: your-storage-class
+  # How many sessions one user may hold at once.
+  sessionsPerUser: 10
+  # Pre-start the minInstances warm pool, so the first user of the day does not
+  # wait for a cold multi-gigabyte image pull.
+  eagerStart: true
+
+# ---------------------------------------------------------------------------
+# Branding
+# ---------------------------------------------------------------------------
+app:
+  name: EduIDE
+landingPage:
+  infoTitle: Welcome to EduIDE
+
+# ---------------------------------------------------------------------------
+# Telemetry - off by default for installations outside TUM
+# ---------------------------------------------------------------------------
+# The Sentry DSN is compiled into the images and points at TUM's Sentry, so
+# leaving these on sends your hostnames and namespace names there.
+operator:
+  sentry:
+    enable: false
+service:
+  sentry:
+    enable: false
+landingPage:
+  sentry:
+    enable: false
+
+# ---------------------------------------------------------------------------
+# Applications
+# ---------------------------------------------------------------------------
+# The chart ships eight by default: Java 17, C, JavaScript, OCaml, Python, Rust
+# and the Java and C template variants. Each is preloaded onto every node, so
+# trimming the list to what your courses use saves a lot of disk and pull time.
+#
+# appDefinitions:
+#   apps:
+#     ocaml-latest: null      # remove one
+#     haskell-latest:         # add one
+#       image: eduide/haskell
+#       landingPage:
+#         label: Haskell
+
+# ---------------------------------------------------------------------------
+# The Gradle and Maven dependency cache - optional, and off by default
+# ---------------------------------------------------------------------------
+# Nothing reaches it unless operator.enableBuildCaching or
+# enableDependencyCaching is also turned on, so enabling this alone deploys a
+# cache with no clients.
+eduide-shared-cache:
+  enabled: false

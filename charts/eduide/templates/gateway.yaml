@@ -1,4 +1,15 @@
 {{- if and .Values.gateway.enabled .Values.gateway.create }}
+{{- /*
+This is the per-namespace Gateway, not the shared one. Its HTTPS listeners name
+three Secrets that neither chart creates, so unless you have made them yourself
+the listeners never program and the only symptom is a TLS failure in a browser.
+Refuse to render rather than hand over something that applies cleanly and does
+not work.
+*/}}
+{{- if and .Values.gateway.tls (not .Values.gateway.acknowledgeManualCertificates) }}
+{{- fail (printf "gateway.create is true with TLS, which needs the Secrets %q, %q and %q to already exist in namespace %q - no chart creates them. Either use the shared Gateway (gateway.create=false plus gateway.parentRefs, the supported path), or create those three Secrets and set gateway.acknowledgeManualCertificates=true."
+      "ws-cert-secret" "service-cert-secret" "landing-page-cert-secret" .Release.Namespace) }}
+{{- end }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

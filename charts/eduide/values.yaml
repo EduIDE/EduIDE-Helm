@@ -85,7 +85,23 @@ hosts:
   # helm upgrade will not properly update this at the moment.
   # These are required to configure TLS (if enabled via gateway.tls == true)
   # I.e. custom certificates or a cert-manager provider that can handle wildcard certificates need to be configured.
-  allWildcardInstances: []
+  # -- Hostname prefixes that session webviews are served from, relative to the
+  # instance host. Sessions render previews, notebooks and embedded docs on
+  # these, so with an empty list webviews 404 - the session itself still starts,
+  # so this is discovered by a user rather than by the installer.
+  #
+  # Every AppDefinition already defaults to the matching
+  # `ingressHostnamePrefixes: ["*.webview."]`, so this default makes the two
+  # agree. It has two consequences you must plan for:
+  #
+  #   DNS   `*.webview.instance.<host>` must resolve.
+  #   TLS   you need a WILDCARD certificate for it. ACME cannot issue a wildcard
+  #         over HTTP-01, so either configure a DNS-01 solver
+  #         (`gatewayAcmeIssuer.solvers` in the eduide-cluster chart) or obtain
+  #         the certificate separately and supply it as a Secret.
+  #
+  # Set to [] only if you genuinely do not want webviews.
+  allWildcardInstances: ["*.webview."]
 # -- Values related to the landing page
 # @default -- (see details below)
 landingPage:
@@ -102,8 +118,10 @@ landingPage:
   # -- Values related to Sentry on the landing page.
   # @default -- (see details below)
   sentry:
-    # -- Whether to set SENTRY_ENABLE=true in the landing page deployment.
-    enable: true
+    # -- Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the
+    # DSN is compiled into the published images and points at TUM's Sentry, so
+    # enabling this outside TUM sends your hostnames and namespace names there.
+    enable: false
   # -- the app id to launch
   appDefinition: "java-17-templates-latest"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
@@ -258,8 +276,10 @@ operator:
   # -- Values related to Sentry on the operator.
   # @default -- (see details below)
   sentry:
-    # -- Whether to set SENTRY_ENABLE=true in the operator deployment.
-    enable: true
+    # -- Set SENTRY_ENABLE=true in the operator deployment. Off by default: the
+    # DSN is compiled into the published images and points at TUM's Sentry, so
+    # enabling this outside TUM sends your hostnames and namespace names there.
+    enable: false
   # -- Whether theia applications shall be started eager. This means that the application is already
   # running without a user. When a user requests a new session, one of the already launched ones
   # is assigned.
@@ -354,7 +374,12 @@ service:
   # the chart manage it, or leave `create: false` and reference one you created
   # yourself.
   adminApiTokenSecret:
+    # -- Have the chart create the Secret from `adminApiToken` below.
     create: false
+    # -- Set true if you created the Secret yourself, outside the chart. Leaving
+    # both this and `create` false means the admin API is simply not exposed -
+    # which is a valid way to run, and is the default.
+    external: false
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
   # -- Base64-encoded admin API token. Only read when adminApiTokenSecret.create
@@ -371,8 +396,10 @@ service:
   # -- Values related to Sentry on the service.
   # @default -- (see details below)
   sentry:
-    # -- Whether to set SENTRY_ENABLE=true in the service deployment.
-    enable: true
+    # -- Set SENTRY_ENABLE=true in the service deployment. Off by default: the
+    # DSN is compiled into the published images and points at TUM's Sentry, so
+    # enabling this outside TUM sends your hostnames and namespace names there.
+    enable: false
   # -- service port (default: 8081)
   port: 8081
   # -- protocol of the REST-API
@@ -383,7 +410,19 @@ gateway:
   enabled: true
   # -- Whether to render a Gateway resource in the release namespace.
   # Set to false when using a centralized shared Gateway in another namespace.
-  create: true
+  # -- Create a Gateway in this namespace.
+  #
+  # Leave this false. The supported model is one shared Gateway per cluster,
+  # installed by the eduide-cluster chart, which every environment attaches to
+  # through `gateway.parentRefs` below. That is what every real installation
+  # uses and the only path that is tested.
+  #
+  # Setting this true renders a Gateway whose HTTPS listeners reference the
+  # Secrets `ws-cert-secret`, `service-cert-secret` and `landing-page-cert-secret`
+  # - which NEITHER CHART CREATES. You would have to create all three yourself.
+  # The listeners sit at Programmed=False until you do, and nothing in
+  # `helm status` explains why.
+  create: false
   routes:
     # -- Whether to render HTTPRoute resources.
     enabled: true

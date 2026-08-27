@@ -1,4 +1,12 @@
 {{- if .Values.monitoring.enabled }}
+{{- /*
+Goes into a namespace this chart does not create, so it must already exist and
+be watched by Grafana. Guarded so that turning monitoring on without setting a
+dashboard namespace fails with a sentence rather than "namespaces not found".
+*/}}
+{{- if not .Values.monitoring.dashboardNamespace }}
+{{- fail "monitoring.enabled is true but monitoring.dashboardNamespace is empty" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

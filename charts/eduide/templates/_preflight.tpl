@@ -43,10 +43,18 @@
 */}}
 {{- define "eduide.preflightKeycloak" -}}
 {{- $kc := .Values.keycloak -}}
-{{- $placeholder := or (eq ($kc.authUrl | toString) "https://keycloak.url/auth/")
-                       (eq ($kc.realm | toString) "TheiaCloud")
-                       (eq ($kc.clientId | toString) "theia-cloud") -}}
-{{- if and $placeholder (not $kc.allowUnauthenticated) }}
+{{- /*
+All three, not any one. A realm legitimately called TheiaCloud or a client
+legitimately called theia-cloud is a natural choice - the chart suggests both -
+so failing on a single match rejects valid configurations.
+
+Only checked when Keycloak is enabled: `keycloak.enable: false` is already an
+explicit statement that there is no identity provider.
+*/}}
+{{- $placeholder := and (eq ($kc.authUrl | toString) "https://keycloak.url/auth/")
+                        (eq ($kc.realm | toString) "TheiaCloud")
+                        (eq ($kc.clientId | toString) "theia-cloud") -}}
+{{- if and $kc.enable $placeholder (not $kc.allowUnauthenticated) }}
 {{- fail (printf "keycloak is left at the chart's placeholder values (authUrl=%s realm=%s clientId=%s). Configure them, or set keycloak.allowUnauthenticated=true to install without a working identity provider." $kc.authUrl $kc.realm $kc.clientId) }}
 {{- end }}
 {{- end -}}

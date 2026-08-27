@@ -9,6 +9,16 @@ spec:
     email: {{ required "gatewayAcmeIssuer.email must be set when gatewayAcmeIssuer.enabled=true" .Values.gatewayAcmeIssuer.email | quote }}
     privateKeySecretRef:
       name: {{ .Values.gatewayAcmeIssuer.privateKeySecretName | quote }}
+    {{- /*
+    HTTP-01 cannot issue a wildcard - ACME does not allow it. The webview hosts
+    are `*.webview.instance.<host>`, so if you want cert-manager to issue those
+    you must supply a DNS-01 solver here. Otherwise that one certificate has to
+    come from elsewhere; see `wildcardTLSSecret`.
+    */}}
+    {{- with .Values.gatewayAcmeIssuer.solvers }}
+    solvers:
+      {{- toYaml . | nindent 4 }}
+    {{- else }}
     solvers:
     - http01:
         gatewayHTTPRoute:
@@ -18,4 +28,5 @@ spec:
             kind: Gateway
             name: {{ .Values.gateway.name }}
             namespace: {{ .Values.gateway.namespace }}
+    {{- end }}
 {{- end }}
