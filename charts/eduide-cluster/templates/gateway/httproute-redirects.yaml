@@ -1,0 +1,44 @@
+{{- /*
+Permanent redirects for hostnames this installation used to serve.
+
+A renamed installation leaves its old hostname in bookmarks, course pages and
+Artemis exercise configurations for a long time. Serving a 301 from the old name
+costs one listener and one route, and turns a dead link into a working one.
+
+The redirect deliberately sets only `hostname`: Gateway API keeps the original
+path when no path filter is given, and Envoy carries the query string across, so
+`https://old/foo?bar=1` lands on `https://new/foo?bar=1`.
+
+The matching listener is emitted by bootstrap-cluster.yml alongside the ones it
+derives from the environments, because a route with no listener attaches to
+nothing.
+*/}}
+{{- range $r := .Values.gateway.redirects }}
+{{- if not $r.name }}{{ fail "gateway.redirects entries need a name, which must match a listener on the Gateway" }}{{ end }}
+{{- if not $r.from }}{{ fail (printf "gateway.redirects %q has no `from` hostname" $r.name) }}{{ end }}
+{{- if not $r.to }}{{ fail (printf "gateway.redirects %q has no `to` hostname" $r.name) }}{{ end }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-{{ $r.name }}
+  namespace: {{ $.Values.gateway.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ $.Values.gateway.name }}
+      namespace: {{ $.Values.gateway.namespace }}
+      sectionName: {{ $r.name }}
+  hostnames:
+    - {{ $r.from | quote }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            hostname: {{ $r.to | quote }}
+            statusCode: {{ default 301 $r.statusCode }}
+{{- end }}

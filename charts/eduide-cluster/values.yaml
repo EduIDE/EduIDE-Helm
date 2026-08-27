@@ -109,6 +109,18 @@ gateway:
   # `protocol` (HTTPS by default, HTTP for an ACME challenge listener), `port`
   # and `allowedRoutes`.
   listeners: []
+  # -- Permanent redirects from hostnames this cluster used to serve.
+  #
+  # Each entry needs a listener of the same `name` on the Gateway - which
+  # `bootstrap-cluster.yml` emits from `spec.redirects` in the cluster manifest -
+  # and renders an HTTPRoute that 301s `from` to `to`, keeping the path and the
+  # query string.
+  #
+  # redirects:
+  #   - name: legacy-landing
+  #     from: theia.example.edu
+  #     to: eduide.example.edu
+  redirects: []
 gatewayClass:
   create: false
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
