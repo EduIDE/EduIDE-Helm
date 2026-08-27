@@ -90,6 +90,28 @@ watching `main`. Full procedure in the README, and as a skill in
   `httproute-instances.yaml` ships `rules: []` deliberately for the operator to
   patch.
 
+## Renovate
+
+`renovate.json` is three lines: it extends `local>EduIDE/.github:renovate-config`,
+the org-wide preset. Policy changes belong there, not here. Nothing is
+automerged.
+
+Two managers see this repo. `helmv3` reads the `dependencies:` block in
+`charts/eduide/Chart.yaml` and refreshes `charts/eduide/Chart.lock` with it.
+`helm-values` reads the image pins in `charts/eduide/values.yaml` and
+`charts/eduide-cluster/values.yaml`.
+
+Expect a Renovate pull request touching a chart to arrive **red**, and to need
+two things done by hand before it merges:
+
+- the chart `version:` bump, which the CI job enforces and Renovate does not know
+  to make;
+- regenerated chart READMEs, because helm-docs renders both the dependency table
+  and the values defaults, so a bump of either drifts them.
+
+That is the intended shape while automerge is off: the bot proposes the version,
+a human takes the release decision.
+
 ## appDefinitions.apps is the single source of truth
 
 Three things derive from it: the AppDefinition custom resources, the app list
