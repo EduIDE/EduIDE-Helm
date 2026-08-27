@@ -1,5 +1,6 @@
 {{- include "eduide.preflight" . -}}
 {{- include "eduide.preflightKeycloak" . -}}
+{{- include "eduide.preflightGateway" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

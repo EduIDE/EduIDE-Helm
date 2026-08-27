@@ -4,7 +4,8 @@ Goes into a namespace this chart does not create, so it must already exist and
 be watched by Grafana. Guarded so that turning monitoring on without setting a
 dashboard namespace fails with a sentence rather than "namespaces not found".
 */}}
-{{- if not .Values.monitoring.dashboardNamespace }}
+{{- $dashboardNs := .Values.monitoring.dashboardNamespace | toString | trim }}
+{{- if not $dashboardNs }}
 {{- fail "monitoring.enabled is true but monitoring.dashboardNamespace is empty" }}
 {{- end }}
 apiVersion: v1
@@ -13,7 +14,7 @@ metadata:
   labels:
     grafana_dashboard: "1"
   name: theia-cloud-dashboard-session-startup
-  namespace: {{ .Values.monitoring.dashboardNamespace }}
+  namespace: {{ $dashboardNs }}
 data:
   session-startup.json: |-
     {

@@ -1,7 +1,7 @@
 # A worked example for `eduide`: one EduIDE installation, in its own namespace.
 #
 #   helm install eduide oci://ghcr.io/eduide/charts/eduide \
-#     --version 2.0.0 -n eduide-prod --create-namespace \
+#     --version 2.1.0 -n eduide-prod --create-namespace \
 #     -f values-example.yaml -f secrets.yaml
 #
 # Install `eduide-cluster` on the cluster first; this chart refuses to install
@@ -64,6 +64,9 @@ keycloak:
 # Storage
 # ---------------------------------------------------------------------------
 operator:
+  # See the telemetry note further down: this points at TUM's Sentry.
+  sentry:
+    enable: false
   # Session volumes. Must exist on your cluster; "default" is rarely right.
   storageClassName: your-storage-class
   # How many sessions one user may hold at once.
@@ -78,6 +81,8 @@ operator:
 app:
   name: EduIDE
 landingPage:
+  sentry:
+    enable: false
   infoTitle: Welcome to EduIDE
 
 # ---------------------------------------------------------------------------
@@ -85,15 +90,13 @@ landingPage:
 # ---------------------------------------------------------------------------
 # The Sentry DSN is compiled into the images and points at TUM's Sentry, so
 # leaving these on sends your hostnames and namespace names there.
-operator:
-  sentry:
-    enable: false
 service:
   sentry:
     enable: false
-landingPage:
-  sentry:
-    enable: false
+
+# operator.sentry and landingPage.sentry are set in the blocks above - a second
+# `operator:` mapping here would be a duplicate key, and the last one wins, so
+# it would silently discard storageClassName, sessionsPerUser and eagerStart.
 
 # ---------------------------------------------------------------------------
 # Applications

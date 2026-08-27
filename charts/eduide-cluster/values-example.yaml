@@ -2,7 +2,7 @@
 # installed once per cluster.
 #
 #   helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-#     --version 2.0.0 -n eduide-system --create-namespace \
+#     --version 2.1.0 -n eduide-system --create-namespace \
 #     -f values-example.yaml
 #
 # Replace eduide.example.edu throughout. This example assumes ONE environment;

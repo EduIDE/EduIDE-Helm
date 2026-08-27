@@ -29,6 +29,26 @@
 {{- end -}}
 
 {{/*
+  Refuse to render HTTPRoutes that attach to nothing.
+
+  With `gateway.create: false` - which is the default, and the supported model -
+  and no `gateway.parentRefs`, the routes fall back to a parentRef named
+  `gateway.name` in the release namespace. Neither chart creates a Gateway by
+  that name, so a default install renders three HTTPRoutes pointing at an object
+  that does not exist.
+
+  Nothing reports this. The routes are created, the install succeeds, and every
+  hostname simply does not answer. Attaching to the shared Gateway is one of the
+  two things every installation must state, so state it.
+*/}}
+{{- define "eduide.preflightGateway" -}}
+{{- $gw := .Values.gateway -}}
+{{- if and (not .Values.skipPreflight) $gw.enabled $gw.routes.enabled (not $gw.create) (not $gw.parentRefs) }}
+{{- fail "gateway.create is false and gateway.parentRefs is empty, so the HTTPRoutes would attach to no Gateway and nothing would answer. Point gateway.parentRefs at the shared Gateway installed by eduide-cluster - see values-example.yaml - or set gateway.create=true to render a Gateway in this namespace." }}
+{{- end }}
+{{- end -}}
+
+{{/*
   Refuse to install with the chart's placeholder Keycloak values.
 
   The oauth2-proxy ConfigMaps render unconditionally - the operator mounts them
@@ -44,16 +64,19 @@
 {{- define "eduide.preflightKeycloak" -}}
 {{- $kc := .Values.keycloak -}}
 {{- /*
-All three, not any one. A realm legitimately called TheiaCloud or a client
-legitimately called theia-cloud is a natural choice - the chart suggests both -
-so failing on a single match rejects valid configurations.
+On authUrl alone, not all three. A realm legitimately called TheiaCloud or a
+client legitimately called theia-cloud is a natural choice - the chart suggests
+both - so failing on either of those would reject valid configurations.
+
+`https://keycloak.url/auth/` is not a plausible real value: that host does not
+resolve anywhere. Requiring all three to match meant that setting the realm and
+client but forgetting the URL passed the check, and the proxy then pointed every
+session at a host that does not exist.
 
 Only checked when Keycloak is enabled: `keycloak.enable: false` is already an
 explicit statement that there is no identity provider.
 */}}
-{{- $placeholder := and (eq ($kc.authUrl | toString) "https://keycloak.url/auth/")
-                        (eq ($kc.realm | toString) "TheiaCloud")
-                        (eq ($kc.clientId | toString) "theia-cloud") -}}
+{{- $placeholder := eq ($kc.authUrl | toString) "https://keycloak.url/auth/" -}}
 {{- if and $kc.enable $placeholder (not $kc.allowUnauthenticated) }}
 {{- fail (printf "keycloak is left at the chart's placeholder values (authUrl=%s realm=%s clientId=%s). Configure them, or set keycloak.allowUnauthenticated=true to install without a working identity provider." $kc.authUrl $kc.realm $kc.clientId) }}
 {{- end }}
