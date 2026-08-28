@@ -288,6 +288,27 @@ monitoring:
     # `discord`) and `secretKey`; Slack entries may also set `channel`. An
     # empty list with alerting enabled means alerts fire but notify nobody, so
     # the chart fails the render instead.
+    #
+    # A channel may set `environments: [ns, ...]` to receive only that
+    # installation's alerts. One cluster can host installations belonging to
+    # different people - Bonn and Mannheim share a cluster and each has its own
+    # Discord - and without scoping, both would see the other's incidents.
+    #
+    # Anything no scoped channel claims goes to **every** channel. That is how
+    # cluster-scoped alerts still get out: a certificate expiring or the
+    # conversion webhook failing is not about any one tenant's namespace, and
+    # dropping it for failing to match a tenant route would lose exactly the
+    # alerts that matter most.
+    #
+    #   channels:
+    #     - name: mannheim
+    #       type: discord
+    #       secretKey: discord-mannheim
+    #       environments: [eduide-mannheim]
+    #     - name: platform
+    #       type: slack
+    #       secretKey: slack-platform
+    #       channel: "#eduide-alerts"
     channels: []
     # Thresholds, so tuning noise down does not need a chart release.
     thresholds:

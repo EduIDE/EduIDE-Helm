@@ -55,3 +55,47 @@ silence all of them at once.
 namespace: {{ .Values.monitoring.alerting.namespace }}
 eduide_namespace: '{{ "{{" }} $labels.namespace {{ "}}" }}'
 {{- end -}}
+
+{{/*
+The receiver bodies for a set of channels.
+
+Shared between the catch-all receiver and each environment-scoped one, so a
+change to the message format cannot apply to one and not the other. Lives here
+rather than in the template because a `define` may not sit inside an `if`, and
+the whole AlertmanagerConfig is guarded by one.
+*/}}
+{{- define "eduide.receiverConfigs" }}
+{{- $ctx := .ctx }}
+{{- $a := $ctx.Values.monitoring.alerting }}
+{{- $slack := list }}
+{{- $discord := list }}
+{{- range .channels }}
+  {{- if eq (.type | toString) "slack" }}{{ $slack = append $slack . }}{{ else }}{{ $discord = append $discord . }}{{ end }}
+{{- end }}
+{{- if $slack }}
+      slackConfigs:
+  {{- range $slack }}
+        - apiURL:
+            name: {{ $a.webhookSecret.name }}
+            key: {{ .secretKey }}
+          {{- if .channel }}
+          channel: {{ .channel | quote }}
+          {{- end }}
+          sendResolved: true
+          username: EduIDE
+          title: {{ $.title | quote }}
+          text: {{ $.text | quote }}
+  {{- end }}
+{{- end }}
+{{- if $discord }}
+      discordConfigs:
+  {{- range $discord }}
+        - apiURL:
+            name: {{ $a.webhookSecret.name }}
+            key: {{ .secretKey }}
+          sendResolved: true
+          title: {{ $.title | quote }}
+          message: {{ $.text | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}
