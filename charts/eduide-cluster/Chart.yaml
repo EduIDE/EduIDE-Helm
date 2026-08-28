@@ -4,5 +4,5 @@ description: |
   Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
   cert-manager issuers. Install once per cluster, before any eduide release.
 type: application
-version: 2.1.4
+version: 2.1.5
 appVersion: "1.2.0"

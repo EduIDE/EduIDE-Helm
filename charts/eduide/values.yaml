@@ -560,6 +560,12 @@ appDefinitions:
 preloading:
   # -- Is image preloading enabled.
   enable: true
+  # -- How many nodes may pull at once when the image set changes, as a count or
+  # a percentage. The Kubernetes default of 1 walks the cluster one node at a
+  # time, each waiting for its whole image set, which on a large cluster means
+  # the last node starts long after the first has finished. These pods carry no
+  # traffic, so there is nothing to protect by staging the rollout.
+  maxUnavailable: "100%"
   # -- Extra images to preload, on top of the ones derived automatically.
   #
   # Leave this empty. The chart preloads every appDefinitions.apps image, every
