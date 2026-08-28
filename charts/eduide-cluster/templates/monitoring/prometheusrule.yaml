@@ -360,9 +360,21 @@ spec:
               device". Checking free space will not show the problem.
             runbook_url: {{ $runbook }}
 
+        {{- /*
+        Narrowed to claims a pod is actually waiting on.
+
+        Most storage classes bind `WaitForFirstConsumer`, so a workspace volume
+        with no running session sits Pending indefinitely and that is correct,
+        not a fault - it binds when a pod first mounts it. Alerting on Pending
+        alone fired permanently for every idle workspace on the first cluster
+        this was deployed to. The join requires some pod to reference the claim,
+        which is what makes a stuck Pending a real problem.
+        */}}
         - alert: EduIDEPVCPending
           expr: |-
-            kube_persistentvolumeclaim_status_phase{namespace=~"{{ $ns }}", phase="Pending"} == 1
+            (kube_persistentvolumeclaim_status_phase{namespace=~"{{ $ns }}", phase="Pending"} == 1)
+            and on (namespace, persistentvolumeclaim)
+            kube_pod_spec_volumes_persistentvolumeclaims_info{namespace=~"{{ $ns }}"}
           for: 10m
           labels:
             severity: warning
@@ -371,8 +383,11 @@ spec:
             summary: 'A workspace volume will not provision in {{ "{{" }} $labels.namespace {{ "}}" }}'
             description: >-
               PersistentVolumeClaim {{ "{{" }} $labels.persistentvolumeclaim {{ "}}" }} in
-              {{ "{{" }} $labels.namespace {{ "}}" }} has been Pending for 10 minutes, so the session
-              that needs it cannot start.
+              {{ "{{" }} $labels.namespace {{ "}}" }} has been Pending for 10 minutes while a pod is
+              waiting on it, so the session that needs it cannot start.
+              A workspace volume with no pod is a different thing and does not alert:
+              most storage classes bind on first consumer, so an idle workspace is
+              Pending by design.
               The storage class is the first thing to check - it is a cluster property
               set once in clusters/<name>.yaml, and a claim naming a class the cluster
               does not offer stays Pending forever without any other symptom.
