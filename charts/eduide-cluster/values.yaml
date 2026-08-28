@@ -221,8 +221,19 @@ monitoring:
     enabled: false
     # -- Namespace cert-manager runs in.
     namespace: cert-manager
-    # -- Name of cert-manager's metrics Service.
-    serviceName: cert-manager
+    # -- Labels identifying cert-manager's controller Service.
+    #
+    # A ServiceMonitor selects on Service **labels**; there is no matcher for
+    # `metadata.name`. These are the labels cert-manager's own chart sets, and
+    # they are values because a release installed under a different name keeps
+    # the labels and changes their values. Get them wrong and the ServiceMonitor
+    # is created with no targets and reports no error.
+    #
+    # Check with:
+    #   kubectl -n cert-manager get svc cert-manager --show-labels
+    selectorLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
     # -- Name of the metrics port on that Service.
     portName: http-metrics
 

@@ -22,6 +22,21 @@ not silently fall back to `.*` and start graphing other tenants' namespaces.
 {{- end -}}
 
 {{/*
+Alerting depends on monitoring, and saying so beats rendering nothing.
+
+Both the PrometheusRule and the AlertmanagerConfig are gated on
+`monitoring.enabled` as well as `monitoring.alerting.enabled`, because alerts
+built on metrics nobody scrapes are decoration. Asking for alerting with
+monitoring off used to render neither resource and succeed, which is the worst
+outcome: the install reports fine and the feature is absent.
+*/}}
+{{- define "eduide.checkAlertingPrerequisites" -}}
+{{- if and .Values.monitoring.alerting.enabled (not .Values.monitoring.enabled) -}}
+{{- fail "monitoring.alerting.enabled is true but monitoring.enabled is false - alerting needs the PodMonitors and the metrics they collect, so this would install nothing at all" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 The labels every EduIDE alert carries.
 
 `namespace` is a routing label and is NOT the environment the alert is about.

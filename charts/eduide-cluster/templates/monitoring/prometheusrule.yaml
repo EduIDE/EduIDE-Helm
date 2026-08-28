@@ -1,3 +1,8 @@
+{{- /*
+Called before the guard below, deliberately: inside it, a misconfiguration that
+renders nothing could not report itself.
+*/}}
+{{- include "eduide.checkAlertingPrerequisites" . }}
 {{- if and .Values.monitoring.enabled .Values.monitoring.alerting.enabled }}
 {{- /*
 EduIDE's alerts.
@@ -113,7 +118,7 @@ spec:
 
         - alert: EduIDEServiceScrapeDown
           expr: |-
-            up{job=~".*theia-cloud-service"} == 0
+            up{job=~".*theia-cloud-service", namespace=~"{{ $ns }}"} == 0
           for: 10m
           labels:
             severity: critical
@@ -154,10 +159,21 @@ spec:
 
     - name: eduide.sessions
       rules:
+        {{- /*
+        Counted off the restart counter, not off the termination reason.
+        `kube_pod_container_status_last_terminated_reason` is a gauge holding
+        only the most recent reason, so increase() over it counts nothing
+        reliable: a container that OOMs ten times reports the same 1 throughout.
+        `kube_pod_container_status_restarts_total` is a real counter, and
+        `and on(...)` narrows it to containers whose last exit was an OOM kill.
+        Same shape as EduIDESessionCrashSpike below, deliberately.
+        */}}
         - alert: EduIDESessionOOMKillSpike
           expr: |-
             sum by (namespace) (
-              increase(kube_pod_container_status_last_terminated_reason{namespace=~"{{ $ns }}", {{ $sessions }}, reason="OOMKilled"}[1h])
+              increase(kube_pod_container_status_restarts_total{namespace=~"{{ $ns }}", {{ $sessions }}}[1h])
+              and on (namespace, pod, container)
+              (kube_pod_container_status_last_terminated_reason{namespace=~"{{ $ns }}", {{ $sessions }}, reason="OOMKilled"} == 1)
             ) > {{ $t.sessionOOMPerHour }}
           for: 10m
           labels:

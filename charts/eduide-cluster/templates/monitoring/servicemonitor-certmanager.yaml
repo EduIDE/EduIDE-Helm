@@ -20,10 +20,16 @@ metadata:
   labels:
     app.kubernetes.io/part-of: eduide
 spec:
+  {{- /*
+  Selected by label, not by name. A ServiceMonitor's selector matches Service
+  *labels*; there is no name matcher. The values are configurable because a
+  cert-manager installed under a different release name keeps these labels but
+  changes their values, and a selector that matches nothing produces a
+  ServiceMonitor with no targets and no error.
+  */}}
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ $cm.serviceName }}
-      app.kubernetes.io/component: controller
+      {{- toYaml $cm.selectorLabels | nindent 6 }}
   namespaceSelector:
     matchNames:
       - {{ $cm.namespace }}
