@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.1.4](https://img.shields.io/badge/Version-2.1.4-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.2.0](https://img.shields.io/badge/Version-2.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -124,6 +124,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operatorrole.name | string | `"operator-api-access"` |  |
 | preloading | object | (see details below) | Values to configure preloading of images on Kubernetes nodes. |
 | preloading.deriveFromApps | bool | `true` | Set to false to preload only preloading.images and nothing derived. |
+| preloading.resources | object | `{"limits":{"cpu":"10m","memory":"32Mi"},"requests":{"cpu":"1m","memory":"8Mi"}}` | Requests and limits for each preload container. There is one per image on every node, and they only sleep, so keep this small. Nine images at these values is 9m CPU and 72Mi per node. |
 | preloading.enable | bool | `true` | Is image preloading enabled. |
 | preloading.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the image preloading containers. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | preloading.images | list | `[]` | Extra images to preload, on top of the ones derived automatically.  Leave this empty. The chart preloads every appDefinitions.apps image, every sidecar image and the landing page image without being told, so the list cannot fall out of step with what the installation actually offers. It used to be written out by hand per environment and addressed by array index, which is how production ended up offering c-templates while preloading everything except c-templates.  Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). |

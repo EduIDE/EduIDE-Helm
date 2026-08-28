@@ -560,6 +560,16 @@ appDefinitions:
 preloading:
   # -- Is image preloading enabled.
   enable: true
+  # -- Requests and limits for each preload container. There is one per image on
+  # every node, and they only sleep, so keep this small. Nine images at these
+  # values is 9m CPU and 72Mi per node.
+  resources:
+    requests:
+      cpu: 1m
+      memory: 8Mi
+    limits:
+      cpu: 10m
+      memory: 32Mi
   # -- Extra images to preload, on top of the ones derived automatically.
   #
   # Leave this empty. The chart preloads every appDefinitions.apps image, every

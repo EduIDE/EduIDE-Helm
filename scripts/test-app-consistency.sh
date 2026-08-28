@@ -50,8 +50,13 @@ fi
 # on the node before a session starts.
 app_images=$(yq -r 'select(.kind=="AppDefinition") | .spec.image, (.spec.sidecars // [])[].image' <<<"$OUT" \
                 | grep -v '^---$' | sort -u)
+# Plain pulls are containers, so they happen in parallel; an entry carrying its
+# own command stays a one-shot init container. Both count as preloaded, and the
+# pause placeholder is not an image anyone offers.
 preloaded=$(yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
-                   | .spec.template.spec.initContainers[].image' <<<"$OUT" | grep -v '^---$' | sort -u)
+                   | (.spec.template.spec.containers // [])[].image,
+                     (.spec.template.spec.initContainers // [])[].image' <<<"$OUT" \
+            | grep -v '^---$' | grep -v '^registry.k8s.io/pause' | sort -u)
 
 missing=$(comm -23 <(echo "$app_images") <(echo "$preloaded"))
 if [[ -z "$missing" ]]; then

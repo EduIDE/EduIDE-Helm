@@ -47,58 +47,71 @@ spec:
     spec:
       # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
       terminationGracePeriodSeconds: 0
-      initContainers:
-      {{- range $index, $entry := $images }}
-      {{- $imageRef := "" }}
-      {{- $isMap := kindIs "map" $entry }}
-      {{- if $isMap }}
-        {{- $imageRef = tpl ($entry.image | toString) $ }}
-      {{- else }}
-        {{- $imageRef = tpl ($entry | toString) $ }}
-      {{- end }}
-      {{- $useShell := true }}
-      {{- $customCmd := list }}
-      {{- $customArgs := list }}
-      {{- $hasArgsKey := false }}
-      {{- if $isMap }}
-        {{- if or $entry.command (hasKey $entry "args") }}
-          {{- $useShell = false }}
+      {{- /*
+      Images are pulled by PLAIN CONTAINERS, not init containers.
+
+      Init containers run strictly one after another, so nine multi-GB images
+      were pulled in series on every node - the node finished the last one long
+      after it could have. Containers in a pod are started together, and this
+      cluster's kubelet has serializeImagePulls=false, so the pulls now overlap.
+
+      Each container therefore has to stay alive; a container that exits in a
+      DaemonSet pod is restarted forever. `sleep infinity` is what keeps it
+      parked, costing the requests below and nothing else.
+
+      An entry that carries its own `command`/`args` is a different thing - a
+      one-shot that is expected to run and exit - so those stay init containers
+      and keep their old semantics.
+      */}}
+      {{- $shellEntries := list }}
+      {{- $jobEntries := list }}
+      {{- range $entry := $images }}
+        {{- if and (kindIs "map" $entry) (or $entry.command (hasKey $entry "args")) }}
+          {{- $jobEntries = append $jobEntries $entry }}
+        {{- else }}
+          {{- $shellEntries = append $shellEntries $entry }}
         {{- end }}
+      {{- end }}
+      {{- if $jobEntries }}
+      initContainers:
+      {{- range $index, $entry := $jobEntries }}
+      - name: image-preload-job-{{ $index }}
+        image: {{ tpl ($entry.image | toString) $ | quote }}
+        imagePullPolicy: {{ $imagePullPolicy }}
         {{- with $entry.command }}
-          {{- $customCmd = . }}
+        command:
+          {{- toYaml . | nindent 10 }}
         {{- end }}
         {{- if hasKey $entry "args" }}
-          {{- $hasArgsKey = true }}
-          {{- $customArgs = $entry.args }}
+        args:
+          {{- toYaml $entry.args | nindent 10 }}
         {{- end }}
+        resources:
+          {{- toYaml $.Values.preloading.resources | nindent 10 }}
+      {{- end }}
+      {{- end }}
+      containers:
+      {{- range $index, $entry := $shellEntries }}
+      {{- $imageRef := "" }}
+      {{- if kindIs "map" $entry }}
+      {{- $imageRef = tpl ($entry.image | toString) $ }}
+      {{- else }}
+      {{- $imageRef = tpl ($entry | toString) $ }}
       {{- end }}
       - name: image-preload-{{ $index }}
         image: {{ $imageRef | quote }}
         imagePullPolicy: {{ $imagePullPolicy }}
-        {{- if $useShell }}
         command: ["/bin/sh", "-c"]
         args:
-        - {{ printf "echo 'Loaded image %s'; exit 0" $imageRef | quote }}
-        {{- else }}
-        {{- with $customCmd }}
-        command:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        {{- if $hasArgsKey }}
-        args:
-          {{- toYaml $customArgs | nindent 10 }}
-        {{- end }}
-        {{- end }}
+        - {{ printf "echo 'Loaded image %s'; exec sleep infinity" $imageRef | quote }}
+        resources:
+          {{- toYaml $.Values.preloading.resources | nindent 10 }}
       {{- end }}
-      # Run the pause container to make the Pod go into the Running state without consuming resources
-      containers:
+      {{- if not $shellEntries }}
+      # Nothing to keep the Pod running otherwise.
       - name: run
         image: registry.k8s.io/pause:3.9
         resources:
-          limits:
-            cpu: 1m
-            memory: 8M
-          requests:
-            cpu: 1m
-            memory: 8M
+          {{- toYaml $.Values.preloading.resources | nindent 10 }}
+      {{- end }}
 {{- end }}
