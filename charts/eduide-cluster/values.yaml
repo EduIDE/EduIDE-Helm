@@ -324,3 +324,20 @@ monitoring:
       volumePercent: 85
       # -- Days before certificate expiry to start warning.
       certExpiryDays: 21
+      # -- How long an environment's warm pool must be empty before alerting.
+      #
+      # Shorter than the other component alerts on purpose. An empty warm pool
+      # is immediately visible to students - if the instance deployments are
+      # gone rather than unhealthy, session launches fail outright - so ten
+      # minutes is long enough for a real outage to pass unnoticed. Long enough,
+      # though, that recycling the pool during an image bump does not page.
+      warmPoolFor: 5m
+      # -- How far back to look for evidence that an environment keeps a warm
+      # pool at all.
+      #
+      # kube-state-metrics emits nothing for a Deployment that does not exist,
+      # so a deleted warm pool leaves no series to compare against. Looking back
+      # over this window keeps the environment in the expression after its
+      # instances vanish. An environment that has genuinely stopped running a
+      # warm pool stops alerting once this window passes.
+      warmPoolHistory: 6h

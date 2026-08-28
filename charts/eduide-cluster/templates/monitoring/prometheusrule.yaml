@@ -134,26 +134,52 @@ spec:
               environment. Check the pod is running and that /q/metrics still answers.
             runbook_url: {{ $runbook }}
 
+        {{- /*
+        Anchored on what the environment *used to* run, not on what it runs now.
+
+        The obvious form - desired > 0 AND available == 0 - cannot see the case
+        that matters most. kube-state-metrics emits nothing at all for a
+        Deployment that does not exist, so when a warm pool is deleted rather
+        than merely broken, both sides of the expression are empty and the alert
+        has nothing to fire on. That happened on Mannheim: the pool was gone for
+        six minutes, sessions failed with "Failed to complete session setup",
+        and this rule stayed silent throughout.
+
+        `max_over_time` over the last {{ $t.warmPoolHistory }} keeps the namespace in the left-hand
+        vector even after its series disappear, so a vanished pool is still
+        compared against a missing one. An environment that never ran a warm
+        pool has no history and so can never trigger this.
+        */}}
         - alert: EduIDEWarmPoolEmpty
           expr: |-
-            (sum by (namespace) (kube_deployment_status_replicas{namespace=~"{{ $ns }}", deployment=~"instance-.*"}) > 0)
-            and
-            (sum by (namespace) (kube_deployment_status_replicas_available{namespace=~"{{ $ns }}", deployment=~"instance-.*"}) == 0)
-          for: 10m
+            (
+              sum by (namespace) (
+                max_over_time(kube_deployment_status_replicas{namespace=~"{{ $ns }}", deployment=~"instance-.*"}[{{ $t.warmPoolHistory }}])
+              ) > 0
+            )
+            unless
+            (
+              sum by (namespace) (kube_deployment_status_replicas_available{namespace=~"{{ $ns }}", deployment=~"instance-.*"}) > 0
+            )
+          for: {{ $t.warmPoolFor }}
           labels:
             severity: critical
             {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
           annotations:
             summary: 'The EduIDE warm pool is empty in {{ "{{" }} $labels.namespace {{ "}}" }}'
             description: >-
-              Every pre-warmed instance in {{ "{{" }} $labels.namespace {{ "}}" }} is unavailable, while the
-              environment is configured to keep some. Sessions still start, but each
-              student now waits for a cold start - pulling the image and booting Theia -
-              instead of being handed a running IDE.
-              This is expressed against desired replicas, so an environment configured
-              with no warm pool cannot trigger it. Common causes are a node that cannot
-              pull the image, insufficient cluster capacity, or every instance having
-              just been claimed at once.
+              Every pre-warmed instance in {{ "{{" }} $labels.namespace {{ "}}" }} is gone or unavailable,
+              while this environment normally keeps some.
+              If the instances are merely unavailable, sessions still start and each
+              student waits for a cold start instead of being handed a running IDE. If
+              the instance deployments have been deleted outright, sessions fail
+              completely with "Failed to complete session setup", because the operator
+              hands out warm instances by name and does not recreate missing ones - a
+              `kubectl rollout restart deploy/operator-deployment` in that namespace
+              rebuilds the pool.
+              Common causes are a node that cannot pull the image, insufficient cluster
+              capacity, every instance having just been claimed at once, or an image
+              bump that recycled the pool.
               `kubectl -n {{ "{{" }} $labels.namespace {{ "}}" }} get pods | grep instance-` is the first look.
             runbook_url: {{ $runbook }}
 
