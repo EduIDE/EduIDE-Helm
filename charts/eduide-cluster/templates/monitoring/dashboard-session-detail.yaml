@@ -1,8 +1,7 @@
 {{- if .Values.monitoring.enabled }}
 {{- /*
-Goes into a namespace this chart does not create, so it must already exist and
-be watched by Grafana. Guarded so that turning monitoring on without setting a
-dashboard namespace fails with a sentence rather than "namespaces not found".
+One session in detail, reached from the Oldest sessions table on the
+sessions overview or by picking a pod directly.
 */}}
 {{- $dashboardNs := .Values.monitoring.dashboardNamespace | toString | trim }}
 {{- if not $dashboardNs }}
@@ -13,10 +12,10 @@ kind: ConfigMap
 metadata:
   labels:
     grafana_dashboard: "1"
-  name: theia-cloud-dashboard-overview
+  name: eduide-dashboard-session-detail
   namespace: {{ $dashboardNs }}
 data:
-  theiacloud.json: |-
+  eduide-session-detail.json: |-
     {
       "annotations": {
         "list": [
@@ -34,11 +33,22 @@ data:
           }
         ]
       },
-      "description": "Visualization to observe a Theia Cloud deployment",
+      "description": "One session, in detail. Pick the environment and the pod; every panel is scoped to that pod.",
       "editable": true,
       "fiscalYearStartMonth": 0,
-      "graphTooltip": 0,
-      "links": [],
+      "graphTooltip": 1,
+      "links": [
+        {
+          "asDropdown": false,
+          "icon": "external link",
+          "tags": [],
+          "targetBlank": false,
+          "title": "All sessions",
+          "tooltip": "Back to the sessions overview",
+          "type": "link",
+          "url": "/d/eduide-sessions/eduide-sessions"
+        }
+      ],
       "panels": [
         {
           "collapsed": false,
@@ -48,9 +58,9 @@ data:
             "x": 0,
             "y": 0
           },
-          "id": 5,
+          "id": 200,
           "panels": [],
-          "title": "Theia Cloud",
+          "title": "This session",
           "type": "row"
         },
         {
@@ -58,87 +68,14 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Shows the number of running session pods.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "stepBefore",
-                "lineStyle": {
-                  "fill": "solid"
-                },
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "decimals": 0,
-              "fieldMinMax": false,
-              "mappings": [],
-              "noValue": "0",
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
+          "description": "How long this pod has existed. Not how long the student has been working - a warm-pool pod is created before anyone claims it.",
           "gridPos": {
-            "h": 8,
-            "w": 12,
+            "h": 5,
+            "w": 4,
             "x": 0,
             "y": 1
           },
-          "id": 3,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
+          "id": 201,
           "targets": [
             {
               "datasource": {
@@ -146,63 +83,154 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "exemplar": false,
-              "expr": "count(count by (pod) (container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\", container!=\"\", container!=\"POD\"}))",
+              "expr": "time() - max(kube_pod_created{namespace=~\"$namespace\", pod=~\"$pod\"})",
               "format": "time_series",
               "instant": false,
-              "interval": "",
-              "legendFormat": "Theia Session Count",
+              "legendFormat": "",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Theia Session Pod Count",
-          "type": "timeseries"
+          "title": "Age",
+          "type": "stat",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "unit": "s",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          }
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "CPU usage of all Theia Cloud pods. This includes session pods and service pods (i.e. landing page, REST service, operator).\nAlso shows the total over all Theia Cloud pods.",
+          "description": "Both the IDE and its oauth2-proxy sidecar must be ready before the session serves traffic. 1 of 2 means the proxy is failing, which presents to the student as a login loop or a 403.",
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 4,
+            "y": 1
+          },
+          "id": 202,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum(kube_pod_container_status_ready{namespace=~\"$namespace\", pod=~\"$pod\"})",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Ready containers",
+          "type": "stat",
           "fieldConfig": {
             "defaults": {
               "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
+                "mode": "thresholds"
               },
               "mappings": [],
+              "noValue": "0",
+              "unit": "none",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Any restart of a session container loses the student's terminal state and unsaved editor buffers.",
+          "gridPos": {
+            "h": 5,
+            "w": 4,
+            "x": 8,
+            "y": 1
+          },
+          "id": 203,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"$pod\"})",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Restarts",
+          "type": "stat",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "unit": "none",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
@@ -211,34 +239,46 @@ data:
                     "value": null
                   },
                   {
+                    "color": "orange",
+                    "value": 1
+                  },
+                  {
                     "color": "red",
-                    "value": 80
+                    "value": 3
                   }
                 ]
               }
             },
             "overrides": []
           },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Limit minus current working set for the IDE container. When this approaches zero the kernel kills the container.",
           "gridPos": {
-            "h": 8,
-            "w": 12,
+            "h": 5,
+            "w": 6,
             "x": 12,
             "y": 1
           },
-          "id": 4,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
+          "id": 204,
           "targets": [
             {
               "datasource": {
@@ -246,9 +286,169 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"POD\",container!=\"\", job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=~\"$namespace\"}[1m])) by (pod)",
+              "expr": "sum(kube_pod_container_resource_limits{namespace=~\"$namespace\", pod=~\"$pod\", resource=\"memory\", container!~\"oauth.*\"}) - sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\", container!~\"oauth.*\", container!=\"POD\"})",
+              "format": "time_series",
               "instant": false,
-              "legendFormat": "__auto",
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Memory headroom",
+          "type": "stat",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "unit": "bytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 209715200
+                  },
+                  {
+                    "color": "green",
+                    "value": 524288000
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Percentage of the workspace volume in use, if this session has a persistent one.",
+          "gridPos": {
+            "h": 5,
+            "w": 6,
+            "x": 18,
+            "y": 1
+          },
+          "id": 205,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "max(100 * kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"})",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Workspace used",
+          "type": "stat",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "noValue": "0",
+              "unit": "percent",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 75
+                  },
+                  {
+                    "color": "red",
+                    "value": 85
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "colorMode": "value",
+            "graphMode": "area",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "auto"
+          }
+        },
+        {
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 6
+          },
+          "id": 210,
+          "panels": [],
+          "title": "Resources",
+          "type": "row"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "The dashed limit line is what the container is killed at. The oauth2-proxy sidecar is included here on purpose: it is small, and a proxy eating memory is a real failure mode.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 7
+          },
+          "id": 211,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\", container!=\"POD\"}",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ "{{" }}container{{ "}}" }}",
               "range": true,
               "refId": "A"
             },
@@ -258,121 +458,16 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "sum(rate(container_cpu_usage_seconds_total{container!=\"POD\",container!=\"\", job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=~\"$namespace\"}[1m]))",
-              "hide": false,
+              "expr": "kube_pod_container_resource_limits{namespace=~\"$namespace\", pod=~\"$pod\", resource=\"memory\"}",
+              "format": "time_series",
               "instant": false,
-              "legendFormat": "TOTAL",
+              "legendFormat": "{{ "{{" }}container{{ "}}" }} limit",
               "range": true,
               "refId": "B"
             }
           ],
-          "title": "Theia Cloud CPU usage",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "Theia Backend process memory consumption for each session pod",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": 60000,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "decbytes"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 9
-          },
-          "id": 2,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\", container!=\"\", container!~\"oauth.*\"}",
-              "instant": false,
-              "legendFormat": "{{ "{{" }}pod{{ "}}" }}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Theia Session Backend Memory",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "CPU usage for Theia Backend processes for each session pod.",
+          "title": "Memory per container, against the limit",
+          "type": "timeseries",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -411,29 +506,19 @@ data:
                 }
               },
               "mappings": [],
+              "unit": "bytes",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
               }
             },
             "overrides": []
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 9
-          },
-          "id": 1,
           "options": {
             "legend": {
               "calcs": [],
@@ -443,10 +528,24 @@ data:
             },
             "tooltip": {
               "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
+          "description": "A container pinned at its limit is being throttled; see the panel below for how hard.",
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 7
+          },
+          "id": 212,
           "targets": [
             {
               "datasource": {
@@ -454,24 +553,29 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "exemplar": false,
-              "expr": "rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\", container!=\"\", container!~\"oauth.*\"}[1m])",
+              "expr": "rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\", container!=\"POD\"}[5m])",
+              "format": "time_series",
               "instant": false,
-              "interval": "",
-              "legendFormat": "{{ "{{" }}pod{{ "}}" }}",
+              "legendFormat": "{{ "{{" }}container{{ "}}" }}",
               "range": true,
-              "refId": "Theia Backend CPU"
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "kube_pod_container_resource_limits{namespace=~\"$namespace\", pod=~\"$pod\", resource=\"cpu\"}",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ "{{" }}container{{ "}}" }} limit",
+              "range": true,
+              "refId": "B"
             }
           ],
-          "title": "Theia Session Backend CPU",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "Average Theia Backend process memory consumption per app definition",
+          "title": "CPU per container, against the limit",
+          "type": "timeseries",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -500,7 +604,7 @@ data:
                   "type": "linear"
                 },
                 "showPoints": "auto",
-                "spanNulls": 60000,
+                "spanNulls": false,
                 "stacking": {
                   "group": "A",
                   "mode": "none"
@@ -510,43 +614,46 @@ data:
                 }
               },
               "mappings": [],
+              "unit": "none",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
-              },
-              "unit": "decbytes"
+              }
             },
             "overrides": []
           },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "maxHeight": 600,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Scheduling periods in which the container wanted CPU and was denied. Non-zero here with normal-looking CPU usage is the signature of a session that feels slow to the student but looks fine to the cluster.",
           "gridPos": {
             "h": 8,
-            "w": 12,
+            "w": 8,
             "x": 0,
-            "y": 17
+            "y": 15
           },
-          "id": 12,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
+          "id": 213,
           "targets": [
             {
               "datasource": {
@@ -554,22 +661,16 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "avg by (container) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\", container!=\"\", container!~\"oauth.*\"})",
+              "expr": "rate(container_cpu_cfs_throttled_periods_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\", container!=\"POD\"}[5m])",
+              "format": "time_series",
               "instant": false,
               "legendFormat": "{{ "{{" }}container{{ "}}" }}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Theia Session Backend Memory Averages",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "Average Theia Backend process CPU consumption per app definition",
+          "title": "CPU throttled periods",
+          "type": "timeseries",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -598,7 +699,7 @@ data:
                   "type": "linear"
                 },
                 "showPoints": "auto",
-                "spanNulls": 60000,
+                "spanNulls": false,
                 "stacking": {
                   "group": "A",
                   "mode": "none"
@@ -608,30 +709,20 @@ data:
                 }
               },
               "mappings": [],
+              "unit": "none",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
               },
-              "unit": "percentunit"
+              "min": 0
             },
             "overrides": []
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 17
-          },
-          "id": 13,
           "options": {
             "legend": {
               "calcs": [],
@@ -641,10 +732,24 @@ data:
             },
             "tooltip": {
               "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
           },
+          "description": "Traffic to and from the session. A live IDE holds an open WebSocket, so a flatline on both while the pod is Running means the student's connection dropped even though nothing restarted.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 8,
+            "y": 15
+          },
+          "id": 214,
           "targets": [
             {
               "datasource": {
@@ -652,15 +757,188 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "avg by (container) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\", container!=\"\", container!~\"oauth.*\"}[1m]))",
+              "expr": "rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m])",
+              "format": "time_series",
               "instant": false,
-              "legendFormat": "{{ "{{" }}container{{ "}}" }}",
+              "legendFormat": "received",
+              "range": true,
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m])",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "transmitted",
+              "range": true,
+              "refId": "B"
+            }
+          ],
+          "title": "Network",
+          "type": "timeseries",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "unit": "Bps",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "maxHeight": 600,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Non-zero means the container is not running and why: ImagePullBackOff for a tag that was never built, CreateContainerConfigError for a missing secret or ConfigMap, CrashLoopBackOff for a container that keeps exiting.",
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 15
+          },
+          "id": 215,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "kube_pod_container_status_waiting_reason{namespace=~\"$namespace\", pod=~\"$pod\"} > 0",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ "{{" }}container{{ "}}" }}: {{ "{{" }}reason{{ "}}" }}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Theia Session Backend CPU Averages",
-          "type": "timeseries"
+          "title": "Container waiting reason",
+          "type": "timeseries",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 30,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "unit": "none",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "maxHeight": 600,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
         },
         {
           "collapsed": false,
@@ -668,11 +946,11 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 25
+            "y": 23
           },
-          "id": 9,
+          "id": 220,
           "panels": [],
-          "title": "Nodes",
+          "title": "How it ended",
           "type": "row"
         },
         {
@@ -680,7 +958,31 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "CPU Usage ratio per node in the cluster",
+          "description": "What killed the container the last time it stopped. OOMKilled means it exceeded its memory limit. Error means the process exited non-zero. Completed with exit 143 or 137 is the garbage collector stopping an idle session, which is routine and not a fault.",
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 24
+          },
+          "id": 221,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "kube_pod_container_status_last_terminated_reason{namespace=~\"$namespace\", pod=~\"$pod\"} > 0",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ "{{" }}container{{ "}}" }}: {{ "{{" }}reason{{ "}}" }}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Last termination reason",
+          "type": "timeseries",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -694,7 +996,7 @@ data:
                 "axisPlacement": "auto",
                 "barAlignment": 0,
                 "drawStyle": "line",
-                "fillOpacity": 0,
+                "fillOpacity": 30,
                 "gradientMode": "none",
                 "hideFrom": {
                   "legend": false,
@@ -719,30 +1021,19 @@ data:
                 }
               },
               "mappings": [],
+              "unit": "none",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
-              },
-              "unit": "percentunit"
+              }
             },
             "overrides": []
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 26
-          },
-          "id": 10,
           "options": {
             "legend": {
               "calcs": [],
@@ -752,108 +1043,24 @@ data:
             },
             "tooltip": {
               "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "instance:node_cpu:ratio",
-              "instant": false,
-              "legendFormat": "Node {{ "{{" }}instance{{ "}}" }}",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Nodes CPU Usage Ratio",
-          "type": "timeseries"
+          }
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Memory Usage Ratio for each node in the cluster.",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "percentunit"
-            },
-            "overrides": []
-          },
+          "description": "137 is SIGKILL, 143 is SIGTERM - both are normal shutdowns. Anything else came from inside the container.",
           "gridPos": {
-            "h": 8,
+            "h": 7,
             "w": 12,
             "x": 12,
-            "y": 26
+            "y": 24
           },
-          "id": 11,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
+          "id": 222,
           "targets": [
             {
               "datasource": {
@@ -861,35 +1068,16 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes",
+              "expr": "kube_pod_container_status_last_terminated_exitcode{namespace=~\"$namespace\", pod=~\"$pod\"}",
+              "format": "time_series",
               "instant": false,
-              "legendFormat": "__auto",
+              "legendFormat": "{{ "{{" }}container{{ "}}" }}",
               "range": true,
               "refId": "A"
             }
           ],
-          "title": "Nodes Memory Usage Ratio",
-          "type": "timeseries"
-        },
-        {
-          "collapsed": false,
-          "gridPos": {
-            "h": 1,
-            "w": 24,
-            "x": 0,
-            "y": 34
-          },
-          "id": 6,
-          "panels": [],
-          "title": "Cluster",
-          "type": "row"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "Ratio of CPUs used across the whole cluster",
+          "title": "Last exit code",
+          "type": "timeseries",
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -928,30 +1116,19 @@ data:
                 }
               },
               "mappings": [],
+              "unit": "none",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   {
                     "color": "green",
                     "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
                   }
                 ]
-              },
-              "unit": "percentunit"
+              }
             },
             "overrides": []
           },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 35
-          },
-          "id": 7,
           "options": {
             "legend": {
               "calcs": [],
@@ -961,139 +1138,29 @@ data:
             },
             "tooltip": {
               "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
+              "mode": "multi",
+              "sort": "desc"
             }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "cluster:node_cpu:ratio",
-              "instant": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Cluster CPU Usage Ratio",
-          "type": "timeseries"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "Memory usage across the whole cluster",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisBorderShow": false,
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "insertNulls": false,
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "unit": "percentunit"
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 12,
-            "y": 35
-          },
-          "id": 8,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "maxHeight": 600,
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "editorMode": "code",
-              "expr": "1 - sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)",
-              "instant": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Cluster Memory Usage Ratio",
-          "type": "timeseries"
+          }
         }
       ],
       "refresh": "30s",
       "schemaVersion": 39,
-      "tags": [],
+      "tags": [
+        "eduide"
+      ],
       "templating": {
         "list": [
           {
-            "allValue": {{ include "eduide.monitoredNamespaceRegex" . | quote }},
             "current": {},
-            "datasource": { "type": "prometheus", "uid": "prometheus" },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
             "definition": "label_values(kube_pod_info{namespace=~\"{{ include "eduide.monitoredNamespaceRegex" . }}\"},namespace)",
             "hide": 0,
-            "includeAll": true,
-            "label": "Namespace",
+            "includeAll": false,
+            "label": "Environment",
             "multi": false,
             "name": "namespace",
             "options": [],
@@ -1107,16 +1174,42 @@ data:
             "skipUrlSync": false,
             "sort": 1,
             "type": "query"
+          },
+          {
+            "current": {},
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(kube_pod_info{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\"},pod)",
+            "hide": 0,
+            "includeAll": false,
+            "label": "Session pod",
+            "multi": false,
+            "name": "pod",
+            "options": [],
+            "query": {
+              "qryType": 1,
+              "query": "label_values(kube_pod_info{namespace=~\"$namespace\", pod=~\"(session-|instance-).*\"},pod)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 2,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 1,
+            "type": "query"
           }
         ]
       },
-      "time": { "from": "now-3h", "to": "now" },
-      "timeRangeUpdatedDuringEditOrView": false,
+      "time": {
+        "from": "now-3h",
+        "to": "now"
+      },
       "timepicker": {},
       "timezone": "browser",
-      "title": "Theia Cloud",
-      "uid": "bdrjgy1fv3d34b",
-      "version": 7,
+      "title": "EduIDE Session Detail",
+      "uid": "eduide-session-detail",
+      "version": 1,
       "weekStart": ""
     }
 {{- end }}

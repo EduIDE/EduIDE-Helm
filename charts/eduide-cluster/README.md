@@ -1,6 +1,6 @@
 # eduide-cluster
 
-![Version: 2.1.5](https://img.shields.io/badge/Version-2.1.5-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.2.0](https://img.shields.io/badge/Version-2.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
 cert-manager issuers. Install once per cluster, before any eduide release.
@@ -50,10 +50,33 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | managedCertificates.enabled | bool | `false` |  |
 | managedCertificates.issuerRef.kind | string | `"ClusterIssuer"` |  |
 | managedCertificates.issuerRef.name | string | `"letsencrypt-prod"` |  |
-| monitoring | object | `{"dashboardNamespace":"cattle-dashboards","enabled":false,"namespace":"cattle-monitoring-system","sessionNamespaces":[],"targetNamespaces":[]}` | ------------------------------------------------------------------------ |
+| monitoring | object | `{"alerting":{"channels":[],"enabled":false,"grafanaUrl":"","groupInterval":"5m","groupWait":"30s","minSeverity":"warning","namespace":"eduide-system","repeatInterval":"4h","runbookUrl":"https://eduide.github.io/Docs/admins/operations","thresholds":{"certExpiryDays":21,"componentRestarts":3,"sessionCrashPerHour":5,"sessionOOMPerHour":3,"startupSeconds":90,"volumePercent":85},"webhookSecret":{"create":false,"data":{},"name":"eduide-alert-webhooks"}},"certManager":{"enabled":false,"namespace":"cert-manager","portName":"http-metrics","serviceName":"cert-manager"},"dashboardNamespace":"cattle-dashboards","enabled":false,"namespace":"cattle-monitoring-system","targetNamespaces":[]}` | ------------------------------------------------------------------------ |
+| monitoring.alerting.channels | list | `[]` | Where to send alerts. Each entry needs `name`, `type` (`slack` or `discord`) and `secretKey`; Slack entries may also set `channel`. An empty list with alerting enabled means alerts fire but notify nobody, so the chart fails the render instead. |
+| monitoring.alerting.enabled | bool | `false` | Create the PrometheusRule and the AlertmanagerConfig. |
+| monitoring.alerting.grafanaUrl | string | `""` | Base URL of the Grafana that serves the EduIDE dashboards, with no trailing slash. Used to deep-link a notification straight to the affected session. Left empty, notifications carry no dashboard link. |
+| monitoring.alerting.groupInterval | string | `"5m"` | How long to wait before notifying about new alerts added to a group. |
+| monitoring.alerting.groupWait | string | `"30s"` | How long to wait for more alerts in a group before the first notification. |
+| monitoring.alerting.minSeverity | string | `"warning"` | Lowest severity that reaches the notification channels: `warning` or `critical`. Anything below stays in Alertmanager and on the dashboards. This is what keeps the channels worth reading. |
+| monitoring.alerting.namespace | string | `"eduide-system"` | Namespace both resources go in.  This is also the `namespace` label every EduIDE alert carries, and it is a routing artifact rather than the environment the alert is about. The Prometheus Operator defaults `alertmanagerConfigMatcherStrategy` to `OnNamespace`, which prepends `namespace = <the AlertmanagerConfig's own namespace>` to every route generated from it, so an alert must claim this namespace to reach a receiver at all.  The environment an alert is about is in `eduide_namespace`. Silence on that label, never on `namespace` - `namespace` is identical across every EduIDE alert and silencing it silences all of them. |
+| monitoring.alerting.repeatInterval | string | `"4h"` | How long before an unresolved alert is sent again. |
+| monitoring.alerting.runbookUrl | string | `"https://eduide.github.io/Docs/admins/operations"` | Base URL of the operations runbooks, with no trailing slash. |
+| monitoring.alerting.thresholds.certExpiryDays | int | `21` | Days before certificate expiry to start warning. |
+| monitoring.alerting.thresholds.componentRestarts | int | `3` | Restarts of a platform container within 15m before it counts as crash looping. |
+| monitoring.alerting.thresholds.sessionCrashPerHour | int | `5` | Session crashes per hour in one environment before alerting. |
+| monitoring.alerting.thresholds.sessionOOMPerHour | int | `3` | Session OOM kills per hour in one environment before alerting. |
+| monitoring.alerting.thresholds.startupSeconds | int | `90` | p95 session startup, in seconds, that counts as too slow. |
+| monitoring.alerting.thresholds.volumePercent | int | `85` | Workspace volume fill percentage that counts as nearly full. |
+| monitoring.alerting.webhookSecret.create | bool | `false` | Create the Secret from `data` below. Off means the Secret already exists and is referenced by name only. |
+| monitoring.alerting.webhookSecret.data | object | `{}` | Base64-encoded webhook URLs, keyed by the `secretKey` a channel names. Supplied by the workflow, not committed. |
+| monitoring.alerting.webhookSecret.name | string | `"eduide-alert-webhooks"` | Name of the Secret channels read their URL from. |
+| monitoring.certManager.enabled | bool | `false` | Create a ServiceMonitor for cert-manager's controller metrics. |
+| monitoring.certManager.namespace | string | `"cert-manager"` | Namespace cert-manager runs in. |
+| monitoring.certManager.portName | string | `"http-metrics"` | Name of the metrics port on that Service. |
+| monitoring.certManager.serviceName | string | `"cert-manager"` | Name of cert-manager's metrics Service. |
 | monitoring.dashboardNamespace | string | `"cattle-dashboards"` | Namespace the Grafana dashboard ConfigMaps go in. Must already exist and be watched by Grafana's sidecar. `cattle-dashboards` is Rancher's. |
 | monitoring.enabled | bool | `false` | Create the PodMonitors and Grafana dashboards.  Off by default because it is not portable: it needs the Prometheus Operator CRDs (`monitoring.coreos.com/v1`) to exist, and the two namespaces below are Rancher's. Helm does not create namespaces it was not told to, so on a cluster without them the install fails outright on the dashboards.  Turn it on once you know where your Prometheus and Grafana look for these. |
 | monitoring.namespace | string | `"cattle-monitoring-system"` | Namespace the PodMonitors go in. Must be somewhere your Prometheus discovers. `cattle-monitoring-system` is Rancher's; change it for any other monitoring stack. |
+| monitoring.targetNamespaces | list | `[]` | Namespaces to watch. Bootstrap derives this from the environments on the cluster; it is also the namespace list every dashboard's picker offers. |
 | operatorrole.name | string | `"operator-api-access"` | name for the operator's cluster role |
 | servicerole.name | string | `"service-api-access"` | name for the services' cluster role |
 | wildcardTLSSecret.certificate | string | `""` |  |

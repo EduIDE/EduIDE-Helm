@@ -121,9 +121,35 @@ wildcardTLSSecret:
 # ---------------------------------------------------------------------------
 # Needs the Prometheus Operator CRDs, and both namespaces must already exist and
 # be watched by your Prometheus and Grafana. The defaults are Rancher's names.
+# Monitoring and alerting are switched on here, unlike most of this file's
+# defaults, because CI renders the chart from this example and validates the
+# result against the CRD schemas. Left off, the PrometheusRule, the
+# AlertmanagerConfig and every dashboard would render to nothing and would never
+# be schema-checked - which is exactly how the dashboards came to select on a
+# label that had not existed since 2.0.0.
 monitoring:
-  enabled: false
-  # namespace: monitoring
-  # dashboardNamespace: monitoring
-  # targetNamespaces: [eduide-prod]
-  # sessionNamespaces: [eduide-prod]
+  enabled: true
+  namespace: monitoring
+  dashboardNamespace: monitoring
+  targetNamespaces: [eduide-prod]
+  certManager:
+    enabled: true
+  alerting:
+    enabled: true
+    namespace: eduide-system
+    grafanaUrl: https://grafana.example.org
+    webhookSecret:
+      create: true
+      # Base64 of a placeholder URL. A real deployment gets these from a GitHub
+      # Environment secret; a webhook URL is a credential and never lives here.
+      data:
+        slack-platform: aHR0cHM6Ly9leGFtcGxlLm9yZy9zbGFjay13ZWJob29r
+        discord-platform: aHR0cHM6Ly9leGFtcGxlLm9yZy9kaXNjb3JkLXdlYmhvb2s=
+    channels:
+      - name: platform-slack
+        type: slack
+        secretKey: slack-platform
+        channel: "#eduide-alerts"
+      - name: platform-discord
+        type: discord
+        secretKey: discord-platform

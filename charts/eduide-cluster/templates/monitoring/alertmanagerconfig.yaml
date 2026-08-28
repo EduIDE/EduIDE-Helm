@@ -1,0 +1,103 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.alerting.enabled }}
+{{- $a := .Values.monitoring.alerting }}
+{{- /*
+Where EduIDE's alerts go.
+
+Two things about this file are not obvious.
+
+**The route matches on `namespace`, and that label is a routing artifact.** The
+Prometheus Operator defaults `alertmanagerConfigMatcherStrategy` to
+`OnNamespace`, which silently prepends `namespace = {{ $a.namespace }}` to the
+route generated from this resource. Every EduIDE alert therefore sets that
+label, and carries the environment it is really about in `eduide_namespace`.
+Grouping and any inhibition rule must use `eduide_namespace`; grouping on
+`namespace` would merge an outage in production with one in staging into a
+single notification, because the label is identical across all of them.
+
+**Only warning and above is notified.** Everything fires and is visible in
+Alertmanager and on the dashboards, but the channels get a filtered subset. A
+channel that receives every capacity blip stops being read, and then the
+platform is unmonitored no matter how many rules exist.
+*/}}
+{{- if not $a.channels }}
+{{- fail "monitoring.alerting.enabled is true but monitoring.alerting.channels is empty - alerts would fire and notify nobody" }}
+{{- end }}
+{{- $severities := list "critical" }}
+{{- if eq ($a.minSeverity | toString) "warning" }}
+{{- $severities = list "critical" "warning" }}
+{{- else if ne ($a.minSeverity | toString) "critical" }}
+{{- fail (printf "monitoring.alerting.minSeverity must be \"warning\" or \"critical\", got %q" ($a.minSeverity | toString)) }}
+{{- end }}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: eduide-alerts
+  namespace: {{ $a.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+spec:
+  route:
+    receiver: eduide-channels
+    groupBy:
+      - alertname
+      - eduide_namespace
+    groupWait: {{ $a.groupWait }}
+    groupInterval: {{ $a.groupInterval }}
+    repeatInterval: {{ $a.repeatInterval }}
+    matchers:
+      - name: severity
+        matchType: =~
+        value: {{ join "|" $severities | quote }}
+  receivers:
+    - name: eduide-channels
+{{- $slack := list }}
+{{- $discord := list }}
+{{- range $i, $c := $a.channels }}
+  {{- if not $c.name }}{{ fail (printf "monitoring.alerting.channels[%d] has no name" $i) }}{{ end }}
+  {{- if not $c.secretKey }}{{ fail (printf "channel %q names no secretKey - webhook URLs are only ever read from a Secret, never from values" $c.name) }}{{ end }}
+  {{- $type := $c.type | default "" | toString }}
+  {{- if eq $type "slack" }}{{ $slack = append $slack $c }}
+  {{- else if eq $type "discord" }}{{ $discord = append $discord $c }}
+  {{- else }}{{ fail (printf "channel %q has type %q; supported types are \"slack\" and \"discord\"" $c.name $type) }}{{ end }}
+{{- end }}
+{{- /*
+The message body. Alertmanager templating, not Helm's - the doubled braces are
+escapes. Written to stand on its own in a chat client: what broke, what it means
+for students, and where to look, without needing the dashboard open. `.Alerts`
+is grouped by alertname and environment, so one message covers one problem in
+one environment however many pods it touched.
+*/}}
+{{- $text := `{{ range .Alerts }}*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+{{ if .Labels.eduide_namespace }}Environment: {{ .Labels.eduide_namespace }}{{ end }}{{ if .Labels.pod }} | Pod: {{ .Labels.pod }}{{ end }}{{ if .Labels.node }} | Node: {{ .Labels.node }}{{ end }}
+Severity: {{ .Labels.severity }} | Since: {{ .StartsAt.Format "15:04 MST" }}
+{{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}
+{{ end }}{{ if .Annotations.dashboard_url }}Dashboard: {{ .Annotations.dashboard_url }}
+{{ end }}{{ end }}` }}
+{{- if $slack }}
+      slackConfigs:
+  {{- range $slack }}
+        - apiURL:
+            name: {{ $a.webhookSecret.name }}
+            key: {{ .secretKey }}
+          {{- if .channel }}
+          channel: {{ .channel | quote }}
+          {{- end }}
+          sendResolved: true
+          username: EduIDE
+          title: '{{ `{{ if eq .Status "firing" }}[FIRING {{ .Alerts.Firing | len }}]{{ else }}[RESOLVED]{{ end }} {{ .GroupLabels.alertname }}{{ if .GroupLabels.eduide_namespace }} - {{ .GroupLabels.eduide_namespace }}{{ end }}` }}'
+          text: {{ $text | quote }}
+  {{- end }}
+{{- end }}
+{{- if $discord }}
+      discordConfigs:
+  {{- range $discord }}
+        - apiURL:
+            name: {{ $a.webhookSecret.name }}
+            key: {{ .secretKey }}
+          sendResolved: true
+          title: '{{ `{{ if eq .Status "firing" }}[FIRING {{ .Alerts.Firing | len }}]{{ else }}[RESOLVED]{{ end }} {{ .GroupLabels.alertname }}{{ if .GroupLabels.eduide_namespace }} - {{ .GroupLabels.eduide_namespace }}{{ end }}` }}'
+          message: {{ $text | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}
