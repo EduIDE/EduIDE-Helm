@@ -1,0 +1,425 @@
+{{- /*
+Called before the guard below, deliberately: inside it, a misconfiguration that
+renders nothing could not report itself.
+*/}}
+{{- include "eduide.checkAlertingPrerequisites" . }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.alerting.enabled }}
+{{- /*
+EduIDE's alerts.
+
+Two rules govern everything in here.
+
+**Every expression is checked against a live Prometheus before it ships.** The
+dashboards in this directory spent months showing nothing because they selected
+on `service=~"theia-.*"`, a label that stopped existing in 2.0.0 and that no
+render test could catch. A selector that matches nothing produces an alert that
+never fires, which looks exactly like a healthy platform.
+
+**Session-level faults alert on rates, never per pod.** This platform runs
+student code. Sessions get OOM-killed and crash during normal exercise work, and
+one notification per event turns the channel into something nobody reads - at
+which point the platform is unmonitored no matter how many rules exist.
+
+Deployment names below are the real ones, verified against kube-state-metrics:
+operator-deployment, service-deployment, landing-page-deployment,
+garbage-collector, conversion-webhook.
+*/}}
+{{- $a := .Values.monitoring.alerting }}
+{{- $t := $a.thresholds }}
+{{- $ns := include "eduide.monitoredNamespaceRegex" . }}
+{{- $sessions := `pod=~"(session-|instance-).*"` }}
+{{- $ide := `container!="", container!~"oauth.*", container!="POD"` }}
+{{- $runbook := printf "%s/incident-response" (trimSuffix "/" $a.runbookUrl) }}
+{{- /*
+A deep link into the session dashboards, when a Grafana URL is configured. The
+notification is read by someone who is not at their desk, so a link that lands
+on the right pod is worth more than the metric value.
+*/}}
+{{- $g := trimSuffix "/" $a.grafanaUrl }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: eduide-alerts
+  namespace: {{ $a.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+spec:
+  groups:
+    - name: eduide.platform
+      rules:
+        - alert: EduIDEComponentDown
+          expr: |-
+            kube_deployment_status_replicas_available{namespace=~"{{ $ns }}", deployment=~"(operator|service|landing-page)-deployment|garbage-collector"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'EduIDE {{ "{{" }} $labels.deployment {{ "}}" }} is down in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              The {{ "{{" }} $labels.deployment {{ "}}" }} deployment in {{ "{{" }} $labels.namespace {{ "}}" }} has had no
+              available replicas for 5 minutes.
+              {{ "{{" }} if eq $labels.deployment "service-deployment" {{ "}}" }}Students cannot start new
+              sessions: the landing page calls this service to create one. Sessions already
+              running are unaffected.{{ "{{" }} end {{ "}}" }}
+              {{ "{{" }} if eq $labels.deployment "operator-deployment" {{ "}}" }}Nothing reconciles Session
+              or Workspace resources: new sessions will be accepted and never start, and
+              stopped ones will not be cleaned up. Running sessions keep working.{{ "{{" }} end {{ "}}" }}
+              {{ "{{" }} if eq $labels.deployment "landing-page-deployment" {{ "}}" }}Students get an error
+              page instead of the environment picker. Running sessions keep working and
+              direct session URLs still resolve.{{ "{{" }} end {{ "}}" }}
+              {{ "{{" }} if eq $labels.deployment "garbage-collector" {{ "}}" }}Idle sessions are no longer
+              being stopped, so the cluster will fill up with sessions nobody is using.
+              Nothing breaks immediately; capacity degrades over hours.{{ "{{" }} end {{ "}}" }}
+              Start with `kubectl -n {{ "{{" }} $labels.namespace {{ "}}" }} describe deploy {{ "{{" }} $labels.deployment {{ "}}" }}`
+              and the pod logs.
+              To silence this during planned maintenance, match on
+              eduide_namespace="{{ "{{" }} $labels.namespace {{ "}}" }}" - not on namespace.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEConversionWebhookDown
+          expr: |-
+            kube_deployment_status_replicas_available{namespace="{{ .Release.Namespace }}", deployment="conversion-webhook"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'The EduIDE conversion webhook is down, cluster-wide'
+            description: >-
+              The conversion webhook has had no available replicas for 5 minutes.
+              This is cluster-scoped, so it affects every environment at once, not one.
+              Every read and write of a Session, Workspace or AppDefinition goes through
+              it, so while it is down the operator cannot reconcile anything and
+              `kubectl get session` fails as well. Sessions already running keep serving
+              traffic; nothing new can start anywhere.
+              Check `kubectl -n {{ .Release.Namespace }} get pods -l app=conversion-webhook`
+              and whether its serving certificate is still valid.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEComponentCrashLooping
+          expr: |-
+            increase(kube_pod_container_status_restarts_total{namespace=~"{{ $ns }}", pod!~"(session-|instance-).*"}[15m]) > {{ $t.componentRestarts }}
+          for: 5m
+          labels:
+            severity: critical
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'EduIDE {{ "{{" }} $labels.container {{ "}}" }} is crash looping in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Container {{ "{{" }} $labels.container {{ "}}" }} in pod {{ "{{" }} $labels.pod {{ "}}" }} restarted
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} times in 15 minutes. This is a platform component,
+              not a student session, so it is a fault rather than something a student did.
+              A component that restarts this often is usually failing on startup: a
+              misconfigured secret, an unreachable Keycloak, or an image that does not
+              match the chart. `kubectl -n {{ "{{" }} $labels.namespace {{ "}}" }} logs {{ "{{" }} $labels.pod {{ "}}" }}
+              --previous` shows why the last attempt died.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEServiceScrapeDown
+          expr: |-
+            up{job=~".*theia-cloud-service", namespace=~"{{ $ns }}"} == 0
+          for: 10m
+          labels:
+            severity: critical
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Prometheus cannot scrape the EduIDE service in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              The REST service in {{ "{{" }} $labels.namespace {{ "}}" }} has not been scrapeable for 10
+              minutes. This does not mean students are affected - the service may be
+              serving fine - but it does mean we are blind: session start counts and
+              startup latency stop being recorded, and EduIDESessionStartupSlow cannot
+              fire while this is true. Treat it as a monitoring outage for that
+              environment. Check the pod is running and that /q/metrics still answers.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEWarmPoolEmpty
+          expr: |-
+            (sum by (namespace) (kube_deployment_status_replicas{namespace=~"{{ $ns }}", deployment=~"instance-.*"}) > 0)
+            and
+            (sum by (namespace) (kube_deployment_status_replicas_available{namespace=~"{{ $ns }}", deployment=~"instance-.*"}) == 0)
+          for: 10m
+          labels:
+            severity: critical
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'The EduIDE warm pool is empty in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Every pre-warmed instance in {{ "{{" }} $labels.namespace {{ "}}" }} is unavailable, while the
+              environment is configured to keep some. Sessions still start, but each
+              student now waits for a cold start - pulling the image and booting Theia -
+              instead of being handed a running IDE.
+              This is expressed against desired replicas, so an environment configured
+              with no warm pool cannot trigger it. Common causes are a node that cannot
+              pull the image, insufficient cluster capacity, or every instance having
+              just been claimed at once.
+              `kubectl -n {{ "{{" }} $labels.namespace {{ "}}" }} get pods | grep instance-` is the first look.
+            runbook_url: {{ $runbook }}
+
+    - name: eduide.sessions
+      rules:
+        {{- /*
+        Counted off the restart counter, not off the termination reason.
+        `kube_pod_container_status_last_terminated_reason` is a gauge holding
+        only the most recent reason, so increase() over it counts nothing
+        reliable: a container that OOMs ten times reports the same 1 throughout.
+        `kube_pod_container_status_restarts_total` is a real counter, and
+        `and on(...)` narrows it to containers whose last exit was an OOM kill.
+        Same shape as EduIDESessionCrashSpike below, deliberately.
+        */}}
+        - alert: EduIDESessionOOMKillSpike
+          expr: |-
+            sum by (namespace) (
+              increase(kube_pod_container_status_restarts_total{namespace=~"{{ $ns }}", {{ $sessions }}}[1h])
+              and on (namespace, pod, container)
+              (kube_pod_container_status_last_terminated_reason{namespace=~"{{ $ns }}", {{ $sessions }}, reason="OOMKilled"} == 1)
+            ) > {{ $t.sessionOOMPerHour }}
+          for: 10m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Sessions are being OOM-killed in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} session containers in {{ "{{" }} $labels.namespace {{ "}}" }} were killed
+              for exceeding their memory limit in the last hour. Each one ended a
+              student's session abruptly: unsaved editor buffers and terminal state are
+              gone, though the workspace volume survives.
+              A single OOM kill is normal - students write code that allocates. This
+              alerts on the rate, so it means either the memory limit is too low for the
+              work being set, or one exercise is pushing everyone over it at once.
+              The session detail dashboard shows memory against the limit per container.
+              Raise `appDefinitions.defaults.limitsMemory` for the environment if this
+              is the workload rather than a bug.
+            runbook_url: {{ $runbook }}
+            {{- if $g }}
+            dashboard_url: '{{ $g }}/d/eduide-sessions/eduide-sessions?var-namespace={{ "{{" }} $labels.namespace {{ "}}" }}'
+            {{- end }}
+
+        {{- /*
+        Restarts, narrowed to containers whose last termination was an Error.
+        Counting exit codes directly does not work: the exit code is a gauge, so
+        it cannot be fed to increase(), and a gauge cannot distinguish one crash
+        from the same crash still being reported an hour later.
+        `and on(...)` filters the restart counter by the existence of an Error
+        termination for the same container, which is both valid PromQL and the
+        thing we actually mean.
+        */}}
+        - alert: EduIDESessionCrashSpike
+          expr: |-
+            sum by (namespace) (
+              increase(kube_pod_container_status_restarts_total{namespace=~"{{ $ns }}", {{ $sessions }}}[1h])
+              and on (namespace, pod, container)
+              (kube_pod_container_status_last_terminated_reason{namespace=~"{{ $ns }}", {{ $sessions }}, reason="Error"} == 1)
+            ) > {{ $t.sessionCrashPerHour }}
+          for: 10m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Sessions are crashing in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} session containers in {{ "{{" }} $labels.namespace {{ "}}" }} exited
+              with an unexpected status in the last hour. Exit codes 137 and 143 are
+              excluded: those are the garbage collector stopping an idle session, which
+              is routine and not a fault.
+              A cluster of real crashes usually means a broken image was just deployed,
+              so check what changed before looking at individual sessions. If a specific
+              language image is involved, the IDE container name in the session detail
+              dashboard names it.
+            runbook_url: {{ $runbook }}
+            {{- if $g }}
+            dashboard_url: '{{ $g }}/d/eduide-sessions/eduide-sessions?var-namespace={{ "{{" }} $labels.namespace {{ "}}" }}'
+            {{- end }}
+
+        - alert: EduIDESessionStartupSlow
+          expr: |-
+            (
+              max by (namespace) (application_application_theiacloud_session_startup_seconds_seconds{namespace=~"{{ $ns }}", quantile="0.95"}) > {{ $t.startupSeconds }}
+            )
+            and
+            (
+              sum by (namespace) (rate(application_application_theiacloud_session_startup_seconds_seconds_count{namespace=~"{{ $ns }}"}[15m])) > 0
+            )
+          for: 15m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Sessions are slow to start in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              95th percentile session startup in {{ "{{" }} $labels.namespace {{ "}}" }} is
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} seconds. Students are waiting that long between
+              clicking through and getting an IDE, which is where they give up and mail
+              somebody.
+              The second half of this expression requires sessions to actually be
+              starting. Without it the alert would latch: these are decaying quantiles
+              and they hold their last value when idle, so one slow start on a Friday
+              evening would alert all weekend.
+              An empty warm pool is the usual cause - check EduIDEWarmPoolEmpty and the
+              warm pool panel first. Image pulls on a cold node are the other.
+            runbook_url: {{ $runbook }}
+            {{- if $g }}
+            dashboard_url: '{{ $g }}/d/eduide-sessions/eduide-sessions?var-namespace={{ "{{" }} $labels.namespace {{ "}}" }}'
+            {{- end }}
+
+        - alert: EduIDESessionPodPending
+          expr: |-
+            kube_pod_status_phase{namespace=~"{{ $ns }}", {{ $sessions }}, phase="Pending"} == 1
+          for: 5m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'A session pod is stuck Pending in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Pod {{ "{{" }} $labels.pod {{ "}}" }} in {{ "{{" }} $labels.namespace {{ "}}" }} has been Pending for
+              5 minutes, which means it has not been scheduled onto a node at all. If a
+              student is waiting on this one, they are looking at a spinner.
+              Almost always cluster capacity, an unschedulable node, or a workspace
+              volume that cannot be provisioned.
+              `kubectl -n {{ "{{" }} $labels.namespace {{ "}}" }} describe pod {{ "{{" }} $labels.pod {{ "}}" }}`
+              names the reason in its events.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDESessionImagePullFailing
+          expr: |-
+            kube_pod_container_status_waiting_reason{namespace=~"{{ $ns }}", reason=~"ImagePullBackOff|ErrImagePull"} == 1
+          for: 10m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'An EduIDE image cannot be pulled in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Container {{ "{{" }} $labels.container {{ "}}" }} in {{ "{{" }} $labels.pod {{ "}}" }}
+              ({{ "{{" }} $labels.namespace {{ "}}" }}) has been in {{ "{{" }} $labels.reason {{ "}}" }} for 10 minutes.
+              The usual cause is a tag that was never built. A pull request only builds
+              the images of the repository it came from, so a blanket image tag puts every
+              other image into this state; the chart has one version knob per source
+              repository for exactly this reason. Check that the tag the environment asks
+              for exists in the registry before looking at the cluster.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDESessionEvicted
+          expr: |-
+            sum by (namespace) (increase(kube_pod_status_reason{namespace=~"{{ $ns }}", reason="Evicted"}[1h])) > 0
+          for: 5m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Pods are being evicted in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} pods were evicted from their nodes in
+              {{ "{{" }} $labels.namespace {{ "}}" }} in the last hour. Eviction means the node ran out
+              of a resource the pod was not limited on - almost always ephemeral disk
+              from build caches and dependency downloads inside sessions.
+              The students affected lost their session with no warning. Check node disk
+              pressure, and whether one image's build behaviour changed.
+            runbook_url: {{ $runbook }}
+
+    - name: eduide.storage
+      rules:
+        - alert: EduIDEWorkspaceVolumeFilling
+          expr: |-
+            100 * kubelet_volume_stats_used_bytes{namespace=~"{{ $ns }}"}
+              / kubelet_volume_stats_capacity_bytes{namespace=~"{{ $ns }}"} > {{ $t.volumePercent }}
+          for: 15m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'A workspace volume is nearly full in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Workspace volume {{ "{{" }} $labels.persistentvolumeclaim {{ "}}" }} in
+              {{ "{{" }} $labels.namespace {{ "}}" }} is {{ "{{" }} $value | printf "%.0f" {{ "}}" }}% full.
+              When it fills completely the IDE starts failing writes with errors that do
+              not mention the disk - saves fail, git operations fail, and the student
+              reports it as the editor being broken.
+              Usually a build cache or a node_modules tree that nobody clears.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEWorkspaceInodesFilling
+          expr: |-
+            100 * kubelet_volume_stats_inodes_used{namespace=~"{{ $ns }}"}
+              / kubelet_volume_stats_inodes{namespace=~"{{ $ns }}"} > {{ $t.volumePercent }}
+          for: 15m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'A workspace volume is running out of inodes in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              Workspace volume {{ "{{" }} $labels.persistentvolumeclaim {{ "}}" }} in
+              {{ "{{" }} $labels.namespace {{ "}}" }} has used {{ "{{" }} $value | printf "%.0f" {{ "}}" }}% of its inodes.
+              This is worth alerting on separately from bytes because it is the one that
+              surprises people: a single npm install creates tens of thousands of small
+              files, so a volume that looks half empty starts returning "no space left on
+              device". Checking free space will not show the problem.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDEPVCPending
+          expr: |-
+            kube_persistentvolumeclaim_status_phase{namespace=~"{{ $ns }}", phase="Pending"} == 1
+          for: 10m
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'A workspace volume will not provision in {{ "{{" }} $labels.namespace {{ "}}" }}'
+            description: >-
+              PersistentVolumeClaim {{ "{{" }} $labels.persistentvolumeclaim {{ "}}" }} in
+              {{ "{{" }} $labels.namespace {{ "}}" }} has been Pending for 10 minutes, so the session
+              that needs it cannot start.
+              The storage class is the first thing to check - it is a cluster property
+              set once in clusters/<name>.yaml, and a claim naming a class the cluster
+              does not offer stays Pending forever without any other symptom.
+            runbook_url: {{ $runbook }}
+
+{{- if .Values.monitoring.certManager.enabled }}
+    - name: eduide.certificates
+      rules:
+        - alert: EduIDECertificateExpiringSoon
+          expr: |-
+            (certmanager_certificate_expiration_timestamp_seconds - time()) / 86400 < {{ $t.certExpiryDays }}
+          for: 1h
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Certificate {{ "{{" }} $labels.name {{ "}}" }} expires in {{ "{{" }} $value | printf "%.0f" {{ "}}" }} days'
+            description: >-
+              Certificate {{ "{{" }} $labels.name {{ "}}" }} in {{ "{{" }} $labels.namespace {{ "}}" }} expires in
+              {{ "{{" }} $value | printf "%.0f" {{ "}}" }} days and has not renewed.
+              cert-manager renews the ACME certificates on its own, so this firing for one
+              of those means renewal is failing and needs looking at now rather than on
+              the day. The webview wildcard is different: it is bought from Harica through
+              RBG and installed by hand, nothing renews it, and when it lapses every
+              preview in every session on the cluster breaks at once - reported as "the
+              IDE is broken", not as a certificate problem.
+            runbook_url: {{ $runbook }}
+
+        - alert: EduIDECertificateNotReady
+          expr: |-
+            certmanager_certificate_ready_status{condition="True"} == 0
+          for: 1h
+          labels:
+            severity: warning
+            {{- include "eduide.alertRoutingLabels" . | nindent 12 }}
+          annotations:
+            summary: 'Certificate {{ "{{" }} $labels.name {{ "}}" }} has not been ready for an hour'
+            description: >-
+              Certificate {{ "{{" }} $labels.name {{ "}}" }} in {{ "{{" }} $labels.namespace {{ "}}" }} has been
+              Ready=False for an hour. Until it issues, the Gateway listener for that
+              hostname serves whatever the Secret already held - which may be an expired
+              or entirely unrelated certificate, since Gateway API never checks that a
+              certificate matches the hostname it is serving. The listener will keep
+              reporting Programmed=True throughout.
+              Read down the chain before changing anything: CertificateRequest, then
+              Order, then Challenge. A challenge stuck with a 404 means the name has no
+              listener; a DNS or connection error means it does not resolve here at all.
+            runbook_url: {{ $runbook }}
+{{- end }}
+{{- end }}

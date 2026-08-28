@@ -205,5 +205,122 @@ monitoring:
   # -- Namespace the Grafana dashboard ConfigMaps go in. Must already exist and
   # be watched by Grafana's sidecar. `cattle-dashboards` is Rancher's.
   dashboardNamespace: cattle-dashboards
+  # -- Namespaces to watch. Bootstrap derives this from the environments on the
+  # cluster; it is also the namespace list every dashboard's picker offers.
   targetNamespaces: []
-  sessionNamespaces: []
+
+  # Scrape cert-manager, so certificate expiry can be alerted on.
+  #
+  # cert-manager exports `certmanager_certificate_expiration_timestamp_seconds`
+  # but ships no ServiceMonitor, so by default nothing watches it. The webview
+  # wildcard is renewed by hand once a year and nothing warns anyone; when it
+  # lapses, every preview in every session on the cluster breaks at once and it
+  # gets reported as "the IDE is broken".
+  certManager:
+    # -- Create a ServiceMonitor for cert-manager's controller metrics.
+    enabled: false
+    # -- Namespace cert-manager runs in.
+    namespace: cert-manager
+    # -- Labels identifying cert-manager's controller Service.
+    #
+    # A ServiceMonitor selects on Service **labels**; there is no matcher for
+    # `metadata.name`. These are the labels cert-manager's own chart sets, and
+    # they are values because a release installed under a different name keeps
+    # the labels and changes their values. Get them wrong and the ServiceMonitor
+    # is created with no targets and reports no error.
+    #
+    # Check with:
+    #   kubectl -n cert-manager get svc cert-manager --show-labels
+    selectorLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+    # -- Name of the metrics port on that Service.
+    portName: http-metrics
+
+  # Alerting: a PrometheusRule plus an AlertmanagerConfig with the channels to
+  # notify. Independent of `monitoring.enabled` only in the sense that it needs
+  # it - alerting off with monitoring on is fine, the reverse is not.
+  alerting:
+    # -- Create the PrometheusRule and the AlertmanagerConfig.
+    enabled: false
+    # -- Namespace both resources go in.
+    #
+    # This is also the `namespace` label every EduIDE alert carries, and it is
+    # a routing artifact rather than the environment the alert is about. The
+    # Prometheus Operator defaults `alertmanagerConfigMatcherStrategy` to
+    # `OnNamespace`, which prepends `namespace = <the AlertmanagerConfig's own
+    # namespace>` to every route generated from it, so an alert must claim this
+    # namespace to reach a receiver at all.
+    #
+    # The environment an alert is about is in `eduide_namespace`. Silence on
+    # that label, never on `namespace` - `namespace` is identical across every
+    # EduIDE alert and silencing it silences all of them.
+    namespace: eduide-system
+    # -- Lowest severity that reaches the notification channels: `warning` or
+    # `critical`. Anything below stays in Alertmanager and on the dashboards.
+    # This is what keeps the channels worth reading.
+    minSeverity: warning
+    # -- How long to wait for more alerts in a group before the first notification.
+    groupWait: 30s
+    # -- How long to wait before notifying about new alerts added to a group.
+    groupInterval: 5m
+    # -- How long before an unresolved alert is sent again.
+    repeatInterval: 4h
+    # -- Base URL of the Grafana that serves the EduIDE dashboards, with no
+    # trailing slash. Used to deep-link a notification straight to the affected
+    # session. Left empty, notifications carry no dashboard link.
+    grafanaUrl: ""
+    # -- Base URL of the operations runbooks, with no trailing slash.
+    runbookUrl: https://eduide.github.io/Docs/admins/operations
+    # The Secret holding the webhook URLs. Never put a webhook URL in a values
+    # file or on a `--set` - it goes in the process list and in Actions debug
+    # logs. Bootstrap writes this Secret from GitHub Environment secrets.
+    webhookSecret:
+      # -- Create the Secret from `data` below. Off means the Secret already
+      # exists and is referenced by name only.
+      create: false
+      # -- Name of the Secret channels read their URL from.
+      name: eduide-alert-webhooks
+      # -- Base64-encoded webhook URLs, keyed by the `secretKey` a channel
+      # names. Supplied by the workflow, not committed.
+      data: {}
+    # -- Where to send alerts. Each entry needs `name`, `type` (`slack` or
+    # `discord`) and `secretKey`; Slack entries may also set `channel`. An
+    # empty list with alerting enabled means alerts fire but notify nobody, so
+    # the chart fails the render instead.
+    #
+    # A channel may set `environments: [ns, ...]` to receive only that
+    # installation's alerts. One cluster can host installations belonging to
+    # different people - Bonn and Mannheim share a cluster and each has its own
+    # Discord - and without scoping, both would see the other's incidents.
+    #
+    # Anything no scoped channel claims goes to **every** channel. That is how
+    # cluster-scoped alerts still get out: a certificate expiring or the
+    # conversion webhook failing is not about any one tenant's namespace, and
+    # dropping it for failing to match a tenant route would lose exactly the
+    # alerts that matter most.
+    #
+    #   channels:
+    #     - name: mannheim
+    #       type: discord
+    #       secretKey: discord-mannheim
+    #       environments: [eduide-mannheim]
+    #     - name: platform
+    #       type: slack
+    #       secretKey: slack-platform
+    #       channel: "#eduide-alerts"
+    channels: []
+    # Thresholds, so tuning noise down does not need a chart release.
+    thresholds:
+      # -- Restarts of a platform container within 15m before it counts as crash looping.
+      componentRestarts: 3
+      # -- Session OOM kills per hour in one environment before alerting.
+      sessionOOMPerHour: 3
+      # -- Session crashes per hour in one environment before alerting.
+      sessionCrashPerHour: 5
+      # -- p95 session startup, in seconds, that counts as too slow.
+      startupSeconds: 90
+      # -- Workspace volume fill percentage that counts as nearly full.
+      volumePercent: 85
+      # -- Days before certificate expiry to start warning.
+      certExpiryDays: 21

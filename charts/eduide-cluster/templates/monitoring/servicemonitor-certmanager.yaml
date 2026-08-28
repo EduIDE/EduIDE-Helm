@@ -1,0 +1,40 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.certManager.enabled }}
+{{- /*
+Scrape cert-manager, so certificates can be alerted on before they lapse.
+
+cert-manager exports the expiry timestamp and readiness of every Certificate it
+manages, but ships no ServiceMonitor, so on a stock install nothing collects
+them. The result is a cluster where a certificate can be failing to renew for
+months with nothing to notice - which is how test3 served a certificate for the
+wrong hostnames for 184 days.
+
+cert-manager is platform-owned, so this only creates the ServiceMonitor. It does
+not install, configure or upgrade cert-manager itself.
+*/}}
+{{- $cm := .Values.monitoring.certManager }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: eduide-cert-manager
+  namespace: {{ .Values.monitoring.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+spec:
+  {{- /*
+  Selected by label, not by name. A ServiceMonitor's selector matches Service
+  *labels*; there is no name matcher. The values are configurable because a
+  cert-manager installed under a different release name keeps these labels but
+  changes their values, and a selector that matches nothing produces a
+  ServiceMonitor with no targets and no error.
+  */}}
+  selector:
+    matchLabels:
+      {{- toYaml $cm.selectorLabels | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ $cm.namespace }}
+  endpoints:
+    - port: {{ $cm.portName }}
+      interval: 60s
+      honorLabels: true
+{{- end }}

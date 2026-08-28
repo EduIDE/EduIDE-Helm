@@ -1,0 +1,118 @@
+{{- include "eduide.checkAlertingPrerequisites" . }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.alerting.enabled }}
+{{- $a := .Values.monitoring.alerting }}
+{{- /*
+Where EduIDE's alerts go.
+
+Three things about this file are not obvious.
+
+**The route matches on `namespace`, and that label is a routing artifact.** The
+Prometheus Operator defaults `alertmanagerConfigMatcherStrategy` to
+`OnNamespace`, which silently prepends `namespace = {{ $a.namespace }}` to the
+route generated from this resource. Every EduIDE alert therefore sets that
+label, and carries the environment it is really about in `eduide_namespace`.
+Grouping and any inhibition rule must use `eduide_namespace`; grouping on
+`namespace` would merge an outage in production with one in staging into a
+single notification, because the label is identical across all of them.
+
+**A channel may be scoped to environments.** Several installations can share one
+cluster and belong to different people: Bonn and Mannheim both live on the
+`eduide` cluster and each has its own Discord. A channel naming `environments`
+gets a sub-route matching those namespaces, and first match wins.
+
+**Anything not claimed by a scoped channel goes to every channel.** The
+top-level receiver holds all of them deliberately. Cluster-scoped alerts - the
+conversion webhook being down, a certificate about to expire - are not about any
+one tenant's namespace, and dropping them because they failed to match a tenant
+route would silently lose exactly the alerts that matter most.
+
+**Only warning and above is notified.** Everything fires and is visible in
+Alertmanager and on the dashboards, but the channels get a filtered subset. A
+channel that receives every capacity blip stops being read, and then the
+platform is unmonitored no matter how many rules exist.
+*/}}
+{{- if not $a.channels }}
+{{- fail "monitoring.alerting.enabled is true but monitoring.alerting.channels is empty - alerts would fire and notify nobody" }}
+{{- end }}
+{{- $severities := list "critical" }}
+{{- if eq ($a.minSeverity | toString) "warning" }}
+{{- $severities = list "critical" "warning" }}
+{{- else if ne ($a.minSeverity | toString) "critical" }}
+{{- fail (printf "monitoring.alerting.minSeverity must be \"warning\" or \"critical\", got %q" ($a.minSeverity | toString)) }}
+{{- end }}
+{{- $slack := list }}
+{{- $discord := list }}
+{{- $scoped := list }}
+{{- $names := dict }}
+{{- range $i, $c := $a.channels }}
+  {{- if not $c.name }}{{ fail (printf "monitoring.alerting.channels[%d] has no name" $i) }}{{ end }}
+  {{- if hasKey $names $c.name }}{{ fail (printf "two channels are both called %q; receiver names must be unique" $c.name) }}{{ end }}
+  {{- $_ := set $names $c.name true }}
+  {{- if not $c.secretKey }}{{ fail (printf "channel %q names no secretKey - webhook URLs are only ever read from a Secret, never from values" $c.name) }}{{ end }}
+  {{- $type := $c.type | default "" | toString }}
+  {{- if eq $type "slack" }}{{ $slack = append $slack $c }}
+  {{- else if eq $type "discord" }}{{ $discord = append $discord $c }}
+  {{- else }}{{ fail (printf "channel %q has type %q; supported types are \"slack\" and \"discord\"" $c.name $type) }}{{ end }}
+  {{- if $c.environments }}{{ $scoped = append $scoped $c }}{{ end }}
+{{- end }}
+{{- /*
+The message body. Alertmanager templating, not Helm's - the doubled braces are
+escapes. Written to stand on its own in a chat client: what broke, what it means
+for students, and where to look, without needing the dashboard open. `.Alerts`
+is grouped by alertname and environment, so one message covers one problem in
+one environment however many pods it touched.
+*/}}
+{{- $text := `{{ range .Alerts }}*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+{{ if .Labels.eduide_namespace }}Environment: {{ .Labels.eduide_namespace }}{{ end }}{{ if .Labels.pod }} | Pod: {{ .Labels.pod }}{{ end }}{{ if .Labels.node }} | Node: {{ .Labels.node }}{{ end }}
+Severity: {{ .Labels.severity }} | Since: {{ .StartsAt.Format "15:04 MST" }}
+{{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}
+{{ end }}{{ if .Annotations.dashboard_url }}Dashboard: {{ .Annotations.dashboard_url }}
+{{ end }}{{ end }}` }}
+{{- $title := `{{ if eq .Status "firing" }}[FIRING {{ .Alerts.Firing | len }}]{{ else }}[RESOLVED]{{ end }} {{ .GroupLabels.alertname }}{{ if .GroupLabels.eduide_namespace }} - {{ .GroupLabels.eduide_namespace }}{{ end }}` }}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: eduide-alerts
+  namespace: {{ $a.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+spec:
+  route:
+    receiver: eduide-all
+    groupBy:
+      - alertname
+      - eduide_namespace
+    groupWait: {{ $a.groupWait }}
+    groupInterval: {{ $a.groupInterval }}
+    repeatInterval: {{ $a.repeatInterval }}
+    matchers:
+      - name: severity
+        matchType: =~
+        value: {{ join "|" $severities | quote }}
+    {{- if $scoped }}
+    routes:
+      {{- range $scoped }}
+      - receiver: {{ printf "eduide-%s" .name }}
+        groupBy:
+          - alertname
+          - eduide_namespace
+        groupWait: {{ $a.groupWait }}
+        groupInterval: {{ $a.groupInterval }}
+        repeatInterval: {{ $a.repeatInterval }}
+        matchers:
+          - name: eduide_namespace
+            matchType: =~
+            value: {{ printf "^(%s)$" (join "|" .environments) | quote }}
+      {{- end }}
+    {{- end }}
+  receivers:
+    {{- /* Every channel. Reached by anything no scoped route claimed, which is
+    how cluster-scoped alerts still get out. */}}
+    - name: eduide-all
+{{- include "eduide.receiverConfigs" (dict "ctx" $ "channels" $a.channels "title" $title "text" $text) }}
+    {{- range $scoped }}
+    - name: {{ printf "eduide-%s" .name }}
+{{- include "eduide.receiverConfigs" (dict "ctx" $ "channels" (list .) "title" $title "text" $text) }}
+    {{- end }}
+{{- end }}
