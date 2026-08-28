@@ -31,6 +31,26 @@ metadata:
     app.kubernetes.io/name: image-preloading
     app.kubernetes.io/part-of: theia-cloud
 spec:
+  {{- /*
+  Every node at once. The default maxUnavailable of 1 replaces these pods one
+  node at a time, and each node waits for its whole image set before the next
+  one starts - so on a 28 node cluster the pulls are fully serialised and the
+  last node finishes long after the first.
+
+  These pods serve no traffic. They exist only to warm the image cache, so
+  taking all of them down together costs nothing: nothing routes to them and no
+  session depends on them being up.
+  */}}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      {{- /*
+      Not quoted. maxUnavailable is an IntOrString, and a string is only valid
+      as a percentage - the API server rejects `"2"` outright while accepting
+      `2` and `"100%"`. Rendering the value as it is written keeps a count
+      working as a count.
+      */}}
+      maxUnavailable: {{ .Values.preloading.maxUnavailable }}
   selector:
     matchLabels:
       app: image-preloading
