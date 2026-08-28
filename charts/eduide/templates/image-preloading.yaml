@@ -44,7 +44,13 @@ spec:
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
-      maxUnavailable: {{ .Values.preloading.maxUnavailable | quote }}
+      {{- /*
+      Not quoted. maxUnavailable is an IntOrString, and a string is only valid
+      as a percentage - the API server rejects `"2"` outright while accepting
+      `2` and `"100%"`. Rendering the value as it is written keeps a count
+      working as a count.
+      */}}
+      maxUnavailable: {{ .Values.preloading.maxUnavailable }}
   selector:
     matchLabels:
       app: image-preloading
