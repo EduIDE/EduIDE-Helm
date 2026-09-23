@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.1.5](https://img.shields.io/badge/Version-2.1.5-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.2.0](https://img.shields.io/badge/Version-2.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -37,7 +37,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | demoApplication.pullSecret | string | `""` | the image pull secret. Leave empty if registry is public |
 | demoApplication.timeout | string | `"30"` | Limit in minutes |
 | eduide-shared-cache | object | `{"enabled":false}` | The Gradle build cache and Maven proxy. Optional: nothing reaches it unless operator.enableBuildCaching or operator.enableDependencyCaching is also turned on, so enabling this alone deploys a cache with no clients. |
-| gateway | object | `{"className":"envoy","create":false,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
+| gateway | object | `{"className":"envoy","create":false,"enabled":true,"httpEnabled":false,"httpPort":80,"httpsPort":443,"instancesRouteName":"theia-cloud-demo-ws-route","instancesWildcardSecretNames":{},"name":"theia-cloud-gateway","parentRefs":[],"routes":{"enabled":true,"sessionEndedRedirect":{"enabled":true,"includeWildcardInstances":true,"path":"/session-ended","statusCode":302}},"serviceRouteRequestTimeout":"60s","tls":true}` | Gateway API configuration (Envoy Gateway by default) |
 | gateway.className | string | `"envoy"` | GatewayClassName to use (Envoy Gateway default is typically "envoy") |
 | gateway.create | bool | `false` | Create a Gateway in this namespace.  Leave this false. The supported model is one shared Gateway per cluster, installed by the eduide-cluster chart, which every environment attaches to through `gateway.parentRefs` below. That is what every real installation uses and the only path that is tested.  Setting this true renders a Gateway whose HTTPS listeners reference the Secrets `ws-cert-secret`, `service-cert-secret` and `landing-page-cert-secret` - which NEITHER CHART CREATES. You would have to create all three yourself. The listeners sit at Programmed=False until you do, and nothing in `helm status` explains why. |
 | gateway.enabled | bool | `true` | Master switch for Gateway API resources. |
@@ -48,6 +48,11 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | gateway.name | string | `"theia-cloud-gateway"` | Name of the Gateway resource |
 | gateway.parentRefs | list | `[]` | Optional explicit parentRefs for HTTPRoutes. If empty, routes attach to `gateway.name` in the same namespace.  Example for a centralized shared gateway: parentRefs:   - name: theia-shared-gateway     namespace: eduide-system |
 | gateway.routes.enabled | bool | `true` | Whether to render HTTPRoute resources. |
+| gateway.routes.sessionEndedRedirect | object | (see details below) | Where a browser lands when it asks for a session that no longer exists.  Session routes are owned by their Session and vanish with it, so a timed-out tab that reloads otherwise gets a bare Envoy 404. This renders a catch-all route on the instance hostnames that redirects those requests to the landing page, which explains what happened and offers to resume.  Live sessions are unaffected: Gateway API ranks matches by path length, and a session's path always beats `/`. |
+| gateway.routes.sessionEndedRedirect.enabled | bool | `true` | Whether to render the catch-all redirect. Needs `landingPage.enabled`, since there is nowhere to send people otherwise. |
+| gateway.routes.sessionEndedRedirect.includeWildcardInstances | bool | `true` | Also catch the webview hostnames. A dead session's webviews usually fail before its main frame does, so this is where students land first. |
+| gateway.routes.sessionEndedRedirect.path | string | `"/session-ended"` | Path on the landing page that explains the session ended. |
+| gateway.routes.sessionEndedRedirect.statusCode | int | `302` | Redirect status code. Only 302 is accepted: eager sessions reuse instance paths, so a cached 301 would permanently break an instance in the user's browser. |
 | gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
 | gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
 | hosts | object | (see details below) | You may adjust the hostname below. |

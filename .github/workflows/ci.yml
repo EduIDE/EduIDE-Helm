@@ -94,12 +94,13 @@ jobs:
           # Gateway API and theia.cloud are not in the default schema set.
           #
           # HTTPRoute is skipped deliberately. templates/httproute-instances.yaml
-          # ships `rules: []` on purpose - the operator patches rules in at
-          # runtime to publish each new session. The CRDs-catalog schema declares
-          # minItems: 1 on spec.rules and so rejects it, but the upstream Gateway
-          # API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on that
-          # field. The catalog is stricter than what the cluster enforces, so this
-          # is a false positive rather than a defect in the chart.
+          # OMITS spec.rules entirely: it exists to carry the gateway attachment
+          # and hostnames that the operator copies onto the per-session route it
+          # creates for each session. The CRDs-catalog schema declares minItems: 1
+          # on spec.rules and so rejects a route without it, but the upstream
+          # Gateway API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on
+          # that field. The catalog is stricter than what the cluster enforces, so
+          # this is a false positive rather than a defect in the chart.
           # Revisit when the gateway templates are restructured; validating against
           # schemas converted from the real CRDs would let us drop the skip.
           SCHEMAS=(
