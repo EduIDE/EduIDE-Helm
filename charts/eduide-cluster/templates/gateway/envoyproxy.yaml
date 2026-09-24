@@ -1,4 +1,17 @@
 {{- if .Values.envoyProxy.create }}
+{{- /*
+Envoy Gateway only owns the data plane Deployment's replica count while the
+EnvoyProxy states it. Omit it and the controller writes the field once at
+creation and never looks at it again, so a single `kubectl scale --replicas=0`
+- or a stray click in a cluster UI - takes every Gateway on the class down
+until somebody scales it back by hand. Default it here, and let a spec that
+sets its own replicas (an HPA-driven cluster, say) win.
+*/}}
+{{- $spec := deepCopy (default (dict) .Values.envoyProxy.spec) }}
+{{- if not (kindIs "invalid" .Values.envoyProxy.replicas) }}
+{{- $default := dict "provider" (dict "kubernetes" (dict "envoyDeployment" (dict "replicas" .Values.envoyProxy.replicas))) }}
+{{- $spec = mergeOverwrite $default $spec }}
+{{- end }}
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:
@@ -13,5 +26,5 @@ metadata:
 {{ toYaml . | nindent 4 }}
   {{- end }}
 spec:
-{{ toYaml .Values.envoyProxy.spec | nindent 2 }}
+{{ toYaml $spec | nindent 2 }}
 {{- end }}
