@@ -12,7 +12,11 @@ versions:
   # of the IDE images, so it carries its own version.
   cloud: "1.2.0"
   # -- EduIDE-Landing-Page. Released independently as well.
-  landingPage: "1.2.1"
+  # 1.2.2 is the first release whose privacy page reads the `landingPage.privacy`
+  # block below. 2.2.0 shipped that block while still pinning 1.2.1, which
+  # ignores it, so every installation kept the hardcoded text the block exists
+  # to replace.
+  landingPage: "1.2.2"
 
 # -- The container registry every EduIDE image is pulled from.
 imageRegistry: ghcr.io/eduide
