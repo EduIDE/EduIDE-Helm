@@ -140,6 +140,28 @@ landingPage:
     # research. Leave off unless this installation has a legal basis for it:
     # this is a processing purpose, not a cosmetic string.
     scientificUse: false
+    # -- Who is accountable for the data, named on the privacy page.
+    # The defaults are deliberately obvious placeholders. Whoever deploys this
+    # is the controller, and a privacy statement naming somebody else's
+    # university is worse than one that visibly has not been filled in.
+    # @default -- (see details below)
+    controller:
+      # -- The legal entity responsible under the GDPR.
+      organisation: Example University
+      # -- The person accountable for this service, as named on the imprint.
+      representative: Prof. Dr. Example Person
+      # -- Postal address of that person. Optional; omitted when empty.
+      address: 1 Example Street, 00000 Example City
+      # -- Where data protection enquiries go.
+      email: privacy@example.edu
+    # -- The data protection officer, named separately from the controller
+    # because the GDPR requires a distinct contact point.
+    # @default -- (see details below)
+    dataProtectionOfficer:
+      # -- Optional name. Most institutions publish only the address.
+      name: ""
+      # -- Where the data protection officer is reached.
+      email: dpo@example.edu
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain

@@ -103,6 +103,25 @@ data:
         sessionMaxMinutes: {{ $appDefaults.timeout | default 1440 }},
         sessionIdleMinutes: {{ ((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60 }},
         scientificUse: {{ ((.Values.landingPage).privacy).scientificUse | default false }},
+        {{- /*
+        Who is accountable, named on the privacy page. Unlike the figures above
+        these cannot be derived from anything - only the operator knows who the
+        controller is - so they are values, and their defaults are obvious
+        placeholders. A statement naming the wrong institution is worse than
+        one that visibly has not been filled in.
+        */}}
+        {{- $ctrl := ((.Values.landingPage).privacy).controller | default dict }}
+        {{- $dpo := ((.Values.landingPage).privacy).dataProtectionOfficer | default dict }}
+        controller: {
+          organisation: {{ $ctrl.organisation | default "Example University" | quote }},
+          representative: {{ $ctrl.representative | default "Prof. Dr. Example Person" | quote }},
+          address: {{ $ctrl.address | default "" | quote }},
+          email: {{ $ctrl.email | default "privacy@example.edu" | quote }},
+        },
+        dataProtectionOfficer: {
+          name: {{ $dpo.name | default "" | quote }},
+          email: {{ $dpo.email | default "dpo@example.edu" | quote }},
+        },
       },
       {{- if .Values.landingPage.footerLinks }}
       footerLinks: {
