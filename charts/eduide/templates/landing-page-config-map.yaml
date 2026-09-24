@@ -79,7 +79,7 @@ data:
       statement quietly becomes false.
 
         workspacePersistent    landingPage.ephemeralStorage, inverted
-        workspaceRetentionDays theia-workspace-garbage-collector.env.WORKSPACE_TTL
+        workspaceRetentionSeconds theia-workspace-garbage-collector.env.WORKSPACE_TTL
         sessionMaxMinutes      appDefinitions.defaults.timeout
         sessionIdleMinutes     appDefinitions.defaults.monitor.activityTracker.timeoutAfter
 
