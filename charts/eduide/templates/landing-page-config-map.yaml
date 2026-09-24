@@ -69,6 +69,41 @@ data:
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
+      {{- /*
+      What the privacy page is allowed to state about this installation.
+
+      DERIVED, deliberately. Every number below is computed from the value that
+      actually produces the behaviour it describes, so raising a retention
+      period cannot leave the privacy statement asserting the old one. The
+      alternative - restating the figures in a second place - is how a privacy
+      statement quietly becomes false.
+
+        workspacePersistent    landingPage.ephemeralStorage, inverted
+        workspaceRetentionDays theia-workspace-garbage-collector.env.WORKSPACE_TTL
+        sessionMaxMinutes      appDefinitions.defaults.timeout
+        sessionIdleMinutes     appDefinitions.defaults.monitor.activityTracker.timeoutAfter
+
+      The last two mirror the fallbacks in appdefinitions.yaml, which is where
+      the operator actually reads them, so the page cannot disagree with the
+      AppDefinition the sessions run under.
+
+      scientificUse is the one policy choice, not a derivation.
+      */}}
+      {{- $gc := (index .Values "theia-workspace-garbage-collector") | default dict }}
+      {{- $gcEnabled := true }}
+      {{- if hasKey $gc "enabled" }}{{ $gcEnabled = $gc.enabled }}{{ end }}
+      {{- $ttl := ((($gc.env).WORKSPACE_TTL) | default "1209600s") | toString | trimSuffix "s" }}
+      {{- $appDefaults := (.Values.appDefinitions).defaults | default dict }}
+      privacy: {
+        workspacePersistent: {{ not .Values.landingPage.ephemeralStorage }},
+        workspaceGarbageCollected: {{ $gcEnabled }},
+        {{- if $gcEnabled }}
+        workspaceRetentionDays: {{ div (atoi $ttl) 86400 }},
+        {{- end }}
+        sessionMaxMinutes: {{ $appDefaults.timeout | default 1440 }},
+        sessionIdleMinutes: {{ ((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60 }},
+        scientificUse: {{ ((.Values.landingPage).privacy).scientificUse | default false }},
+      },
       {{- if .Values.landingPage.footerLinks }}
       footerLinks: {
         {{- if .Values.landingPage.footerLinks.attribution }}

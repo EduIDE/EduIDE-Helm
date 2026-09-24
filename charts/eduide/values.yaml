@@ -127,6 +127,19 @@ landingPage:
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage.
   ephemeralStorage: true
+  # -- What the privacy page states about this installation.
+  # Only the research clause lives here. The retention and session figures the
+  # page shows are DERIVED in the landing page config map from the settings that
+  # actually produce them - `theia-workspace-garbage-collector.env.WORKSPACE_TTL`,
+  # `landingPage.ephemeralStorage` and `appDefinitions.defaults.timeout` - so
+  # changing a retention period cannot leave the privacy statement claiming
+  # something untrue. Do not restate those numbers here.
+  # @default -- (see details below)
+  privacy:
+    # -- State that anonymised usage data may also be used for scientific
+    # research. Leave off unless this installation has a legal basis for it:
+    # this is a processing purpose, not a cosmetic string.
+    scientificUse: false
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain

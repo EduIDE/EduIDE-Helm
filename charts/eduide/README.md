@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.1.5](https://img.shields.io/badge/Version-2.1.5-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
+![Version: 2.2.0](https://img.shields.io/badge/Version-2.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.2.0](https://img.shields.io/badge/AppVersion-1.2.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -84,6 +84,8 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.logo | string | `"logos/theiablueprint.svg"` | The logo of the application that should be displayed on the landing pages |
 | landingPage.logoData | string | `nil` | set landingPage.logoData=$(cat path/to/file.svg | base64 -w 0 -) Another way is to directly add the base64 string to the values file. |
 | landingPage.logoFileExtension | string | `"svg"` | The file extension of the logo. Must be set to match the logo respectively the logoData. This is required because browsers cannot show a binary image (e.g. png) with a svg ending and vice-versa. |
+| landingPage.privacy | object | (see details below) | What the privacy page states about this installation. Only the research clause lives here. The retention and session figures the page shows are DERIVED in the landing page config map from the settings that actually produce them - `theia-workspace-garbage-collector.env.WORKSPACE_TTL`, `landingPage.ephemeralStorage` and `appDefinitions.defaults.timeout` - so changing a retention period cannot leave the privacy statement claiming something untrue. Do not restate those numbers here. |
+| landingPage.privacy.scientificUse | bool | `false` | State that anonymised usage data may also be used for scientific research. Leave off unless this installation has a legal basis for it: this is a processing purpose, not a cosmetic string. |
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
 | landingPage.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
 | monitor | object | (see details below) | Values to influence the monitor initialization on the operator |
