@@ -22,7 +22,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | envoyProxy.labels | object | `{}` |  |
 | envoyProxy.name | string | `"theia-shared-gateway"` |  |
 | envoyProxy.namespace | string | `"envoy-gateway-system"` |  |
-| envoyProxy.replicas | int | `1` | Data plane replica count, rendered into the spec at `provider.kubernetes.envoyDeployment.replicas`. Envoy Gateway stops reconciling that field when the EnvoyProxy leaves it out, which makes a manual scale to zero permanent and the Gateway unreachable for good. Set to `null` to hand the field back to an HPA; a `spec` that names its own replicas wins over this. |
+| envoyProxy.replicas | int | `1` | Data plane replica count, rendered into the spec at `provider.kubernetes.envoyDeployment.replicas`. Envoy Gateway stops reconciling that field when the EnvoyProxy leaves it out, which makes a manual scale to zero permanent and the Gateway unreachable for good. A `spec` that names its own replicas wins over this, and `null` leaves the field out entirely. Ignored for a spec that scales some other way - an `envoyHpa`, an `envoyDaemonSet`, or a `Host` provider. |
 | envoyProxy.spec | object | `{}` |  |
 | gateway | object | `{"addresses":[],"allowedRoutes":{"namespaces":{"from":"All"}},"annotations":{},"className":"envoy","create":true,"labels":{},"listeners":[],"name":"theia-shared-gateway","namespace":"eduide-system","redirects":[]}` | ------------------------------------------------------------------------ |
 | gateway.create | bool | `true` | Create the shared Gateway. Set false only if you terminate and route traffic some other way; EduIDE then has no ingress of its own. |

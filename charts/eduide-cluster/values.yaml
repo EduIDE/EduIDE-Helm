@@ -136,9 +136,10 @@ envoyProxy:
   # -- Data plane replica count, rendered into the spec at
   # `provider.kubernetes.envoyDeployment.replicas`. Envoy Gateway stops
   # reconciling that field when the EnvoyProxy leaves it out, which makes a
-  # manual scale to zero permanent and the Gateway unreachable for good. Set to
-  # `null` to hand the field back to an HPA; a `spec` that names its own
-  # replicas wins over this.
+  # manual scale to zero permanent and the Gateway unreachable for good. A
+  # `spec` that names its own replicas wins over this, and `null` leaves the
+  # field out entirely. Ignored for a spec that scales some other way - an
+  # `envoyHpa`, an `envoyDaemonSet`, or a `Host` provider.
   replicas: 1
   spec: {}
 managedCertificates:
