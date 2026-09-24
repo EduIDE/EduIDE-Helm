@@ -94,14 +94,37 @@ data:
       {{- if hasKey $gc "enabled" }}{{ $gcEnabled = $gc.enabled }}{{ end }}
       {{- $ttl := ((($gc.env).WORKSPACE_TTL) | default "1209600s") | toString | trimSuffix "s" }}
       {{- $appDefaults := (.Values.appDefinitions).defaults | default dict }}
+      {{- /*
+      Session limits are the WORST CASE across everything a user can pick, not
+      the defaults. appdefinitions.yaml resolves each app's own timeout before
+      falling back to the defaults, so an app overriding it would otherwise make
+      the page understate how long a session can live. Nothing overrides these
+      today; taking the maximum keeps the statement true if something does.
+      */}}
+      {{- $maxSession := ($appDefaults.timeout | default 1440) | int }}
+      {{- $maxIdle := (((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60) | int }}
+      {{- range $name, $app := (.Values.appDefinitions).apps | default dict }}
+      {{- if and $app $app.landingPage }}
+      {{- $t := ($app.timeout | default $appDefaults.timeout | default 1440) | int }}
+      {{- if gt $t $maxSession }}{{ $maxSession = $t }}{{ end }}
+      {{- $i := ((($app.monitor).activityTracker).timeoutAfter) | default ((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60 | int }}
+      {{- if gt $i $maxIdle }}{{ $maxIdle = $i }}{{ end }}
+      {{- end }}
+      {{- end }}
       privacy: {
         workspacePersistent: {{ not .Values.landingPage.ephemeralStorage }},
         workspaceGarbageCollected: {{ $gcEnabled }},
         {{- if $gcEnabled }}
-        workspaceRetentionDays: {{ div (atoi $ttl) 86400 }},
+        {{- /*
+        Seconds, not days: helm's `div` is integer division, so a TTL that is
+        not a whole number of days would be silently rounded down and the page
+        would claim a shorter retention than the deployment actually keeps.
+        The page formats it.
+        */}}
+        workspaceRetentionSeconds: {{ atoi $ttl }},
         {{- end }}
-        sessionMaxMinutes: {{ $appDefaults.timeout | default 1440 }},
-        sessionIdleMinutes: {{ ((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60 }},
+        sessionMaxMinutes: {{ $maxSession }},
+        sessionIdleMinutes: {{ $maxIdle }},
         scientificUse: {{ ((.Values.landingPage).privacy).scientificUse | default false }},
         {{- /*
         Who is accountable, named on the privacy page. Unlike the figures above
@@ -113,14 +136,14 @@ data:
         {{- $ctrl := ((.Values.landingPage).privacy).controller | default dict }}
         {{- $dpo := ((.Values.landingPage).privacy).dataProtectionOfficer | default dict }}
         controller: {
-          organisation: {{ $ctrl.organisation | default "Example University" | quote }},
-          representative: {{ $ctrl.representative | default "Prof. Dr. Example Person" | quote }},
+          organisation: {{ $ctrl.organisation | quote }},
+          representative: {{ $ctrl.representative | quote }},
           address: {{ $ctrl.address | default "" | quote }},
-          email: {{ $ctrl.email | default "privacy@example.edu" | quote }},
+          email: {{ $ctrl.email | quote }},
         },
         dataProtectionOfficer: {
           name: {{ $dpo.name | default "" | quote }},
-          email: {{ $dpo.email | default "dpo@example.edu" | quote }},
+          email: {{ $dpo.email | quote }},
         },
       },
       {{- if .Values.landingPage.footerLinks }}

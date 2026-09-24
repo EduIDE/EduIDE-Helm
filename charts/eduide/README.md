@@ -86,12 +86,12 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.logoFileExtension | string | `"svg"` | The file extension of the logo. Must be set to match the logo respectively the logoData. This is required because browsers cannot show a binary image (e.g. png) with a svg ending and vice-versa. |
 | landingPage.privacy | object | (see details below) | What the privacy page states about this installation. Only the research clause lives here. The retention and session figures the page shows are DERIVED in the landing page config map from the settings that actually produce them - `theia-workspace-garbage-collector.env.WORKSPACE_TTL`, `landingPage.ephemeralStorage` and `appDefinitions.defaults.timeout` - so changing a retention period cannot leave the privacy statement claiming something untrue. Do not restate those numbers here. |
 | landingPage.privacy.controller | object | (see details below) | Who is accountable for the data, named on the privacy page. The defaults are deliberately obvious placeholders. Whoever deploys this is the controller, and a privacy statement naming somebody else's university is worse than one that visibly has not been filled in. |
-| landingPage.privacy.controller.address | string | `"1 Example Street, 00000 Example City"` | Postal address of that person. Optional; omitted when empty. |
-| landingPage.privacy.controller.email | string | `"privacy@example.edu"` | Where data protection enquiries go. |
-| landingPage.privacy.controller.organisation | string | `"Example University"` | The legal entity responsible under the GDPR. |
-| landingPage.privacy.controller.representative | string | `"Prof. Dr. Example Person"` | The person accountable for this service, as named on the imprint. |
-| landingPage.privacy.dataProtectionOfficer | object | (see details below) | The data protection officer, named separately from the controller because the GDPR requires a distinct contact point. |
-| landingPage.privacy.dataProtectionOfficer.email | string | `"dpo@example.edu"` | Where the data protection officer is reached. |
+| landingPage.privacy.controller.address | string | `""` | Postal address of that person, e.g. "1 Example Street, 00000 Example City". Optional; omitted when empty. |
+| landingPage.privacy.controller.email | string | `""` | Where data protection enquiries go, e.g. "privacy@example.edu". |
+| landingPage.privacy.controller.organisation | string | `""` | The legal entity responsible under the GDPR, e.g. "Example University". Empty by default on purpose: the page then says plainly that no controller has been configured, rather than presenting a placeholder as though it were this installation's real contact. |
+| landingPage.privacy.controller.representative | string | `""` | The person accountable for this service, as named on the imprint, e.g. "Prof. Dr. Example Person". |
+| landingPage.privacy.dataProtectionOfficer | object | (see details below) | The data protection officer, named separately from the controller because the GDPR requires a distinct contact point. Empty by default for the same reason as above. |
+| landingPage.privacy.dataProtectionOfficer.email | string | `""` | Where the data protection officer is reached, e.g. "dpo@example.edu". |
 | landingPage.privacy.dataProtectionOfficer.name | string | `""` | Optional name. Most institutions publish only the address. |
 | landingPage.privacy.scientificUse | bool | `false` | State that anonymised usage data may also be used for scientific research. Leave off unless this installation has a legal basis for it: this is a processing purpose, not a cosmetic string. |
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |

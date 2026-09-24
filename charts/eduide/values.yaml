@@ -146,22 +146,28 @@ landingPage:
     # university is worse than one that visibly has not been filled in.
     # @default -- (see details below)
     controller:
-      # -- The legal entity responsible under the GDPR.
-      organisation: Example University
-      # -- The person accountable for this service, as named on the imprint.
-      representative: Prof. Dr. Example Person
-      # -- Postal address of that person. Optional; omitted when empty.
-      address: 1 Example Street, 00000 Example City
-      # -- Where data protection enquiries go.
-      email: privacy@example.edu
+      # -- The legal entity responsible under the GDPR, e.g. "Example University".
+      # Empty by default on purpose: the page then says plainly that no
+      # controller has been configured, rather than presenting a placeholder as
+      # though it were this installation's real contact.
+      organisation: ""
+      # -- The person accountable for this service, as named on the imprint,
+      # e.g. "Prof. Dr. Example Person".
+      representative: ""
+      # -- Postal address of that person, e.g. "1 Example Street, 00000 Example
+      # City". Optional; omitted when empty.
+      address: ""
+      # -- Where data protection enquiries go, e.g. "privacy@example.edu".
+      email: ""
     # -- The data protection officer, named separately from the controller
-    # because the GDPR requires a distinct contact point.
+    # because the GDPR requires a distinct contact point. Empty by default for
+    # the same reason as above.
     # @default -- (see details below)
     dataProtectionOfficer:
       # -- Optional name. Most institutions publish only the address.
       name: ""
-      # -- Where the data protection officer is reached.
-      email: dpo@example.edu
+      # -- Where the data protection officer is reached, e.g. "dpo@example.edu".
+      email: ""
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain
