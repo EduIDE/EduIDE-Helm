@@ -127,6 +127,47 @@ landingPage:
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage.
   ephemeralStorage: true
+  # -- What the privacy page states about this installation.
+  # Only the research clause lives here. The retention and session figures the
+  # page shows are DERIVED in the landing page config map from the settings that
+  # actually produce them - `theia-workspace-garbage-collector.env.WORKSPACE_TTL`,
+  # `landingPage.ephemeralStorage` and `appDefinitions.defaults.timeout` - so
+  # changing a retention period cannot leave the privacy statement claiming
+  # something untrue. Do not restate those numbers here.
+  # @default -- (see details below)
+  privacy:
+    # -- State that anonymised usage data may also be used for scientific
+    # research. Leave off unless this installation has a legal basis for it:
+    # this is a processing purpose, not a cosmetic string.
+    scientificUse: false
+    # -- Who is accountable for the data, named on the privacy page.
+    # The defaults are deliberately obvious placeholders. Whoever deploys this
+    # is the controller, and a privacy statement naming somebody else's
+    # university is worse than one that visibly has not been filled in.
+    # @default -- (see details below)
+    controller:
+      # -- The legal entity responsible under the GDPR, e.g. "Example University".
+      # Empty by default on purpose: the page then says plainly that no
+      # controller has been configured, rather than presenting a placeholder as
+      # though it were this installation's real contact.
+      organisation: ""
+      # -- The person accountable for this service, as named on the imprint,
+      # e.g. "Prof. Dr. Example Person".
+      representative: ""
+      # -- Postal address of that person, e.g. "1 Example Street, 00000 Example
+      # City". Optional; omitted when empty.
+      address: ""
+      # -- Where data protection enquiries go, e.g. "privacy@example.edu".
+      email: ""
+    # -- The data protection officer, named separately from the controller
+    # because the GDPR requires a distinct contact point. Empty by default for
+    # the same reason as above.
+    # @default -- (see details below)
+    dataProtectionOfficer:
+      # -- Optional name. Most institutions publish only the address.
+      name: ""
+      # -- Where the data protection officer is reached, e.g. "dpo@example.edu".
+      email: ""
   # -- The page may show these additional apps in a drop down. This is a map.
   # The key maps to the app definition name
   # The value contains the label shown in the UI and may optionally contain

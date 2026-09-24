@@ -69,6 +69,83 @@ data:
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
+      {{- /*
+      What the privacy page is allowed to state about this installation.
+
+      DERIVED, deliberately. Every number below is computed from the value that
+      actually produces the behaviour it describes, so raising a retention
+      period cannot leave the privacy statement asserting the old one. The
+      alternative - restating the figures in a second place - is how a privacy
+      statement quietly becomes false.
+
+        workspacePersistent    landingPage.ephemeralStorage, inverted
+        workspaceRetentionDays theia-workspace-garbage-collector.env.WORKSPACE_TTL
+        sessionMaxMinutes      appDefinitions.defaults.timeout
+        sessionIdleMinutes     appDefinitions.defaults.monitor.activityTracker.timeoutAfter
+
+      The last two mirror the fallbacks in appdefinitions.yaml, which is where
+      the operator actually reads them, so the page cannot disagree with the
+      AppDefinition the sessions run under.
+
+      scientificUse is the one policy choice, not a derivation.
+      */}}
+      {{- $gc := (index .Values "theia-workspace-garbage-collector") | default dict }}
+      {{- $gcEnabled := true }}
+      {{- if hasKey $gc "enabled" }}{{ $gcEnabled = $gc.enabled }}{{ end }}
+      {{- $ttl := ((($gc.env).WORKSPACE_TTL) | default "1209600s") | toString | trimSuffix "s" }}
+      {{- $appDefaults := (.Values.appDefinitions).defaults | default dict }}
+      {{- /*
+      Session limits are the WORST CASE across everything a user can pick, not
+      the defaults. appdefinitions.yaml resolves each app's own timeout before
+      falling back to the defaults, so an app overriding it would otherwise make
+      the page understate how long a session can live. Nothing overrides these
+      today; taking the maximum keeps the statement true if something does.
+      */}}
+      {{- $maxSession := ($appDefaults.timeout | default 1440) | int }}
+      {{- $maxIdle := (((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60) | int }}
+      {{- range $name, $app := (.Values.appDefinitions).apps | default dict }}
+      {{- if and $app $app.landingPage }}
+      {{- $t := ($app.timeout | default $appDefaults.timeout | default 1440) | int }}
+      {{- if gt $t $maxSession }}{{ $maxSession = $t }}{{ end }}
+      {{- $i := ((($app.monitor).activityTracker).timeoutAfter) | default ((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60 | int }}
+      {{- if gt $i $maxIdle }}{{ $maxIdle = $i }}{{ end }}
+      {{- end }}
+      {{- end }}
+      privacy: {
+        workspacePersistent: {{ not .Values.landingPage.ephemeralStorage }},
+        workspaceGarbageCollected: {{ $gcEnabled }},
+        {{- if $gcEnabled }}
+        {{- /*
+        Seconds, not days: helm's `div` is integer division, so a TTL that is
+        not a whole number of days would be silently rounded down and the page
+        would claim a shorter retention than the deployment actually keeps.
+        The page formats it.
+        */}}
+        workspaceRetentionSeconds: {{ atoi $ttl }},
+        {{- end }}
+        sessionMaxMinutes: {{ $maxSession }},
+        sessionIdleMinutes: {{ $maxIdle }},
+        scientificUse: {{ ((.Values.landingPage).privacy).scientificUse | default false }},
+        {{- /*
+        Who is accountable, named on the privacy page. Unlike the figures above
+        these cannot be derived from anything - only the operator knows who the
+        controller is - so they are values, and their defaults are obvious
+        placeholders. A statement naming the wrong institution is worse than
+        one that visibly has not been filled in.
+        */}}
+        {{- $ctrl := ((.Values.landingPage).privacy).controller | default dict }}
+        {{- $dpo := ((.Values.landingPage).privacy).dataProtectionOfficer | default dict }}
+        controller: {
+          organisation: {{ $ctrl.organisation | quote }},
+          representative: {{ $ctrl.representative | quote }},
+          address: {{ $ctrl.address | default "" | quote }},
+          email: {{ $ctrl.email | quote }},
+        },
+        dataProtectionOfficer: {
+          name: {{ $dpo.name | default "" | quote }},
+          email: {{ $dpo.email | quote }},
+        },
+      },
       {{- if .Values.landingPage.footerLinks }}
       footerLinks: {
         {{- if .Values.landingPage.footerLinks.attribution }}
