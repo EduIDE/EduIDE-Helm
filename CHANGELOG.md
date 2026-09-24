@@ -2,6 +2,8 @@
 
 ## [1.2.0] - estimated between 2025-11 and 2026-05
 
+- [eduide] Redirect requests for ended sessions to the landing page instead of a bare 404 [#137](https://github.com/EduIDE/EduIDE-Helm/pull/137)
+
 ## [1.1.2] - 2025-09-26
 
 - [theia-cloud] Use ingress path type ImplementationSpecific instead of Prefix [#99](https://github.com/eclipse-theia/theia-cloud-helm/pull/99)

@@ -426,6 +426,31 @@ gateway:
   routes:
     # -- Whether to render HTTPRoute resources.
     enabled: true
+    # -- Where a browser lands when it asks for a session that no longer exists.
+    #
+    # Session routes are owned by their Session and vanish with it, so a timed-out
+    # tab that reloads matches nothing. This turns the instances route's catch-all
+    # rule into a redirect to the landing page, which explains what happened and
+    # offers to resume, instead of the empty rule Gateway API defaults it to.
+    #
+    # It applies to every hostname on that route, webviews included - which is
+    # where students usually land first, since a dead session's webviews fail
+    # before its main frame does.
+    #
+    # Live sessions are unaffected: Gateway API ranks matches by path length, and
+    # a session's path always beats `/`.
+    # @default -- (see details below)
+    sessionEndedRedirect:
+      # -- Whether to emit the redirect. Needs `landingPage.enabled`, since there
+      # is nowhere to send people otherwise. With this off, the instances route
+      # falls back to the defaulted empty catch-all rule.
+      enabled: true
+      # -- Path on the landing page that explains the session ended.
+      path: /session-ended
+      # -- Redirect status code. Only 302 is accepted: eager sessions reuse
+      # instance paths, so a cached 301 would permanently break an instance in
+      # the user's browser.
+      statusCode: 302
   # -- GatewayClassName to use (Envoy Gateway default is typically "envoy")
   className: "envoy"
   # -- Name of the Gateway resource
