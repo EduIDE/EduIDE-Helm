@@ -1,4 +1,15 @@
-# Cut one EduIDE platform release across four repositories.
+# Cut one EduIDE platform release across four repositories, moving all of them
+# to a single version.
+#
+# THIS IS NOT THE ORDINARY RELEASE PATH. Each repository releases on its own
+# cadence: EduIDE cuts vX.Y.Z, and a chart release pins it through appVersion.
+# `.claude/skills/cut-a-release.md` is that process, and `release.yml` runs it.
+#
+# Use this workflow only for a deliberate lockstep release, where every
+# component is rebuilt and tagged with the same number. It requires all four
+# version fields across both charts to equal that number, which is exactly what
+# an ordinary chart release does NOT do - so a run against a normal `main` will
+# fail the pre-check, and that is correct rather than a bug.
 #
 # The order is deliberate: BUILD, VERIFY, then TAG.
 #
@@ -234,7 +245,9 @@ jobs:
             fi
           done
           if [[ $fail -ne 0 ]]; then
-            echo "::error::Bump the charts in a reviewed pull request first, then re-run. See README: Cutting a release."
+            echo "::error::This workflow performs a LOCKSTEP release: both charts must carry $V in both version and appVersion."
+            echo "::error::An ordinary chart release does not do that - appVersion tracks the EduIDE release and the chart version moves on its own."
+            echo "::error::For a normal release see .claude/skills/cut-a-release.md; for a lockstep one, bump all four fields in a reviewed pull request first."
             exit 1
           fi
           echo "both charts are at $V"
