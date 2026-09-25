@@ -16,7 +16,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     env:
       OCI_REGISTRY: ghcr.io
@@ -39,7 +39,74 @@ jobs:
           OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
 
+      # A chart version is a promise about images: appVersion pins every IDE
+      # image, versions.cloud the operator and service, versions.landingPage the
+      # landing page. Publishing a chart that names a tag nobody pushed produces
+      # an ImagePullBackOff in whichever environment installs it next, which is
+      # the slowest possible place to find out. Check first, publish second.
+      - name: Install crane and yq
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/google/go-containerregistry/releases/download/v0.20.2/go-containerregistry_Linux_x86_64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin crane
+          echo '${{ secrets.GITHUB_TOKEN }}' | crane auth login ghcr.io -u '${{ github.actor }}' --password-stdin
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Every image the chart pins exists
+        id: pins
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+
+          ide=$(yq -r '.appVersion' charts/eduide/Chart.yaml)
+          cloud=$(yq -r '.versions.cloud' charts/eduide/values.yaml)
+          landing=$(yq -r '.versions.landingPage' charts/eduide/values.yaml)
+
+          # The IDE image list is read from EduIDE's build matrix rather than
+          # kept here: a hand-written copy drifts the moment someone adds an
+          # image, and then a release verifies a subset and passes.
+          gh api repos/EduIDE/EduIDE/contents/.github/workflows/build.yml --jq '.content' | base64 -d > /tmp/build.yml
+          ide_images=$(yq -r '[.jobs.images.strategy.matrix.include[]["image-name"]] | .[]' /tmp/build.yml | sed 's|^eduide/||')
+          ide_base=$(yq -r '.jobs.base.with["image-name"]' /tmp/build.yml | sed 's|^eduide/||')
+          if [[ -z "${ide_images// /}" || -z "$ide_base" || "$ide_base" == "null" ]]; then
+            echo "::error::could not read EduIDE's build matrix; refusing to verify an incomplete image set"
+            exit 1
+          fi
+
+          fail=0
+          check() {
+            local ref="$1" manifest arches
+            if ! manifest=$(crane manifest "$ref" 2>/dev/null); then
+              echo "::error::missing $ref"
+              fail=1
+              return
+            fi
+            arches=$(jq -r '[.manifests[]?.platform.architecture] | sort | join(",")' <<<"$manifest")
+            if [[ "$arches" != *amd64* || "$arches" != *arm64* ]]; then
+              echo "::error::$ref is not multi-arch (has: ${arches:-none})"
+              fail=1
+              return
+            fi
+            echo "  ok  $ref  [$arches]"
+          }
+
+          for img in $ide_base $ide_images; do check "ghcr.io/eduide/${img}:${ide}"; done
+          for img in eduide-cloud/operator eduide-cloud/service eduide-cloud/conversion-webhook; do
+            check "ghcr.io/eduide/${img}:${cloud}"
+          done
+          check "ghcr.io/eduide/eduide-landing-page:${landing}"
+
+          {
+            echo "ide=$ide"
+            echo "cloud=$cloud"
+            echo "landing=$landing"
+          } >> "$GITHUB_OUTPUT"
+          exit $fail
+
       - name: Package and publish charts
+        id: publish
         run: |
           set -euo pipefail
 
@@ -52,6 +119,7 @@ jobs:
             eduide
           )
 
+          published=""
           for chart in "${charts[@]}"; do
             version="$(awk '/^version:/ {print $2; exit}' "charts/${chart}/Chart.yaml")"
             artifact="dist/${chart}-${version}.tgz"
@@ -66,7 +134,70 @@ jobs:
             helm package "charts/${chart}" --destination dist
             helm push "${artifact}" "${OCI_PREFIX}"
             helm show chart "${ref}" --version "${version}" >/dev/null
+            published="${published} ${chart}"
           done
+
+          # What the release step tags. Empty when main carried no version bump,
+          # which is every ordinary merge.
+          echo "charts=${published# }" >> "$GITHUB_OUTPUT"
+          echo "version=$(awk '/^version:/ {print $2; exit}' charts/eduide/Chart.yaml)" >> "$GITHUB_OUTPUT"
+
+      # Without this the only record of what is current is a tag list, or the
+      # registry. A release names the version, says what it pins, and gives
+      # anyone asking "what is deployed?" one page to read.
+      - name: Tag and publish a GitHub release
+        if: steps.publish.outputs.charts != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V: ${{ steps.publish.outputs.version }}
+          CHARTS: ${{ steps.publish.outputs.charts }}
+          IDE: ${{ steps.pins.outputs.ide }}
+          CLOUD: ${{ steps.pins.outputs.cloud }}
+          LANDING: ${{ steps.pins.outputs.landing }}
+        run: |
+          set -euo pipefail
+
+          if git ls-remote --tags origin "refs/tags/v${V}" | grep -q .; then
+            echo "::notice::tag v${V} already exists; charts published, release left alone"
+            exit 0
+          fi
+
+          pre=""
+          [[ "$V" == *-* ]] && pre="--prerelease"
+
+          {
+            echo "Charts published to \`oci://ghcr.io/eduide/charts\`:"
+            echo
+            for c in $CHARTS; do
+              echo "- \`${c}\` $(awk '/^version:/ {print $2; exit}' "charts/${c}/Chart.yaml")"
+            done
+            echo
+            echo "## What this chart version pins"
+            echo
+            echo "| Component | Version |"
+            echo "|---|---|"
+            echo "| IDE images (EduIDE) | ${IDE} |"
+            echo "| Operator and service (EduIDE-Cloud) | ${CLOUD} |"
+            echo "| Landing page | ${LANDING} |"
+            echo
+            echo "Every image above was verified to exist and be multi-arch before the charts were pushed."
+            echo
+            echo "## Deploying it"
+            echo
+            echo "Bump \`spec.platform.chartVersion\` to \`${V}\` in the relevant"
+            echo "\`environments/*/env.yaml\` in EduIDE-deployment, in a pull request."
+            echo "Merging that is the deploy; nothing here rolls anything out."
+          } > /tmp/notes.md
+
+          git tag -a "v${V}" -m "EduIDE charts ${V}"
+          git push origin "v${V}"
+
+          # --generate-notes adds the commit and contributor list; the body above
+          # is what a reader actually needs first, so it goes in --notes-file.
+          gh release create "v${V}" \
+            --title "v${V}" \
+            --notes-file /tmp/notes.md \
+            --generate-notes $pre
 
   release-pr-preview:
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository

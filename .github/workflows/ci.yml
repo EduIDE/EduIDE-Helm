@@ -46,6 +46,22 @@ jobs:
       - name: App definitions, landing page and preloading agree
         run: ./scripts/test-app-consistency.sh
 
+      # AGENTS.md says the two charts are released together at the same version
+      # and nothing checked it, so they drifted to 2.2.1 and 2.2.2 across a pair
+      # of unrelated fixes. One repository tag and one GitHub release name one
+      # version, so two versions leave the release ambiguous about half of what
+      # it published.
+      - name: Both charts carry the same version
+        run: |
+          set -euo pipefail
+          a="$(awk '/^version:/ {print $2; exit}' charts/eduide/Chart.yaml)"
+          b="$(awk '/^version:/ {print $2; exit}' charts/eduide-cluster/Chart.yaml)"
+          if [[ "$a" != "$b" ]]; then
+            echo "::error file=charts/eduide-cluster/Chart.yaml::eduide is $a but eduide-cluster is $b. They are released together at one version."
+            exit 1
+          fi
+          echo "both charts are at $a"
+
       - name: Chart version must be bumped when a chart changes
         if: github.event_name == 'pull_request'
         run: |

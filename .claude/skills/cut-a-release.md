@@ -1,76 +1,121 @@
 ---
 name: cut-a-release
-description: Cut an EduIDE platform release across all four repositories. Use when asked to release, cut a version, publish charts, or ship a version of EduIDE.
+description: Release an EduIDE chart, which is what moves a component version into the environments. Use when asked to release, cut a version, publish charts, ship a version of EduIDE, or move an environment to a new IDE version.
 ---
 
 # Cutting a release
 
-A release is one version across EduIDE-Cloud, EduIDE, EduIDE-Landing-Page and
-EduIDE-Helm.
+**Each repository releases on its own cadence.** EduIDE cuts `v1.3.0`, EduIDE-Cloud
+cuts its own, the landing page cuts its own. A chart release then says which of
+those versions belong together, and a deployment PR says which environments get
+them.
 
-**Do not bump the chart version from a workflow or by pushing to `main`.** The
-release train deliberately does not do this, and neither should you. It checks
-the charts are already at the requested version and fails otherwise. The bump is
-a reviewed pull request; automation that pushes to `main` triggers the workflows
-watching `main`.
+So "release EduIDE 1.3.0 to production" is three merges in three repositories,
+in this order. None of them is optional and the order is not a preference.
 
-## 1. Dry run first, always
+```
+EduIDE            release v1.3.0        images published as 1.3.0
+EduIDE-Helm       chart 2.3.0           appVersion 1.3.0 -> every IDE image
+EduIDE-deployment chartVersion 2.3.0    merging this IS the deploy
+```
+
+## What a chart version pins
+
+One knob per source repository, and the chart version is the name for the set:
+
+| Value | Repository | Renders as |
+|---|---|---|
+| `appVersion` in `Chart.yaml` | EduIDE | every IDE image tag |
+| `versions.cloud` in `values.yaml` | EduIDE-Cloud | operator, service, conversion webhook |
+| `versions.landingPage` in `values.yaml` | EduIDE-Landing-Page | the landing page |
+
+`versions.ide` in an environment's values overrides `appVersion` for that
+installation. It exists for pinning an unreleased image - a `pr-123` tag - and
+every use of it is temporary. If one is in place, the comment beside it should
+say what has to become true before it goes, and that condition should be checked
+whenever a release moves past it.
+
+## 1. The component release exists first
+
+Whatever you are pinning must already be published. Check, do not assume:
 
 ```bash
-gh workflow run release-train.yml --repo EduIDE/EduIDE-Helm \
-  -f version=2.3.0 -f dry_run=true
+gh release view v1.3.0 --repo EduIDE/EduIDE
+gh run list --repo EduIDE/EduIDE --event release --limit 1   # did the build finish?
+docker manifest inspect ghcr.io/eduide/eduide/java-17:1.3.0  # did it publish?
 ```
 
-Read the summary. It reports which images the version would need, and builds
-nothing.
+A GitHub release existing means somebody clicked release. It does **not** mean
+the images exist: the build runs after the tag, takes the better part of an
+hour, and can fail. `release.yml` now refuses to publish a chart whose pinned
+images are missing, so getting this wrong costs a red build rather than an
+`ImagePullBackOff` in production - but it is still the first thing to check.
 
-## 2. Bump both charts in a pull request
+## 2. Bump the chart in a pull request
 
-Both charts, both fields — four values, all identical:
+Both charts carry the same version - CI enforces it - and only `appVersion`
+moves with the component:
 
 ```yaml
-# charts/eduide/Chart.yaml  AND  charts/eduide-cluster/Chart.yaml
-version: 2.3.0
-appVersion: "2.3.0"
+# charts/eduide/Chart.yaml
+version: 2.3.0          # and the same in charts/eduide-cluster/Chart.yaml
+appVersion: "1.3.0"     # the EduIDE release being pinned
 ```
 
-Then regenerate the READMEs, or the `docs-drift` job fails:
+Chart version is semver about **the chart**: a values change that alters
+rendered output is a minor, a fix is a patch. It does not track the component
+version and never has.
+
+Then regenerate the READMEs, or `docs-drift` fails - the version badges come
+from `Chart.yaml`:
 
 ```bash
 docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2
 ```
 
-Open the PR and let CI run. Do not merge it yourself unless asked to.
+Open the PR, let CI run, and do not merge it yourself unless asked.
 
-## 3. Run it for real
+## 3. Merging publishes and releases it
 
-```bash
-gh workflow run release-train.yml --repo EduIDE/EduIDE-Helm \
-  -f version=2.3.0 -f dry_run=false
-```
+`release.yml` runs on push to `main` and does four things in order:
 
-Order: validate, build all 14 images, verify they exist and are multi-arch,
-**then** tag, then publish. Building before tagging means a flaky image build
-costs a re-run rather than stranding immutable tags on repositories whose
-images were never published.
+1. verifies every image the chart pins exists and is multi-arch
+2. packages and pushes any chart whose version is not already published
+3. tags the repository `vX.Y.Z`
+4. creates a GitHub release naming what the version pins, with generated notes
 
-## 4. Roll it out separately
+Step 1 reads the IDE image list from EduIDE's build matrix at run time rather
+than from a list here, because a hand-kept copy drifts the moment somebody adds
+an image and then a release verifies a subset and passes.
 
-The train deploys nothing. In EduIDE-deployment, bump
-`spec.platform.chartVersion` in the relevant `environments/*/env.yaml`, in a
-pull request. Production is never deployed automatically.
+If `main` carries no version bump, steps 2 to 4 do nothing. That is every
+ordinary merge.
 
-## Version forms
+## 4. Roll it out
 
-- git tags `vX.Y.Z`
-- chart `version`, chart `appVersion` and image tags all `X.Y.Z`
-- release candidates `2.3.0-rc.1` throughout
+Nothing here deploys. In EduIDE-deployment, bump `spec.platform.chartVersion` in
+the relevant `environments/*/env.yaml`, in a pull request - staging first, then
+production, in separate PRs so production can be reverted without reverting the
+environment that proved it. Merging the production one is the deploy.
+
+## The release train is a different thing
+
+`release-train.yml` moves **all four repositories to one number** and requires
+both charts to carry that number in both `version` and `appVersion`. That is a
+deliberate lockstep release, not this process, and running it against an
+ordinary `main` fails its pre-check by design.
+
+Reach for it only when you actually want every component rebuilt and retagged
+together. Almost nothing needs that.
 
 ## Common failures
 
 | Message | Meaning |
 |---|---|
-| `version is 'X', expected 'Y'` | step 2 skipped, or only one chart/field bumped |
-| `missing ghcr.io/...` | a component build failed; check that repository's Actions |
-| `is not multi-arch` | one architecture failed; re-run the whole build, not just the merge job |
-| `tag v2.3.0 already exists` | pick the next version, tags are immutable |
+| `missing ghcr.io/...` in Release Charts | step 1 - the component release's build has not finished, or failed |
+| `is not multi-arch` | one architecture failed in the component build; re-run that build, not this one |
+| `eduide is X but eduide-cluster is Y` | the two charts drifted; they release together at one version |
+| `changed but version is still X` | a chart changed with no bump; `release.yml` would publish nothing |
+| `chart READMEs are out of date` | run helm-docs and commit the result |
+| `tag vX.Y.Z already exists` | the charts were published under that version already; bump |
+| Chart published but no release | the tag already existed - the charts are out, only the release page is missing |
