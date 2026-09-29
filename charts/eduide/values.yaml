@@ -111,6 +111,9 @@ hosts:
 landingPage:
   # -- Whether the landing page shall be enabled
   enabled: true
+  # -- Number of landing page pods. More than one keeps the landing page up
+  # when a node goes away, and turns on its PodDisruptionBudget.
+  replicas: 1
   # -- the landing page image to use. Templated, so the tag follows
   # versions.landingPage unless the whole string is overridden.
   image: '{{ .Values.imageRegistry }}/eduide-landing-page:{{ .Values.versions.landingPage }}'
@@ -447,8 +450,27 @@ service:
     enable: false
   # -- service port (default: 8081)
   port: 8081
+  # -- Number of REST service pods. The service keeps no state of its own, so
+  # more than one is safe; it also turns on its PodDisruptionBudget.
+  replicas: 1
   # -- protocol of the REST-API
   protocol: https
+# -- Static page shown instead of Envoy's raw error when the landing page is down
+# @default -- (see details below)
+maintenancePage:
+  # -- Answer 502/503/504 on the landing route with files/maintenance.html
+  # ("EduIDE is currently unavailable") instead of Envoy's plain-text error.
+  # Covers the landing page only - the REST service and sessions keep their
+  # own errors. Needs Envoy Gateway (BackendTrafficPolicy responseOverride).
+  enabled: true
+# -- PodDisruptionBudgets for the landing page and REST service
+# @default -- (see details below)
+podDisruptionBudget:
+  # -- Render a PodDisruptionBudget (minAvailable: 1) for every Deployment
+  # above that runs more than one replica. Turn this off on single-node
+  # clusters: there a drain can never reschedule the evicted replica, so it
+  # waits on the last one forever.
+  enabled: true
 # -- Gateway API configuration (Envoy Gateway by default)
 gateway:
   # -- Master switch for Gateway API resources.

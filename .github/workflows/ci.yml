@@ -46,6 +46,9 @@ jobs:
       - name: App definitions, landing page and preloading agree
         run: ./scripts/test-app-consistency.sh
 
+      - name: Maintenance page and rolling updates
+        run: ./scripts/test-maintenance-page.sh
+
       - name: Chart version must be bumped when a chart changes
         if: github.event_name == 'pull_request'
         run: |
