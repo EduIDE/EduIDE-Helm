@@ -1,5 +1,11 @@
 # Changelog
 
+## [eduide 2.4.0] - 2026-09-28
+
+- [eduide] Serve a static maintenance page instead of Envoy's raw `no healthy upstream` when the landing page is down (`maintenancePage.enabled`, default on)
+- [eduide] Add a readiness probe to the REST service, and a `preStop` drain and `maxUnavailable: 0` to the landing page and REST service, so deploys keep a ready pod
+- [eduide] Add `landingPage.replicas` and `service.replicas`, with a PodDisruptionBudget (`podDisruptionBudget.enabled`) and node spreading when above 1
+
 ## [1.2.0] - estimated between 2025-11 and 2026-05
 
 ## [1.1.2] - 2025-09-26

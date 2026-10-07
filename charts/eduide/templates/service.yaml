@@ -6,7 +6,13 @@ metadata:
     app: service
   namespace: {{ .Release.Namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.service.replicas }}
+  {{- /* Start the new pod before stopping the old one, so a deploy never leaves the route without a ready pod. */}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: service
@@ -21,6 +27,7 @@ spec:
       # we need to be able to create and read sessions
       automountServiceAccountToken: true
       serviceAccountName: service-api-service-account
+      {{- include "eduide.spreadAcrossNodes" "service" | nindent 6 }}
       containers:
       - name: service-container
         image: {{ tpl (.Values.service.image | toString) . }}
@@ -29,6 +36,18 @@ spec:
         - name: http
           containerPort: {{ tpl (.Values.service.port | toString) . }}
           protocol: TCP
+        {{- /*
+        The service has no health endpoint. An open port means Quarkus is up,
+        which is what matters: without this the pod counted as ready the moment
+        the container started and the old one was stopped too early.
+        */}}
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        lifecycle:
+          {{- include "eduide.preStopDrain" . | nindent 10 }}
         envFrom:
         - configMapRef:
             name: service-config

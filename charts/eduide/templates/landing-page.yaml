@@ -7,7 +7,13 @@ metadata:
     app: landing-page
   namespace: {{ .Release.Namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.landingPage.replicas }}
+  {{- /* Start the new pod before stopping the old one, so a deploy never leaves the route without a ready pod. */}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: landing-page
@@ -20,6 +26,7 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/landing-page-config-map.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
+      {{- include "eduide.spreadAcrossNodes" "landing-page" | nindent 6 }}
       containers:
         - name: landing-page-container
           image: {{ tpl (.Values.landingPage.image | toString) . }}
@@ -37,6 +44,8 @@ spec:
               port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
+          lifecycle:
+            {{- include "eduide.preStopDrain" . | nindent 12 }}
           volumeMounts:
             - name: landing-page-config
               mountPath: /usr/share/nginx/html/config.js

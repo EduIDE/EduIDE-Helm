@@ -116,3 +116,29 @@ disagree with what the installation offers.
 {{- end -}}
 {{- $out | toJson -}}
 {{- end -}}
+
+{{/*
+Keep serving for a few seconds after the pod is marked for deletion. Envoy only
+learns that the endpoint is gone after the Pod is deleted, so without this it
+keeps sending requests to a process that is already shutting down.
+*/}}
+{{- define "eduide.preStopDrain" -}}
+preStop:
+  exec:
+    command: ["sleep", "10"]
+{{- end }}
+
+{{/*
+Prefer putting the replicas of a Deployment on different nodes, so one node
+going away does not take all of them. Soft, so a single-node cluster still
+schedules every replica.
+*/}}
+{{- define "eduide.spreadAcrossNodes" -}}
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app: {{ . }}
+{{- end }}

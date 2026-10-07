@@ -78,6 +78,39 @@ One install means one namespace, so prefixing buys no collision protection
 anyway. Standard `app.kubernetes.io/*` labels give the same grouping without
 the rename, and labels are additive on upgrade.
 
+## Maintenance page and rolling updates
+
+While the landing page has no ready pod, Envoy would answer with a bare
+`no healthy upstream`. The `eduide` chart ships a `BackendTrafficPolicy` on
+`landing-route` that replaces every 502/503/504 there with
+`charts/eduide/files/maintenance.html` ("EduIDE is currently unavailable").
+Envoy serves the page from the `maintenance-page` ConfigMap itself, so it works
+with the landing page down and loads nothing from anywhere else. The status
+code stays 5xx. It needs Envoy Gateway; turn it off with
+`maintenancePage.enabled: false` elsewhere.
+
+Keep `%` out of the page. Envoy reads the body as a format string, rejects
+the override because of it and still reports the policy as Accepted, so
+visitors get an empty 503. `scripts/test-maintenance-page.sh` checks for it.
+
+It covers the landing page only. The REST service and sessions keep their own
+errors, and nothing helps while Envoy itself is down.
+
+To show the page on purpose, scale `landing-page-deployment` to 0 - the
+`maintenance.yml` workflow in EduIDE-deployment does exactly that. The next
+deploy scales it back.
+
+So that deploys rarely show it:
+
+- the landing page and REST service start the new pod before stopping the old
+  one (`maxUnavailable: 0`), and the REST service is only ready once its port
+  is open
+- both sleep 10s in `preStop`, so Envoy stops sending traffic before the
+  process exits
+- `landingPage.replicas` / `service.replicas` above 1 add a
+  PodDisruptionBudget each (`podDisruptionBudget.enabled`, off on single-node
+  clusters, where it would block every drain) and prefer different nodes
+
 ## Checking a change
 
 ```bash

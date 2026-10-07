@@ -1,0 +1,44 @@
+{{- /*
+The page Envoy serves instead of its raw "no healthy upstream" when the landing
+page has no ready pod - during a deploy, or on purpose when the maintenance
+workflow in EduIDE-deployment scales it to 0. Envoy serves it itself, so it
+must not load anything from the landing page. The status code stays 5xx.
+*/}}
+{{- if and .Values.maintenancePage.enabled .Values.landingPage.enabled .Values.gateway.enabled .Values.gateway.routes.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maintenance-page
+  namespace: {{ .Release.Namespace }}
+data:
+  response.body: |
+{{ .Files.Get "files/maintenance.html" | indent 4 }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: landing-maintenance-page
+  namespace: {{ .Release.Namespace }}
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: landing-route
+  responseOverride:
+  - match:
+      statusCodes:
+      - type: Value
+        value: 502
+      - type: Value
+        value: 503
+      - type: Value
+        value: 504
+    response:
+      contentType: text/html; charset=utf-8
+      body:
+        type: ValueRef
+        valueRef:
+          group: ""
+          kind: ConfigMap
+          name: maintenance-page
+{{- end }}

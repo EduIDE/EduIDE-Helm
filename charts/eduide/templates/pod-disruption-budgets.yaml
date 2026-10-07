@@ -1,0 +1,30 @@
+{{- /*
+Only with more than one replica: a PDB over a single pod blocks every drain.
+Single-node clusters must turn these off, because a drain there can never
+reschedule the evicted replica and so waits on the second one forever.
+*/}}
+{{- if and .Values.podDisruptionBudget.enabled .Values.landingPage.enabled (gt (int .Values.landingPage.replicas) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: landing-page-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: landing-page
+{{- end }}
+{{- if and .Values.podDisruptionBudget.enabled (gt (int .Values.service.replicas) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: service-pdb
+  namespace: {{ .Release.Namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: service
+{{- end }}

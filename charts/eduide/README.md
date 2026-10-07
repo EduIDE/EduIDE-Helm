@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.3.0](https://img.shields.io/badge/Version-2.3.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.3.0](https://img.shields.io/badge/AppVersion-1.3.0-informational?style=flat-square)
+![Version: 2.4.0](https://img.shields.io/badge/Version-2.4.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.3.0](https://img.shields.io/badge/AppVersion-1.3.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -94,8 +94,11 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.privacy.dataProtectionOfficer.email | string | `""` | Where the data protection officer is reached, e.g. "dpo@example.edu". |
 | landingPage.privacy.dataProtectionOfficer.name | string | `""` | Optional name. Most institutions publish only the address. |
 | landingPage.privacy.scientificUse | bool | `false` | State that anonymised usage data may also be used for scientific research. Leave off unless this installation has a legal basis for it: this is a processing purpose, not a cosmetic string. |
+| landingPage.replicas | int | `1` | Number of landing page pods. More than one keeps the landing page up when a node goes away, and turns on its PodDisruptionBudget. |
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
 | landingPage.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
+| maintenancePage | object | (see details below) | Static page shown instead of Envoy's raw error when the landing page is down |
+| maintenancePage.enabled | bool | `true` | Answer 502/503/504 on the landing route with files/maintenance.html ("EduIDE is currently unavailable") instead of Envoy's plain-text error. Covers the landing page only - the REST service and sessions keep their own errors. Needs Envoy Gateway (BackendTrafficPolicy responseOverride). |
 | monitor | object | (see details below) | Values to influence the monitor initialization on the operator |
 | monitor.activityTracker | object | (see details below) | Values to influence the activityTracker module |
 | monitor.activityTracker.enable | bool | `true` | Should the activityTracker module be enabled |
@@ -132,6 +135,8 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.storageClassName | string | `"default"` | The name of the storage class for persistent volume claims for workspaces. This storage class must be present on the cluster. Most cloud providers offer a default storage class without additional configuration. |
 | operator.wondershaperImage | string | `"theiacloud/theia-cloud-wondershaper:1.2.0-next"` | If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container |
 | operatorrole.name | string | `"operator-api-access"` |  |
+| podDisruptionBudget | object | (see details below) | PodDisruptionBudgets for the landing page and REST service |
+| podDisruptionBudget.enabled | bool | `true` | Render a PodDisruptionBudget (minAvailable: 1) for every Deployment above that runs more than one replica. Turn this off on single-node clusters: there a drain can never reschedule the evicted replica, so it waits on the last one forever. |
 | preloading | object | (see details below) | Values to configure preloading of images on Kubernetes nodes. |
 | preloading.deriveFromApps | bool | `true` | Set to false to preload only preloading.images and nothing derived. |
 | preloading.enable | bool | `true` | Is image preloading enabled. |
@@ -149,6 +154,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | service.imagePullSecret | string | `nil` | Optional: the image pull secret |
 | service.port | int | `8081` | service port (default: 8081) |
 | service.protocol | string | `"https"` | protocol of the REST-API |
+| service.replicas | int | `1` | Number of REST service pods. The service keeps no state of its own, so more than one is safe; it also turns on its PodDisruptionBudget. |
 | service.sentry | object | (see details below) | Values related to Sentry on the service. |
 | service.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the service deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
 | servicerole.name | string | `"service-api-access"` |  |
