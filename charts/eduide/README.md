@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.5.0](https://img.shields.io/badge/Version-2.5.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0](https://img.shields.io/badge/AppVersion-1.4.0-informational?style=flat-square)
+![Version: 2.5.1](https://img.shields.io/badge/Version-2.5.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0](https://img.shields.io/badge/AppVersion-1.4.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -65,7 +65,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | keycloak.authUrl | string | `"https://keycloak.url/auth/"` | Key cloak auth URL. Only has to be specified when enable: true |
 | keycloak.clientId | string | `"theia-cloud"` | The client-id. Only has to be specified when enable: true |
 | keycloak.clientSecret | string | `"publicbutoauth2proxywantsasecret"` | The oaid client secret. In case you configure your keycloak client as confidential, then you may specifiy the secret here. If you stick with our default public client, you may leave below value. For public clients keycloak does not generate a client-secret, but in order to make oath2-proxy happy, we will pass a value |
-| keycloak.cookieSecret | string | `"OQINaROshtE9TcZkNAm5Zs2Pv3xaWytBmc5W7sPX7ws="` | The cookie secret. This should not be public! Only has to be specified when enable: true See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret for how to generate a strong cookie secret. |
+| keycloak.cookieSecret | string | `""` | The cookie secret. This must be unique per environment and must not be public. The chart ships no default on purpose: like `service.adminApiToken`, every environment supplies its own and the template fails to render if this is left empty. Generate one with `openssl rand -base64 32 | tr -- '+/' '-_'`. See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret for details. |
 | keycloak.enable | bool | `false` | Whether keycloak authentication shall be used |
 | keycloak.realm | string | `"TheiaCloud"` | The Keycloak Realm. Only has to be specified when enable: true |
 | landingPage | object | (see details below) | Values related to the landing page |
@@ -105,9 +105,19 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | monitor.activityTracker.interval | int | `1` | Minutes between re-pinging the pods |
 | monitor.enable | bool | `true` | Should the monitor be enabled |
 | monitoring | object | `{"enabled":true}` | Whether this installation is scraped by Prometheus and appears on the dashboards.  The PodMonitor objects themselves are in `eduide-cluster`, not here. They have to be created in Rancher's own namespace to be discovered, and one PodMonitor per tenant writing into a shared namespace would collide on names. So the cluster chart owns the objects and this flag decides whether this release's namespace is in the list they watch - `bootstrap-cluster.yml` reads it when it derives that list.  Turning it off means this environment stops being scraped. Nothing else about the release changes; `monitor.enable` below is a different thing entirely (the operator's own session activity tracker). |
+| networkPolicies | object | (see details below) | NetworkPolicies that isolate session pods. Session pods run untrusted user code, so by default they may only reach cluster DNS and receive traffic from the gateway/proxy, and are explicitly blocked from the cloud metadata endpoint. Operator, service and landing-page pods are left untouched. |
+| networkPolicies.allowExternalEgress | bool | `true` | Allow sessions general outbound internet access (the metadata endpoint below stays blocked either way). Set false to lock sessions down to DNS only - this breaks in-session git clone and package downloads. |
+| networkPolicies.dnsNamespace | string | `"kube-system"` | Namespace of the cluster DNS resolver. Session pods may send DNS to it. |
+| networkPolicies.enabled | bool | `true` | Master switch. Secure by default. |
+| networkPolicies.gatewayNamespace | string | `"envoy-gateway-system"` | Namespace that runs the gateway/proxy data plane (Envoy Gateway by default). Session pods accept ingress only from pods in this namespace. Matched through the automatic `kubernetes.io/metadata.name` namespace label. |
+| networkPolicies.metadataCidr | string | `"169.254.169.254/32"` | Cloud metadata endpoint. Always excluded from session egress so a compromised session cannot read instance credentials. |
+| networkPolicies.sessionPorts | list | `[3000,5000]` | Ports on the session pod the gateway/proxy is allowed to reach. Covers the IDE port and the oauth2-proxy sidecar port. |
 | oauth2Proxy | object | `{"cookieDomains":[],"sslInsecureSkipVerify":false,"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
 | oauth2Proxy.sslInsecureSkipVerify | bool | `false` | Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider (sets ssl_insecure_skip_verify). Defaults to false to enforce certificate validation. Set to true only when the provider uses a self-signed or otherwise untrusted certificate. |
 | operator | object | (see details below) | Values related to the operator |
+| operator.allowCustomEnvFromMap | bool | `true` | Whether a launch request may set arbitrary environment variables via `env.fromMap`. Reserved platform variables are always stripped by the operator regardless of this flag. (`--allowCustomEnvFromMap`.) |
+| operator.allowedEnvFromConfigMaps | list | `[]` | Allowlist of ConfigMap names a launch request may inject into a session via `env.fromConfigMaps`. Empty (the default) denies all injection. Enforced by the operator (`--allowedEnvFromConfigMaps`). |
+| operator.allowedEnvFromSecrets | list | `[]` | Allowlist of Secret names a launch request may inject into a session via `env.fromSecrets`. Empty (the default) denies all injection - a session receives only the platform environment. Add the specific Secret names an environment legitimately needs. Enforced by the operator (`--allowedEnvFromSecrets`, EduIDE-Cloud #144). |
 | operator.bandwidthLimiter | string | `"K8SANNOTATION"` | Whether Theia Cloud shall limit network speed. This might not be fully supported on all cloud provider/in all clusters. Possible values: - K8SANNOTATION                   Set via kubernetes annotations (kubernetes.io/egress-bandwidth and kubernetes.io/ingress-bandwidth) - WONDERSHAPER                    Set via wondershaper init container - K8SANNOTATIONANDWONDERSHAPER    Set Kubernetes annotations and use wondershaper init container |
 | operator.buildCache | object | `{"bazelUrl":"","enablePush":false,"enabled":false,"gradleUrl":""}` | Build cache configuration |
 | operator.buildCache.bazelUrl | string | `""` | The URL of the remote Bazel build cache server. |
@@ -115,6 +125,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.buildCache.enabled | bool | `false` | Whether to enable build caching |
 | operator.buildCache.gradleUrl | string | `""` | The URL of the remote Gradle build cache server. |
 | operator.cloudProvider | string | `"K8S"` | Select your cloud provider. Possible values: - K8S      Plain Kubernetes - MINIKUBE Local deployment on Minikube |
+| operator.clusterWideRbac | bool | `false` | Grant the operator its permissions cluster-wide instead of only in its own namespace. The operator manages Sessions, Workspaces, Deployments, Pods, ConfigMaps and Services in its own release namespace, so the default (false) binds its ClusterRole through a namespaced RoleBinding. Set true only for setups that genuinely need cross-namespace or cluster-scoped access (for example the Minikube cloud provider, which creates cluster-scoped PersistentVolumes); this renders a ClusterRoleBinding. |
 | operator.continueOnException | bool | `false` | Whether the operator should stop in cases where an exception is not handled |
 | operator.dependencyCache | object | `{"enabled":false,"url":""}` | Dependency cache configuration (Reposilite) |
 | operator.dependencyCache.enabled | bool | `false` | Whether to enable the dependency cache |

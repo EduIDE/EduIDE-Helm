@@ -36,6 +36,13 @@ spec:
         env:
         - name: SENTRY_ENABLE
           value: {{ tpl (.Values.operator.sentry.enable | toString) . | quote }}
+        # Sourced from a Secret rather than passed as a plaintext arg. The arg
+        # below expands $(SERVICE_AUTH_TOKEN) from this env at container start.
+        - name: SERVICE_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: service-config-secret
+              key: SERVICE_AUTH_TOKEN
         args:
           {{- if .Values.keycloak.enable }}
           - "--keycloak"
@@ -58,7 +65,7 @@ spec:
           - "--sessionsPerUser"
           - "{{ tpl (.Values.operator.sessionsPerUser | toString) . }}"
           - "--serviceAuthToken"
-          - {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . | quote }}
+          - "$(SERVICE_AUTH_TOKEN)"
           - "--instancesHost"
           - "{{ include "theia-cloud.host.instance" . }}"
           - "--storageClassName"
@@ -109,6 +116,15 @@ spec:
           - "{{ tpl (.Values.operator.dependencyCache.url | toString) . }}"
           {{- end }}
           {{- end }}
+          {{- with .Values.operator.allowedEnvFromSecrets }}
+          - "--allowedEnvFromSecrets"
+          - "{{ join "," . }}"
+          {{- end }}
+          {{- with .Values.operator.allowedEnvFromConfigMaps }}
+          - "--allowedEnvFromConfigMaps"
+          - "{{ join "," . }}"
+          {{- end }}
+          - "--allowCustomEnvFromMap={{ .Values.operator.allowCustomEnvFromMap }}"
         {{- if .Values.operator.logging.override }}
         volumeMounts:
           - name: operator-logging-config

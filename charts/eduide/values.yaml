@@ -290,10 +290,14 @@ keycloak:
   # keycloak does not generate a client-secret, but in order to make oath2-proxy happy,
   # we will pass a value
   clientSecret: "publicbutoauth2proxywantsasecret"
-  # -- The cookie secret. This should not be public! Only has to be specified when enable: true
+  # -- The cookie secret. This must be unique per environment and must not be
+  # public. The chart ships no default on purpose: like `service.adminApiToken`,
+  # every environment supplies its own and the template fails to render if this
+  # is left empty. Generate one with
+  # `openssl rand -base64 32 | tr -- '+/' '-_'`.
   # See https://oauth2-proxy.github.io/oauth2-proxy/docs/configuration/overview/#generating-a-cookie-secret
-  # for how to generate a strong cookie secret.
-  cookieSecret: "OQINaROshtE9TcZkNAm5Zs2Pv3xaWytBmc5W7sPX7ws="
+  # for details.
+  cookieSecret: ""
 
 # -- Values related to OAuth2 Proxy configuration
 oauth2Proxy:
@@ -411,6 +415,28 @@ operator:
 
   # -- The version to use of the quay.io/oauth2-proxy/oauth2-proxy image
   oAuth2ProxyVersion: "v7.12.0"
+  # -- Allowlist of Secret names a launch request may inject into a session via
+  # `env.fromSecrets`. Empty (the default) denies all injection - a session
+  # receives only the platform environment. Add the specific Secret names an
+  # environment legitimately needs. Enforced by the operator
+  # (`--allowedEnvFromSecrets`, EduIDE-Cloud #144).
+  allowedEnvFromSecrets: []
+  # -- Allowlist of ConfigMap names a launch request may inject into a session
+  # via `env.fromConfigMaps`. Empty (the default) denies all injection.
+  # Enforced by the operator (`--allowedEnvFromConfigMaps`).
+  allowedEnvFromConfigMaps: []
+  # -- Whether a launch request may set arbitrary environment variables via
+  # `env.fromMap`. Reserved platform variables are always stripped by the
+  # operator regardless of this flag. (`--allowCustomEnvFromMap`.)
+  allowCustomEnvFromMap: true
+  # -- Grant the operator its permissions cluster-wide instead of only in its
+  # own namespace. The operator manages Sessions, Workspaces, Deployments,
+  # Pods, ConfigMaps and Services in its own release namespace, so the default
+  # (false) binds its ClusterRole through a namespaced RoleBinding. Set true
+  # only for setups that genuinely need cross-namespace or cluster-scoped
+  # access (for example the Minikube cloud provider, which creates
+  # cluster-scoped PersistentVolumes); this renders a ClusterRoleBinding.
+  clusterWideRbac: false
 # -- Values of the Theia Cloud REST service
 # @default -- (see details below)
 service:
@@ -524,6 +550,32 @@ operatorrole:
   name: operator-api-access
 servicerole:
   name: service-api-access
+# -- NetworkPolicies that isolate session pods. Session pods run untrusted user
+# code, so by default they may only reach cluster DNS and receive traffic from
+# the gateway/proxy, and are explicitly blocked from the cloud metadata
+# endpoint. Operator, service and landing-page pods are left untouched.
+# @default -- (see details below)
+networkPolicies:
+  # -- Master switch. Secure by default.
+  enabled: true
+  # -- Namespace that runs the gateway/proxy data plane (Envoy Gateway by
+  # default). Session pods accept ingress only from pods in this namespace.
+  # Matched through the automatic `kubernetes.io/metadata.name` namespace label.
+  gatewayNamespace: envoy-gateway-system
+  # -- Ports on the session pod the gateway/proxy is allowed to reach. Covers
+  # the IDE port and the oauth2-proxy sidecar port.
+  sessionPorts:
+    - 3000
+    - 5000
+  # -- Namespace of the cluster DNS resolver. Session pods may send DNS to it.
+  dnsNamespace: kube-system
+  # -- Allow sessions general outbound internet access (the metadata endpoint
+  # below stays blocked either way). Set false to lock sessions down to DNS
+  # only - this breaks in-session git clone and package downloads.
+  allowExternalEgress: true
+  # -- Cloud metadata endpoint. Always excluded from session egress so a
+  # compromised session cannot read instance credentials.
+  metadataCidr: 169.254.169.254/32
 # -- Values to influence the monitor initialization on the operator
 # @default -- (see details below)
 monitor:

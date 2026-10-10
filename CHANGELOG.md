@@ -1,5 +1,15 @@
 # Changelog
 
+## [eduide 2.5.1] - 2026-10-10
+
+Security hardening (secure-by-default; environments already override the sensitive values):
+
+- [eduide] Wire the operator session env-injection allowlist (`operator.allowedEnvFromSecrets`, `operator.allowedEnvFromConfigMaps`, `operator.allowCustomEnvFromMap`), passed as `--allowedEnvFromSecrets` / `--allowedEnvFromConfigMaps` / `--allowCustomEnvFromMap`. Empty = deny, matching EduIDE-Cloud [#144](https://github.com/EduIDE/EduIDE-Cloud/pull/144)
+- [eduide] Add NetworkPolicies isolating session pods (`networkPolicies.enabled`, default on): default-deny ingress/egress, DNS egress only, ingress to session ports from the gateway namespace, and an explicit block of the cloud metadata IP `169.254.169.254/32`
+- [eduide] Namespace-scope the operator RBAC: bind its ClusterRole through a namespaced RoleBinding by default (`operator.clusterWideRbac`, default false) instead of a cluster-wide ClusterRoleBinding
+- [eduide] Move `SERVICE_AUTH_TOKEN` and `KEYCLOAK_CLIENTSECRET` out of the `service-config` ConfigMap into the `service-config-secret` Secret, and source the operator's `--serviceAuthToken` from that Secret instead of a plaintext arg
+- [eduide] Require a unique per-environment `keycloak.cookieSecret` (removed the committed default; the template now fails if it is unset), and set oauth2-proxy `cookie_secure="true"`
+
 ## [eduide 2.4.0] - 2026-09-28
 
 - [eduide] Serve a static maintenance page instead of Envoy's raw `no healthy upstream` when the landing page is down (`maintenancePage.enabled`, default on)

@@ -1,5 +1,33 @@
+{{- /*
+Bind the operator's ClusterRole (defined once per cluster by eduide-cluster).
+
+By default this is a namespaced RoleBinding, so the operator holds its
+permissions - including the broad verbs on configmaps, pods, deployments and
+services - only in its own release namespace. A RoleBinding that references a
+ClusterRole grants that ClusterRole's rules scoped to the binding's namespace,
+which is exactly what a per-environment operator needs and nothing more.
+
+Set operator.clusterWideRbac=true to grant the permissions cluster-wide with a
+ClusterRoleBinding instead - needed only for setups that reach across
+namespaces or create cluster-scoped resources (for example the Minikube cloud
+provider's PersistentVolumes).
+*/ -}}
+{{- if .Values.operator.clusterWideRbac }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.operatorrole.name }}-{{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.operatorrole.name }}
+subjects:
+- kind: ServiceAccount
+  name: operator-api-service-account
+  namespace: {{ .Release.Namespace }}
+{{- else }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
   name: {{ .Values.operatorrole.name }}-{{ .Release.Namespace }}
   namespace: {{ .Release.Namespace }}
@@ -11,3 +39,4 @@ subjects:
 - kind: ServiceAccount
   name: operator-api-service-account
   namespace: {{ .Release.Namespace }}
+{{- end }}
