@@ -429,13 +429,16 @@ operator:
   # `env.fromMap`. Reserved platform variables are always stripped by the
   # operator regardless of this flag. (`--allowCustomEnvFromMap`.)
   allowCustomEnvFromMap: true
-  # -- Grant the operator its permissions cluster-wide instead of only in its
-  # own namespace. The operator manages Sessions, Workspaces, Deployments,
-  # Pods, ConfigMaps and Services in its own release namespace, so the default
-  # (false) binds its ClusterRole through a namespaced RoleBinding. Set true
-  # only for setups that genuinely need cross-namespace or cluster-scoped
-  # access (for example the Minikube cloud provider, which creates
-  # cluster-scoped PersistentVolumes); this renders a ClusterRoleBinding.
+  # -- Grant the operator's *namespaced* permissions (Sessions, Workspaces,
+  # Deployments, Pods, ConfigMaps, Services, ...) cluster-wide instead of only
+  # in its own namespace. The default (false) binds the shared
+  # "operator-api-access" ClusterRole through a namespaced RoleBinding, so those
+  # broad verbs apply only in the release namespace. Set true only for setups
+  # that genuinely reach across namespaces; this renders a ClusterRoleBinding.
+  # This flag does NOT affect the cluster-scoped resources the operator always
+  # needs (read-only CustomResourceDefinitions and PersistentVolumes): those are
+  # granted via a separate minimal ClusterRole regardless of this setting,
+  # because a RoleBinding cannot grant access to cluster-scoped resources.
   clusterWideRbac: false
 # -- Values of the Theia Cloud REST service
 # @default -- (see details below)
