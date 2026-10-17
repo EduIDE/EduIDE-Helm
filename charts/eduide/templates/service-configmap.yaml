@@ -4,7 +4,8 @@ metadata:
   name: service-config
   namespace: {{ .Release.Namespace }}
 data:
-  SERVICE_AUTH_TOKEN: {{ tpl ((.Values.service.authToken | default .Values.app.id) | toString) . | quote }}
+  # SERVICE_AUTH_TOKEN and KEYCLOAK_CLIENTSECRET moved to the Secret
+  # `service-config-secret`; the service receives them via envFrom.secretRef.
   APPID: {{ tpl (.Values.app.id | toString) . | quote }}
   SERVICE_PORT: {{ tpl (.Values.service.port | toString) . | quote }}
   KEYCLOAK_ENABLE: {{ tpl (.Values.keycloak.enable | toString) . | quote }}
@@ -16,5 +17,4 @@ data:
   KEYCLOAK_ADMIN_GROUP: {{ tpl (.Values.keycloak.adminGroup | toString) . | quote }}
   KEYCLOAK_SERVERURL: {{ tpl (.Values.keycloak.authUrl | toString) . }}realms/{{ tpl (.Values.keycloak.realm | toString) . }}
   KEYCLOAK_CLIENTID: {{ tpl (.Values.keycloak.clientId | toString) . | quote }}
-  KEYCLOAK_CLIENTSECRET: {{ tpl (.Values.keycloak.clientSecret | toString) . | quote }}
   {{- end }}

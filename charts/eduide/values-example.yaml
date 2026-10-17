@@ -52,8 +52,11 @@ keycloak:
   authUrl: https://sso.example.edu/
   realm: your-realm
   clientId: eduide
-  # cookieSecret goes in secrets.yaml - the chart's default is a placeholder
-  # published in a public repository and MUST be replaced.
+  # Unique per environment and never committed to a real values file - keep the
+  # real one in secrets.yaml. The chart ships no default, so the value below is
+  # an obvious placeholder that only lets this example render; replace it with
+  # `openssl rand -base64 32 | tr -- '+/' '-_'`.
+  cookieSecret: REPLACE-WITH-A-UNIQUE-PER-ENVIRONMENT-COOKIE-SECRET
 
 # No identity provider yet? Comment out the block above and uncomment this. It
 # means the installation has NO AUTHENTICATION; do not expose it.

@@ -1,5 +1,40 @@
+{{- /*
+Grant the operator its permissions in two parts, so the common case needs no
+cluster-wide write access.
+
+1. Namespaced resources (Sessions, Workspaces, Deployments, Pods, ConfigMaps,
+   Services, HTTPRoutes, leases, ...) are bound through the shared
+   "operator-api-access" ClusterRole. By default that binding is a namespaced
+   RoleBinding, so the broad verbs apply only in the operator's own release
+   namespace. Set operator.clusterWideRbac=true to bind those same rules
+   cluster-wide with a ClusterRoleBinding instead - needed only for setups that
+   reach across namespaces.
+
+2. Cluster-scoped resources the operator cannot avoid touching are granted
+   separately and always: it lists CustomResourceDefinitions at startup
+   (read-only) and manages PersistentVolumes for workspace storage. These live
+   in a dedicated, minimal ClusterRole defined here (per namespace, so tenants
+   sharing a cluster do not collide) and are always bound cluster-wide, because
+   a RoleBinding can never grant access to cluster-scoped resources. This is the
+   fix for the regression where a namespaced-only binding left the operator
+   unable to list CRDs and crashlooping at startup.
+*/ -}}
+{{- if .Values.operator.clusterWideRbac }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.operatorrole.name }}-{{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.operatorrole.name }}
+subjects:
+- kind: ServiceAccount
+  name: operator-api-service-account
+  namespace: {{ .Release.Namespace }}
+{{- else }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
 metadata:
   name: {{ .Values.operatorrole.name }}-{{ .Release.Namespace }}
   namespace: {{ .Release.Namespace }}
@@ -7,6 +42,40 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ .Values.operatorrole.name }}
+subjects:
+- kind: ServiceAccount
+  name: operator-api-service-account
+  namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+# Minimal cluster-scoped grant the operator always needs. CRDs are read-only
+# (listed at startup to verify they exist); PersistentVolumes are managed for
+# workspace storage. Everything else the operator does is namespaced and covered
+# by the binding above.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.operatorrole.name }}-cluster-{{ .Release.Namespace }}
+rules:
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.operatorrole.name }}-cluster-{{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.operatorrole.name }}-cluster-{{ .Release.Namespace }}
 subjects:
 - kind: ServiceAccount
   name: operator-api-service-account

@@ -20,8 +20,8 @@ data:
     # Client config
     client_id="{{ tpl (.Values.keycloak.clientId | toString) . }}"
     client_secret="{{ tpl (.Values.keycloak.clientSecret | toString) . }}"
-    cookie_secret="{{ tpl (.Values.keycloak.cookieSecret | toString) . }}"
-    cookie_secure="false"
+    cookie_secret="{{ tpl ((required "keycloak.cookieSecret is empty - set a unique per-environment cookie secret (see values.yaml)" .Values.keycloak.cookieSecret) | toString) . }}"
+    cookie_secure="true"
     #proxy_prefix=""
     # Upstream config
     http_address="0.0.0.0:5000"
