@@ -207,6 +207,16 @@ landingPage:
   # -- Optional: If specified with a value, this overrides the message shown to the user while the session is started.
   # Empty values are ignored and the default text is used.
   loadingText:
+  # -- Hosts a git link without an Artemis token may clone from, e.g. one from the
+  # "Open in EduIDE" browser extension. Such links are also refused when they are
+  # not HTTPS or carry credentials. An empty list allows no host.
+  allowedGitHosts:
+    - github.com
+  # -- Environment variables added to every session the landing page starts, for
+  # per-installation settings such as Scorpio's `SCORPIO_GITHUB_CLIENT_ID`.
+  # **Public**: they are rendered into config.js, which every visitor can read.
+  # Never put a secret here.
+  sessionEnv: {}
   # -- The logo of the application that should be displayed on the landing pages
   logo: logos/theiablueprint.svg
   # -- Set a base64 encoded svg image that should be displayed on the landing pages.
