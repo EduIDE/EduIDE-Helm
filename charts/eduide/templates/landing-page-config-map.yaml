@@ -68,6 +68,15 @@ data:
       {{- if .Values.landingPage.loadingText }}
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
+      {{- /*
+      Links without an Artemis token (the "Open in EduIDE" browser extension) may
+      only clone from these hosts. Rendered even when empty, so an empty list
+      really means "none" rather than falling back to the page's default.
+      */}}
+      allowedGitHosts: {{ .Values.landingPage.allowedGitHosts | default list | toJson }},
+      {{- with .Values.landingPage.sessionEnv }}
+      sessionEnv: {{ . | toJson }},
+      {{- end }}
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
       {{- /*
       What the privacy page is allowed to state about this installation.

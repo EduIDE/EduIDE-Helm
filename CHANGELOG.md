@@ -1,5 +1,10 @@
 # Changelog
 
+## [eduide 2.6.0] - unreleased
+
+- [eduide] `landingPage.allowedGitHosts` (default `github.com`): hosts a git link without an Artemis token may clone from, as checked by EduIDE-Landing-Page
+- [eduide] `landingPage.sessionEnv`: public environment variables added to every session, e.g. Scorpio's `SCORPIO_GITHUB_CLIENT_ID`
+
 ## [eduide 2.4.0] - 2026-09-28
 
 - [eduide] Serve a static maintenance page instead of Envoy's raw `no healthy upstream` when the landing page is down (`maintenancePage.enabled`, default on)
