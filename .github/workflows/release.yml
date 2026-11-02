@@ -203,20 +203,20 @@ jobs:
             echo
             echo "Bump \`spec.platform.chartVersion\` to \`${V}\` in the relevant"
             echo "\`environments/*/env.yaml\` in EduIDE-deployment, in a pull request."
-            echo "Merging that is the deploy; nothing here rolls anything out."
+            echo "Merging records the version; only \`e2e\` deploys on merge. Every"
+            echo "other environment, production included, needs Actions ->"
+            echo "**Deploy environment** run against it. Nothing here rolls anything out."
           } > /tmp/notes.md
 
-          # The tag may already be there from a run that failed after pushing it.
-          if git ls-remote --tags origin "refs/tags/v${V}" | grep -q .; then
-            echo "::notice::reusing existing tag v${V}"
-          else
-            git tag -a "v${V}" -m "EduIDE charts ${V}"
-            git push origin "v${V}"
-          fi
-
+          # --target lets gh create the tag server side. `git tag -a` needs a
+          # committer identity, which actions/checkout does not configure, so it
+          # would fail here - after the charts are already published. An existing
+          # tag from an earlier failed run is reused, and --target ignored.
+          #
           # --generate-notes adds the commit and contributor list; the body above
           # is what a reader actually needs first, so it goes in --notes-file.
           gh release create "v${V}" \
+            --target "${GITHUB_SHA}" \
             --title "v${V}" \
             --notes-file /tmp/notes.md \
             --generate-notes $pre

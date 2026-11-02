@@ -96,7 +96,13 @@ ordinary merge.
 Nothing here deploys. In EduIDE-deployment, bump `spec.platform.chartVersion` in
 the relevant `environments/*/env.yaml`, in a pull request - staging first, then
 production, in separate PRs so production can be reverted without reverting the
-environment that proved it. Merging the production one is the deploy.
+environment that proved it.
+
+Merging that PR records the version; it does not roll it out. Only `e2e` deploys
+on merge, from `deploy-e2e.yml` watching `environments/**` on main. Every other
+environment, production included, waits for somebody to run Actions ->
+**Deploy environment** against it. A merged bump and a deployed version are two
+different things, and the environment keeps serving the old one until that run.
 
 ## The release train is a different thing
 
