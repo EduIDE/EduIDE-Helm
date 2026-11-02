@@ -60,6 +60,25 @@ else
   bad "images offered but not preloaded" "$(tr '\n' ' ' <<<"$missing")"
 fi
 
+# Unset has to stay absent rather than render an empty nodeSelector: production
+# and parma have no node pool, and their DaemonSets must not change.
+preload_selector() {
+  yq -o=json -I=0 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
+                   | .spec.template.spec.nodeSelector' | grep -v '^---$'
+}
+got=$(preload_selector <<<"$OUT")
+if [[ "$got" == "null" ]]; then
+  ok "preloading has no nodeSelector by default"
+else
+  bad "preloading has a nodeSelector by default" "$got"
+fi
+got=$(render --set-json 'preloading.nodeSelector={"aet.cit.tum.de/pool":"eduide"}' | preload_selector)
+if [[ "$got" == '{"aet.cit.tum.de/pool":"eduide"}' ]]; then
+  ok "preloading.nodeSelector reaches the DaemonSet"
+else
+  bad "preloading.nodeSelector does not reach the DaemonSet" "$got"
+fi
+
 # The landing page must not advertise an app that was never deployed.
 offered=$(yq -r 'select(.kind=="ConfigMap" and (.metadata.name|test("landing")))
                  | .data | to_entries[0].value' <<<"$OUT" \

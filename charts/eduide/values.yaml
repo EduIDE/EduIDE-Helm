@@ -633,6 +633,11 @@ preloading:
   # the last node starts long after the first has finished. These pods carry no
   # traffic, so there is nothing to protect by staging the rollout.
   maxUnavailable: "100%"
+  # -- Preload only onto nodes carrying these labels. Empty means every node.
+  # Set this when some nodes cannot hold the images: the exited init containers
+  # keep them in use, so kubelet image GC cannot free that disk space. Sessions
+  # are not pinned by this, so one landing on another node pulls its image cold.
+  nodeSelector: {}
   # -- Extra images to preload, on top of the ones derived automatically.
   #
   # Leave this empty. The chart preloads every appDefinitions.apps image, every

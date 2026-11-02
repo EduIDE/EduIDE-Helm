@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.6.0] - 2026-11-02
+
+- [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
+
 ## [eduide 2.4.0] - 2026-09-28
 
 - [eduide] Serve a static maintenance page instead of Envoy's raw `no healthy upstream` when the landing page is down (`maintenancePage.enabled`, default on)
