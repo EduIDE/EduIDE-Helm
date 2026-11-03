@@ -86,7 +86,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: session-allow-operator-databridge
+  name: session-allow-operator
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/part-of: eduide
@@ -98,10 +98,11 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    # The operator injects each session's environment over the data bridge for
-    # prewarmed/eager sessions. It runs in this namespace and connects to the
-    # session's ClusterIP, so the default-deny needs this one same-namespace
-    # allow or injection is dropped and the session starts with no credentials.
+    # The operator runs in this namespace and connects to each session's ClusterIP.
+    # Over the data bridge it injects the environment of eager sessions; without
+    # this, those sessions start with no credentials. It also polls the monitor
+    # port one session at a time, so dropping those polls would stall the tracker
+    # on a connect timeout per session.
     - from:
         - podSelector:
             matchLabels:
@@ -109,6 +110,8 @@ spec:
       ports:
         - protocol: TCP
           port: {{ $np.dataBridgePort }}
+        - protocol: TCP
+          port: {{ $np.monitorPort }}
 {{- if $np.allowExternalEgress }}
 ---
 apiVersion: networking.k8s.io/v1

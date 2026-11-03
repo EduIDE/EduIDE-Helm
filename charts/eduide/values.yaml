@@ -576,6 +576,9 @@ networkPolicies:
   # the session would start with no credentials (no autoclone, no Artemis
   # sign-in). Must match `appDefinitions.*.options.dataBridgePort`.
   dataBridgePort: 16281
+  # -- Port the operator polls on each session for activity. Must match
+  # `monitor.port` of the app definitions.
+  monitorPort: 3000
   # -- Namespace of the cluster DNS resolver. Session pods may send DNS to it.
   dnsNamespace: kube-system
   # -- Allow sessions general outbound internet access (the metadata endpoint

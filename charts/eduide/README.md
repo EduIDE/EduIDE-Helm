@@ -112,6 +112,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | networkPolicies.enabled | bool | `true` | Master switch. Secure by default. |
 | networkPolicies.gatewayNamespace | string | `"envoy-gateway-system"` | Namespace that runs the gateway/proxy data plane (Envoy Gateway by default). Session pods accept ingress only from pods in this namespace. Matched through the automatic `kubernetes.io/metadata.name` namespace label. |
 | networkPolicies.metadataCidr | string | `"169.254.169.254/32"` | Cloud metadata endpoint. Always excluded from session egress so a compromised session cannot read instance credentials. |
+| networkPolicies.monitorPort | int | `3000` | Port the operator polls on each session for activity. Must match `monitor.port` of the app definitions. |
 | networkPolicies.sessionPorts | list | `[3000,5000]` | Ports on the session pod the gateway/proxy is allowed to reach. Covers the IDE port and the oauth2-proxy sidecar port. |
 | oauth2Proxy | object | `{"cookieDomains":[],"sslInsecureSkipVerify":false,"whitelistDomains":[]}` | Values related to OAuth2 Proxy configuration |
 | oauth2Proxy.sslInsecureSkipVerify | bool | `false` | Whether OAuth2 Proxy skips TLS certificate verification of the OIDC provider (sets ssl_insecure_skip_verify). Defaults to false to enforce certificate validation. Set to true only when the provider uses a self-signed or otherwise untrusted certificate. |
