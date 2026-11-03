@@ -577,8 +577,8 @@ networkPolicies:
   # sign-in). Must match `appDefinitions.*.options.dataBridgePort`.
   dataBridgePort: 16281
   # -- Port the operator polls on each session for activity. Must match
-  # `monitor.port` of the app definitions.
-  monitorPort: 3000
+  # `appDefinitions.defaults.monitor.port`.
+  monitorPort: 8081
   # -- Namespace of the cluster DNS resolver. Session pods may send DNS to it.
   dnsNamespace: kube-system
   # -- Allow sessions general outbound internet access (the metadata endpoint
@@ -588,6 +588,16 @@ networkPolicies:
   # -- Cloud metadata endpoint. Always excluded from session egress so a
   # compromised session cannot read instance credentials.
   metadataCidr: 169.254.169.254/32
+  # -- Ranges excluded from general outbound access, so a session cannot reach
+  # the pods and services of the cluster. Add the cluster's pod and service
+  # CIDRs here when they are outside these private ranges. A host in one of
+  # these ranges that sessions must reach, such as a private Artemis, needs its
+  # range removed.
+  privateEgressCidrs:
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - 100.64.0.0/10
 # -- Values to influence the monitor initialization on the operator
 # @default -- (see details below)
 monitor:
@@ -633,6 +643,10 @@ appDefinitions:
     options:
       dataBridgeEnabled: "true"
       dataBridgePort: "16281"
+    monitor:
+      # The monitor extension's own server. Not the app port: there the operator
+      # would hit oauth2-proxy, which can never answer the activity poll.
+      port: 8081
   # -- The applications. Key is the AppDefinition name.
   apps:
     java-17-latest:

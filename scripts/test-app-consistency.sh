@@ -172,6 +172,23 @@ else
   bad "NetworkPolicy data bridge port does not match the app definitions" "policy=[$policy_port] apps=[$app_ports]"
 fi
 
+# The operator polls this port for activity. A mismatch makes every poll fail.
+policy_monitor=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[1].port' <<<"$rendered" | grep -vE '^(---|null)$')
+app_monitor=$(yq -r 'select(.kind == "AppDefinition") | .spec.monitor.port' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)
+if [[ -n "$policy_monitor" && "$policy_monitor" == "$app_monitor" ]]; then
+  ok "monitor port $policy_monitor open to the operator"
+else
+  bad "NetworkPolicy monitor port does not match the app definitions" "policy=[$policy_monitor] apps=[$app_monitor]"
+fi
+
+# Without this exclusion a session reaches the cluster's own pods and services.
+excluded=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-external-egress") | .spec.egress[0].to[0].ipBlock.except[]' <<<"$rendered")
+if grep -qx '10.0.0.0/8' <<<"$excluded" && grep -qx '169.254.169.254/32' <<<"$excluded"; then
+  ok "session egress excludes private ranges and the metadata endpoint"
+else
+  bad "session egress must exclude private ranges and the metadata endpoint" "except=[$excluded]"
+fi
+
 echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
 exit $FAILED
