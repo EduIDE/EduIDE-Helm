@@ -82,6 +82,33 @@ spec:
         - protocol: TCP
           port: {{ . }}
         {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-operator-databridge
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # The operator injects each session's environment over the data bridge for
+    # prewarmed/eager sessions. It runs in this namespace and connects to the
+    # session's ClusterIP, so the default-deny needs this one same-namespace
+    # allow or injection is dropped and the session starts with no credentials.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: operator
+      ports:
+        - protocol: TCP
+          port: {{ $np.dataBridgePort }}
 {{- if $np.allowExternalEgress }}
 ---
 apiVersion: networking.k8s.io/v1

@@ -160,6 +160,18 @@ for extra in "" "--set eduide-shared-cache.enabled=true"; do
   fi
 done
 
+# Eager sessions get their environment from the operator over the data bridge. If
+# the NetworkPolicy allows a different port than the app definitions open, the
+# default-deny drops the injection and the session starts with no credentials.
+rendered=$(render)
+policy_port=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator-databridge") | .spec.ingress[0].ports[0].port' <<<"$rendered" | grep -vE '^(---|null)$')
+app_ports=$(yq -r 'select(.kind == "AppDefinition") | .spec.options.dataBridgePort' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)
+if [[ -n "$policy_port" && "$policy_port" == "$app_ports" ]]; then
+  ok "data bridge port $policy_port open to the operator"
+else
+  bad "NetworkPolicy data bridge port does not match the app definitions" "policy=[$policy_port] apps=[$app_ports]"
+fi
+
 echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
 exit $FAILED

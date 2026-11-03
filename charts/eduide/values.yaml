@@ -570,6 +570,12 @@ networkPolicies:
   sessionPorts:
     - 3000
     - 5000
+  # -- Data bridge port on the session pod. The operator connects to this port
+  # to inject each session's environment (Artemis token, GIT_URI, git identity)
+  # into prewarmed/eager sessions. The default-deny would otherwise drop it, so
+  # the session would start with no credentials (no autoclone, no Artemis
+  # sign-in). Must match `appDefinitions.*.options.dataBridgePort`.
+  dataBridgePort: 16281
   # -- Namespace of the cluster DNS resolver. Session pods may send DNS to it.
   dnsNamespace: kube-system
   # -- Allow sessions general outbound internet access (the metadata endpoint
