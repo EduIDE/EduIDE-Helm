@@ -172,6 +172,22 @@ else
   bad "NetworkPolicy data bridge port does not match the app definitions" "policy=[$policy_port] apps=[$app_ports]"
 fi
 
+# One app overriding the port must fail the render, not lose its injection at runtime.
+first_app=$(head -n1 <<<"$declared")
+if render --set-string "appDefinitions.apps.$first_app.options.dataBridgePort=1234" >/dev/null; then
+  bad "an app with a different data bridge port must fail the render" "app=[$first_app]"
+else
+  ok "an app with a different data bridge port fails the render"
+fi
+
+# Only the Minikube provider creates PersistentVolumes, and this rule is always bound cluster-wide.
+pv_verbs() { yq -r 'select(.kind == "ClusterRole" and (.metadata.name | test("-cluster-"))) | .rules[] | select(.resources[] == "persistentvolumes") | .verbs[]' | grep -vE '^---$'; }
+if ! pv_verbs <<<"$rendered" | grep -qx create && render --set operator.cloudProvider=MINIKUBE | pv_verbs | grep -qx create; then
+  ok "PersistentVolume writes are granted only for Minikube"
+else
+  bad "PersistentVolume writes must be granted only for Minikube" "default=[$(pv_verbs <<<"$rendered" | tr '\n' ' ')]"
+fi
+
 # The operator polls this port for activity. A mismatch makes every poll fail.
 policy_monitor=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[1].port' <<<"$rendered" | grep -vE '^(---|null)$')
 app_monitor=$(yq -r 'select(.kind == "AppDefinition") | .spec.monitor.port' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)

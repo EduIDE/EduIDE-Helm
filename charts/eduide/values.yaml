@@ -436,9 +436,10 @@ operator:
   # broad verbs apply only in the release namespace. Set true only for setups
   # that genuinely reach across namespaces; this renders a ClusterRoleBinding.
   # This flag does NOT affect the cluster-scoped resources the operator always
-  # needs (read-only CustomResourceDefinitions and PersistentVolumes): those are
-  # granted via a separate minimal ClusterRole regardless of this setting,
-  # because a RoleBinding cannot grant access to cluster-scoped resources.
+  # needs (read-only CustomResourceDefinitions and PersistentVolumes, plus write
+  # access to PersistentVolumes when cloudProvider is MINIKUBE): those are granted
+  # via a separate minimal ClusterRole regardless of this setting, because a
+  # RoleBinding cannot grant access to cluster-scoped resources.
   clusterWideRbac: false
 # -- Values of the Theia Cloud REST service
 # @default -- (see details below)

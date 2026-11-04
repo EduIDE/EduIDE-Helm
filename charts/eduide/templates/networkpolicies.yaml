@@ -17,6 +17,13 @@ cannot reach them because the external-egress allow excludes private ranges.
 {{- if .Values.networkPolicies.enabled }}
 {{- $np := .Values.networkPolicies }}
 {{- $sessionSelector := dict "app.kubernetes.io/component" "session" "app.kubernetes.io/part-of" "theia-cloud" }}
+{{- $d := .Values.appDefinitions.defaults | default dict }}
+{{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
+{{- $port := (($app.options | default $d.options) | default dict).dataBridgePort }}
+{{- if and $port (ne (toString $port) (toString $np.dataBridgePort)) }}
+{{- fail (printf "appDefinitions.apps.%s uses dataBridgePort %v but networkPolicies.dataBridgePort is %v, so the default-deny would drop its data injection" $name $port $np.dataBridgePort) }}
+{{- end }}
+{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
