@@ -18,6 +18,14 @@ cannot reach them because the external-egress allow excludes private ranges.
 {{- $np := .Values.networkPolicies }}
 {{- $sessionSelector := dict "app.kubernetes.io/component" "session" "app.kubernetes.io/part-of" "theia-cloud" }}
 {{- $d := .Values.appDefinitions.defaults | default dict }}
+{{- /* The operator polls the monitor port of every app definition this chart renders. */ -}}
+{{- $monitorPorts := list (int $np.monitorPort) }}
+{{- if and .Values.demoApplication.install .Values.demoApplication.monitor }}
+{{- $monitorPorts = append $monitorPorts (int (tpl (.Values.demoApplication.monitor.port | toString) .)) }}
+{{- end }}
+{{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
+{{- $monitorPorts = append $monitorPorts (int (($app.monitor).port | default ($d.monitor).port | default 8081)) }}
+{{- end }}
 {{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
 {{- $port := (($app.options | default $d.options) | default dict).dataBridgePort }}
 {{- if and $port (ne (toString $port) (toString $np.dataBridgePort)) }}
@@ -118,8 +126,10 @@ spec:
       ports:
         - protocol: TCP
           port: {{ $np.dataBridgePort }}
+        {{- range ($monitorPorts | uniq) }}
         - protocol: TCP
-          port: {{ $np.monitorPort }}
+          port: {{ . }}
+        {{- end }}
 {{- if $np.allowExternalEgress }}
 ---
 apiVersion: networking.k8s.io/v1

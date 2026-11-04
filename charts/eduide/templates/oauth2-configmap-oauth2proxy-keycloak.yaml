@@ -4,6 +4,8 @@
 {{- $hostRegex := `^https?://([^/]+)(/.*)?$` -}}
 {{- /* Replace the URL with only the first group which is only the host. */ -}}
 {{- $keycloakHost:= regexReplaceAll $hostRegex $keycloakUrl `$1` -}}
+{{- $cookieSecretError := "keycloak.cookieSecret is empty - set a unique per-environment cookie secret (see values.yaml)" -}}
+{{- $cookieSecret := required $cookieSecretError (tpl ((required $cookieSecretError .Values.keycloak.cookieSecret) | toString) .) -}}
 
 apiVersion: v1
 kind: ConfigMap
@@ -20,8 +22,8 @@ data:
     # Client config
     client_id="{{ tpl (.Values.keycloak.clientId | toString) . }}"
     client_secret="{{ tpl (.Values.keycloak.clientSecret | toString) . }}"
-    cookie_secret="{{ tpl ((required "keycloak.cookieSecret is empty - set a unique per-environment cookie secret (see values.yaml)" .Values.keycloak.cookieSecret) | toString) . }}"
-    cookie_secure="true"
+    cookie_secret="{{ $cookieSecret }}"
+    cookie_secure="{{ .Values.oauth2Proxy.cookieSecure }}"
     #proxy_prefix=""
     # Upstream config
     http_address="0.0.0.0:5000"

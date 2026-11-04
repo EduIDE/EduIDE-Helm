@@ -197,6 +197,32 @@ else
   bad "NetworkPolicy monitor port does not match the app definitions" "policy=[$policy_monitor] apps=[$app_monitor]"
 fi
 
+# The demo app and per-app overrides poll on their own monitor ports.
+operator_ports() { yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[].port' | grep -vE '^(---|null)$'; }
+if helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=true --set keycloak.allowUnauthenticated=true \
+    --set keycloak.cookieSecret=test-render-secret 2>/dev/null | operator_ports | grep -qx 3000; then
+  ok "the demo app's monitor port is open to the operator"
+else
+  bad "the demo app's monitor port must be open to the operator"
+fi
+if render --set "appDefinitions.apps.$first_app.monitor.port=9123" | operator_ports | grep -qx 9123; then
+  ok "a per-app monitor port is open to the operator"
+else
+  bad "a per-app monitor port must be open to the operator"
+fi
+
+# A value that expands to nothing must not render an empty cookie secret.
+if render --set 'keycloak.cookieSecret={{ "" }}' >/dev/null; then
+  bad "a cookie secret that expands to nothing must fail the render"
+else
+  ok "a cookie secret that expands to nothing fails the render"
+fi
+if grep -q 'cookie_secure="true"' <<<"$rendered" && render --set oauth2Proxy.cookieSecure=false | grep -q 'cookie_secure="false"'; then
+  ok "cookie_secure defaults to true and can be turned off"
+else
+  bad "cookie_secure must default to true and follow oauth2Proxy.cookieSecure"
+fi
+
 # Without this exclusion a session reaches the cluster's own pods and services.
 excluded=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-external-egress") | .spec.egress[0].to[0].ipBlock.except[]' <<<"$rendered")
 if grep -qx '10.0.0.0/8' <<<"$excluded" && grep -qx '169.254.169.254/32' <<<"$excluded"; then

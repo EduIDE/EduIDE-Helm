@@ -33,13 +33,16 @@ environments on the same cluster.
 
 The one cluster-scoped exception the tenant chart owns is the operator's
 unavoidable cluster-scoped access: it lists `customresourcedefinitions`
-(read-only) at startup and manages `persistentvolumes` for workspace storage,
-neither of which a namespaced RoleBinding can grant. The tenant chart therefore
+(read-only) at startup and reads `persistentvolumes`, writing them for workspace
+storage only when `operator.cloudProvider` is `MINIKUBE`. A namespaced RoleBinding
+can grant neither. The tenant chart therefore
 renders a minimal `operator-api-access-cluster-<namespace>` ClusterRole and
 ClusterRoleBinding, named per namespace so tenants never collide on them. The
 broad, namespaced operator verbs stay bound through the shared
 `operator-api-access` ClusterRole (a RoleBinding by default, see
-`operator.clusterWideRbac`).
+`operator.clusterWideRbac`). That role includes write verbs on
+`persistentvolumes` and `customresourcedefinitions`, so setting
+`operator.clusterWideRbac=true` grants those writes cluster-wide.
 
 ### The conversion webhook belongs to the cluster
 

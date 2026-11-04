@@ -8,11 +8,12 @@ cluster-wide write access.
    RoleBinding, so the broad verbs apply only in the operator's own release
    namespace. Set operator.clusterWideRbac=true to bind those same rules
    cluster-wide with a ClusterRoleBinding instead - needed only for setups that
-   reach across namespaces.
+   reach across namespaces. The shared role also lists PersistentVolumes and CRDs
+   with write verbs, so that binding grants those writes cluster-wide on any provider.
 
 2. Cluster-scoped resources the operator cannot avoid touching are granted
    separately and always: it lists CustomResourceDefinitions at startup
-   (read-only) and manages PersistentVolumes for workspace storage. These live
+   (read-only) and reads PersistentVolumes, which it writes only on Minikube. These live
    in a dedicated, minimal ClusterRole defined here (per namespace, so tenants
    sharing a cluster do not collide) and are always bound cluster-wide, because
    a RoleBinding can never grant access to cluster-scoped resources. This is the

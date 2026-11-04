@@ -306,6 +306,12 @@ oauth2Proxy:
   # Set to true only when the provider uses a self-signed or otherwise untrusted certificate.
   sslInsecureSkipVerify: false
 
+  # -- Whether the session cookie is sent over HTTPS only (sets cookie_secure).
+  # Set to false only for an install served over plain HTTP (`gateway.httpEnabled`),
+  # where the browser would otherwise drop the cookie and login cannot finish. The
+  # cookie then travels in clear text.
+  cookieSecure: true
+
   # Allowed redirect domains for OAuth2 Proxy (controls whitelist_domains).
   # When empty, defaults are used:
   #   [ "<instance>:*", "<keycloak host>:*" ]
@@ -555,9 +561,9 @@ operatorrole:
 servicerole:
   name: service-api-access
 # -- NetworkPolicies that isolate session pods. Session pods run untrusted user
-# code, so by default they may only reach cluster DNS and receive traffic from
-# the gateway/proxy, and are explicitly blocked from the cloud metadata
-# endpoint. Operator, service and landing-page pods are left untouched.
+# code. By default they reach cluster DNS and the internet, but not private
+# ranges or the cloud metadata endpoint, and receive traffic only from the
+# gateway/proxy and the operator. Set `allowExternalEgress: false` for DNS only. Operator, service and landing-page pods are left untouched.
 # @default -- (see details below)
 networkPolicies:
   # -- Master switch. Secure by default.
