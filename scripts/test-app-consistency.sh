@@ -29,8 +29,10 @@ bad() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '        %s\n' "
   echo "could not resolve chart dependencies" >&2; exit 1; }
 
 render() {
+  # keycloak.cookieSecret is required (no committed default), like skipPreflight
+  # and allowUnauthenticated above a dummy value just lets the chart render here.
   helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false \
-    --set keycloak.allowUnauthenticated=true "$@" 2>/dev/null
+    --set keycloak.allowUnauthenticated=true --set keycloak.cookieSecret=test-render-secret "$@" 2>/dev/null
 }
 
 echo "=== app definitions, landing page and preloading agree ==="
@@ -157,6 +159,51 @@ for extra in "" "--set eduide-shared-cache.enabled=true"; do
     bad "invalid resource names (${label})" "$(tr '\n' ' ' <<<"$bad_names")"
   fi
 done
+
+# Eager sessions get their environment from the operator over the data bridge. If
+# the NetworkPolicy allows a different port than the app definitions open, the
+# default-deny drops the injection and the session starts with no credentials.
+rendered=$(render)
+policy_port=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[0].port' <<<"$rendered" | grep -vE '^(---|null)$')
+app_ports=$(yq -r 'select(.kind == "AppDefinition") | .spec.options.dataBridgePort' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)
+if [[ -n "$policy_port" && "$policy_port" == "$app_ports" ]]; then
+  ok "data bridge port $policy_port open to the operator"
+else
+  bad "NetworkPolicy data bridge port does not match the app definitions" "policy=[$policy_port] apps=[$app_ports]"
+fi
+
+# One app overriding the port must fail the render, not lose its injection at runtime.
+first_app=$(head -n1 <<<"$declared")
+if render --set-string "appDefinitions.apps.$first_app.options.dataBridgePort=1234" >/dev/null; then
+  bad "an app with a different data bridge port must fail the render" "app=[$first_app]"
+else
+  ok "an app with a different data bridge port fails the render"
+fi
+
+# Only the Minikube provider creates PersistentVolumes, and this rule is always bound cluster-wide.
+pv_verbs() { yq -r 'select(.kind == "ClusterRole" and (.metadata.name | test("-cluster-"))) | .rules[] | select(.resources[] == "persistentvolumes") | .verbs[]' | grep -vE '^---$'; }
+if ! pv_verbs <<<"$rendered" | grep -qx create && render --set operator.cloudProvider=MINIKUBE | pv_verbs | grep -qx create; then
+  ok "PersistentVolume writes are granted only for Minikube"
+else
+  bad "PersistentVolume writes must be granted only for Minikube" "default=[$(pv_verbs <<<"$rendered" | tr '\n' ' ')]"
+fi
+
+# The operator polls this port for activity. A mismatch makes every poll fail.
+policy_monitor=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[1].port' <<<"$rendered" | grep -vE '^(---|null)$')
+app_monitor=$(yq -r 'select(.kind == "AppDefinition") | .spec.monitor.port' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)
+if [[ -n "$policy_monitor" && "$policy_monitor" == "$app_monitor" ]]; then
+  ok "monitor port $policy_monitor open to the operator"
+else
+  bad "NetworkPolicy monitor port does not match the app definitions" "policy=[$policy_monitor] apps=[$app_monitor]"
+fi
+
+# Without this exclusion a session reaches the cluster's own pods and services.
+excluded=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-external-egress") | .spec.egress[0].to[0].ipBlock.except[]' <<<"$rendered")
+if grep -qx '10.0.0.0/8' <<<"$excluded" && grep -qx '169.254.169.254/32' <<<"$excluded"; then
+  ok "session egress excludes private ranges and the metadata endpoint"
+else
+  bad "session egress must exclude private ranges and the metadata endpoint" "except=[$excluded]"
+fi
 
 echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"

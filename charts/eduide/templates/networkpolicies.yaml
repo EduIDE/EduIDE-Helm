@@ -1,0 +1,172 @@
+{{- /*
+Network isolation for session pods.
+
+Session pods run untrusted user code. They are selected by the theia-cloud
+labels the operator stamps on every session (see LabelsUtil in EduIDE-Cloud:
+app.kubernetes.io/component=session, app.kubernetes.io/part-of=theia-cloud).
+
+NetworkPolicies are allow-only and additive, so the model is: one policy that
+denies all ingress and egress for session pods, then narrow allow policies on
+top. The cloud metadata endpoint is excluded from the external-egress allow so
+a compromised session cannot read instance credentials, even when general
+outbound access is on.
+
+Operator, service and landing-page pods have no policies of their own. Sessions
+cannot reach them because the external-egress allow excludes private ranges.
+*/ -}}
+{{- if .Values.networkPolicies.enabled }}
+{{- $np := .Values.networkPolicies }}
+{{- $sessionSelector := dict "app.kubernetes.io/component" "session" "app.kubernetes.io/part-of" "theia-cloud" }}
+{{- $d := .Values.appDefinitions.defaults | default dict }}
+{{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
+{{- $port := (($app.options | default $d.options) | default dict).dataBridgePort }}
+{{- if and $port (ne (toString $port) (toString $np.dataBridgePort)) }}
+{{- fail (printf "appDefinitions.apps.%s uses dataBridgePort %v but networkPolicies.dataBridgePort is %v, so the default-deny would drop its data injection" $name $port $np.dataBridgePort) }}
+{{- end }}
+{{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-default-deny
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.dnsNamespace | quote }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-gateway-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.gatewayNamespace | quote }}
+      ports:
+        {{- range $np.sessionPorts }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-operator
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    # The operator runs in this namespace and connects to each session's ClusterIP.
+    # Over the data bridge it injects the environment of eager sessions; without
+    # this, those sessions start with no credentials. It also polls the monitor
+    # port one session at a time, so dropping those polls would stall the tracker
+    # on a connect timeout per session.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: operator
+      ports:
+        - protocol: TCP
+          port: {{ $np.dataBridgePort }}
+        - protocol: TCP
+          port: {{ $np.monitorPort }}
+{{- if $np.allowExternalEgress }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-external-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - {{ $np.metadataCidr | quote }}
+              {{- range $np.privateEgressCidrs }}
+              - {{ . | quote }}
+              {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: session-allow-sidecars
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: session-network-policy
+spec:
+  podSelector:
+    matchLabels:
+      {{- toYaml $sessionSelector | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Language servers run as sidecar pods in this namespace, and the private
+    # ranges above no longer cover them.
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: theia-cloud.io/sidecar
+                operator: Exists
+{{- end }}
+{{- end }}

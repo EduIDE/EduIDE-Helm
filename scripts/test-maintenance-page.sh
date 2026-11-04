@@ -20,8 +20,10 @@ bad() { printf '  FAIL  %s\n' "$1"; [[ -n "${2:-}" ]] && printf '        %s\n' "
   echo "could not resolve chart dependencies" >&2; exit 1; }
 
 render() {
+  # keycloak.cookieSecret is required (no committed default); like skipPreflight
+  # and allowUnauthenticated above, a dummy value just lets the chart render.
   helm template t "$CHART" --set skipPreflight=true --set demoApplication.install=false \
-    --set keycloak.allowUnauthenticated=true "$@" 2>/dev/null
+    --set keycloak.allowUnauthenticated=true --set keycloak.cookieSecret=test-render-secret "$@" 2>/dev/null
 }
 
 # expect <label> <expected> <actual>
