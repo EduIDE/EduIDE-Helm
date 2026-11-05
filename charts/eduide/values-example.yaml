@@ -84,15 +84,18 @@ operator:
 app:
   name: EduIDE
 landingPage:
+  # To turn it on, set enable: true and dsn to your own Sentry endpoint.
   sentry:
     enable: false
+    dsn: ""
   infoTitle: Welcome to EduIDE
 
 # ---------------------------------------------------------------------------
 # Telemetry - off by default for installations outside TUM
 # ---------------------------------------------------------------------------
-# The Sentry DSN is compiled into the images and points at TUM's Sentry, so
-# leaving these on sends your hostnames and namespace names there.
+# The service and operator images have TUM's Sentry DSN compiled in, so turning
+# these on sends your hostnames and namespace names there. The landing page has
+# no built-in DSN and reports only to landingPage.sentry.dsn.
 service:
   sentry:
     enable: false

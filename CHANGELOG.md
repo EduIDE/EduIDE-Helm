@@ -3,6 +3,7 @@
 ## Unreleased
 
 - [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
+- [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
 
 ## [eduide 2.5.1] - 2026-10-10
 
