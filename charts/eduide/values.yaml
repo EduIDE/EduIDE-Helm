@@ -125,10 +125,12 @@ landingPage:
   # -- Values related to Sentry on the landing page.
   # @default -- (see details below)
   sentry:
-    # -- Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the
-    # DSN is compiled into the published images and points at TUM's Sentry, so
-    # enabling this outside TUM sends your hostnames and namespace names there.
+    # -- Turn on Sentry browser monitoring on the landing page. Off by default, and
+    # it stays off until landingPage.sentry.dsn is set too.
     enable: false
+    # -- The Sentry endpoint the landing page reports to. The landing page has no
+    # built-in default.
+    dsn: ""
   # -- the app id to launch
   appDefinition: "java-17-templates-latest"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.

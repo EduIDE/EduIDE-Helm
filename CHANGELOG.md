@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
+
 ## [eduide 2.5.1] - 2026-10-10
 
 Security hardening (secure-by-default; environments already override the sensitive values):
