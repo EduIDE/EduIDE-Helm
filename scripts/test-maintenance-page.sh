@@ -105,5 +105,34 @@ expect "PDB selects the landing page pods" "landing-page" \
   "$(render --set landingPage.replicas=2 | yq -r 'select(.kind=="PodDisruptionBudget") | .spec.selector.matchLabels.app')"
 
 echo
+echo "=== landing page runs without root ==="
+
+landing() { deploy landing-page-deployment "$1"; }
+
+expect "containerPort is 8080" "8080" "$(landing '.spec.template.spec.containers[0].ports[0].containerPort')"
+expect "readiness probe uses 8080" "8080" "$(landing '.spec.template.spec.containers[0].readinessProbe.httpGet.port')"
+expect "Service targets 8080" "8080" \
+  "$(yq -r 'select(.kind=="Service" and .metadata.name=="landing-page-service") | .spec.ports[0].targetPort' <<<"$OUT")"
+# Routes address the Service, so its own port must not follow the container.
+expect "Service stays on 80" "80" \
+  "$(yq -r 'select(.kind=="Service" and .metadata.name=="landing-page-service") | .spec.ports[0].port' <<<"$OUT")"
+expect "route still points at 80" "80" \
+  "$(yq -r 'select(.kind=="HTTPRoute" and .metadata.name=="landing-route") | .spec.rules[0].backendRefs[0].port' <<<"$OUT")"
+expect "pod: runAsNonRoot" "true" "$(landing '.spec.template.spec.securityContext.runAsNonRoot')"
+expect "pod: seccomp RuntimeDefault" "RuntimeDefault" "$(landing '.spec.template.spec.securityContext.seccompProfile.type')"
+expect "container: no privilege escalation" "false" "$(landing '.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation')"
+expect "container: read-only root filesystem" "true" "$(landing '.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem')"
+expect "container: drops all capabilities" "ALL" "$(landing '.spec.template.spec.containers[0].securityContext.capabilities.drop | join(" ")')"
+# Without this nginx cannot write its pid file on the read-only root filesystem.
+expect "/tmp is mounted" "/tmp" "$(landing '.spec.template.spec.containers[0].volumeMounts[] | select(.name=="tmp") | .mountPath')"
+expect "/tmp is an emptyDir" "{}" "$(landing '.spec.template.spec.volumes[] | select(.name=="tmp") | .emptyDir')"
+
+trusted() { yq -r 'select(.kind=="ConfigMap" and .metadata.name=="landing-page-config") | .data."config.js"' | grep trustedArtemisHosts | tr -d ' '; }
+
+expect "no trustedArtemisHosts by default" "" "$(trusted <<<"$OUT")"
+expect "trustedArtemisHosts renders quoted strings" 'trustedArtemisHosts:["a.example.edu","b.example.edu"],' \
+  "$(render --set 'landingPage.trustedArtemisHosts={a.example.edu,b.example.edu}' | trusted)"
+
+echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
 exit $FAILED

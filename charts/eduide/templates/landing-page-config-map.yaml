@@ -72,6 +72,9 @@ data:
       {{- if .Values.landingPage.sentry.dsn }}
       sentryDsn: {{ tpl (.Values.landingPage.sentry.dsn | toString) . | quote }},
       {{- end }}
+      {{- if .Values.landingPage.trustedArtemisHosts }}
+      trustedArtemisHosts: {{ .Values.landingPage.trustedArtemisHosts | toJson }},
+      {{- end }}
       {{- /*
       What the privacy page is allowed to state about this installation.
 
