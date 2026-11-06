@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.7.0] - 2026-11-06
+
+- [eduide] Let the operator get, create, update, patch and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections ([EduIDE-Cloud#157](https://github.com/EduIDE/EduIDE-Cloud/issues/157)). No list or watch: the operator reads each Secret by name
+
 ## [eduide 2.6.0] - 2026-11-06
 
 - [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
