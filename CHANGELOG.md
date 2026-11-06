@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## [eduide 2.6.0] - 2026-11-06
+
+- [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
+- [eduide-cluster] [eduide] Stop serving AppDefinition versions the conversion webhook cannot map ([#52](https://github.com/EduIDE/EduIDE-Helm/pull/52)). This merged after 2.5.1 was published without a version bump, so 2.6.0 is the first chart that carries it
+
+## [eduide 2.5.1] - 2026-11-06
 
 - [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
 - [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
@@ -13,8 +18,6 @@ Upgrade notes:
 
 - This chart needs a landing page image that listens on 8080: the release containing the non-root change. An older image runs as root, so its pods do not start under `runAsNonRoot`. If you override `versions.landingPage` or `landingPage.image`, move them to that release
 - Installations relying on Artemis auto-start must set `landingPage.trustedArtemisHosts`. The default is empty, so every such link waits for a click
-
-## [eduide 2.5.1] - 2026-10-10
 
 Security hardening (secure-by-default; environments already override the sensitive values):
 
