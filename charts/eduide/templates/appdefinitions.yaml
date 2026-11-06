@@ -64,7 +64,7 @@ spec:
   mountPath: {{ $app.mountPath | default $d.mountPath | default "/home/project" }}
   timeout: {{ $app.timeout | default $d.timeout | default 1440 }}
   monitor:
-    port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 3000 }}
+    port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 8081 }}
     activityTracker:
       timeoutAfter: {{ ((($app.monitor).activityTracker).timeoutAfter) | default ((($d.monitor).activityTracker).timeoutAfter) | default 60 }}
       notifyAfter: {{ ((($app.monitor).activityTracker).notifyAfter) | default ((($d.monitor).activityTracker).notifyAfter) | default 55 }}
