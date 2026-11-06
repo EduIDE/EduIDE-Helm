@@ -87,8 +87,9 @@ watching `main`. Full procedure in the README, and as a skill in
   drift.
 - `kubeconform` skips `HTTPRoute`: the CRDs-catalog schema declares
   `minItems: 1` on `spec.rules`, but the upstream Gateway API CRD does not, and
-  `httproute-instances.yaml` ships `rules: []` deliberately for the operator to
-  patch.
+  `httproute-instances.yaml` deliberately omits the field. The operator does not
+  patch that route - it reads its `parentRefs` and `hostnames` and copies them
+  onto a new, Session-owned route per session.
 
 ## Renovate
 
