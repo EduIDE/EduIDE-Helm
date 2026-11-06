@@ -40,15 +40,20 @@ echo "=== app definitions, landing page and preloading agree ==="
 
 OUT=$(render) || { echo "  chart does not render"; exit 1; }
 
-declared=$(yq -r '.appDefinitions.enabled[]' "$CHART/values.yaml" | sort)
-# Written out on purpose: every installation that keeps the defaults gets this
-# set, so adding to it is a decision for each of them, not a side effect of
-# adding an image to the catalog.
-default_set=$(printf '%s\n' c-latest c-templates-latest java-17-latest java-17-templates-latest javascript-latest python-latest)
-if [[ "$declared" == "$default_set" ]]; then
-  ok "the chart enables exactly the default set"
+declared=$(yq -r '.appDefinitions.catalog | keys | .[]' "$CHART/values.yaml" | sort)
+# Written out on purpose: the catalog is what EduIDE officially releases, and
+# every installation on chart defaults offers all of it. A custom build for one
+# installation does not belong here.
+official=$(printf '%s\n' c c-templates java-17 java-17-templates java-25 java-25-templates javascript python)
+if [[ "$declared" == "$official" ]]; then
+  ok "the catalog holds exactly the official images"
 else
-  bad "appDefinitions.enabled is not the default set" "$(diff <(echo "$default_set") <(echo "$declared") | tr '\n' ' ')"
+  bad "appDefinitions.catalog is not the official image set" "$(diff <(echo "$official") <(echo "$declared") | tr '\n' ' ')"
+fi
+if [[ "$(yq -r '.appDefinitions.enabled | length' "$CHART/values.yaml")" == 0 ]]; then
+  ok "enabled is empty by default, so the defaults offer the whole catalog"
+else
+  bad "appDefinitions.enabled is not empty by default"
 fi
 defs=$(yq -r 'select(.kind=="AppDefinition") | .metadata.name' <<<"$OUT" | grep -v '^---$' | sort)
 
@@ -130,9 +135,9 @@ preloaded_images() {
     | grep -v '^---$' | sort
 }
 
-out=$(render --set-json 'appDefinitions.enabled=["java-17-latest","python-latest"]')
-if [[ "$(app_names <<<"$out")" == "java-17-latest python-latest " \
-      && "$(offered_names <<<"$out")" == "java-17-latest python-latest " ]]; then
+out=$(render --set-json 'appDefinitions.enabled=["java-17","python"]')
+if [[ "$(app_names <<<"$out")" == "java-17 python " \
+      && "$(offered_names <<<"$out")" == "java-17 python " ]]; then
   ok "enabled restricts the AppDefinitions and the landing page"
 else
   bad "enabled does not restrict the app list" "defs=[$(app_names <<<"$out")] offered=[$(offered_names <<<"$out")]"
@@ -142,24 +147,24 @@ fi
 custom=$(mktemp)
 cat > "$custom" <<'EOF'
 appDefinitions:
-  enabled: [python-latest]
+  enabled: [haskell, python]
   apps:
-    haskell-latest:
+    haskell:
       image: registry.example.edu/ide/haskell:2.1.0
       limitsMemory: 4000M
       landingPage:
         label: Haskell
         image: theia-logo.png
-    python-latest:
+    python:
       landingPage:
         label: Python 3
 EOF
 out=$(render -f "$custom")
 rm -f "$custom"
-hs=$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="haskell-latest") | .spec.image + " " + .spec.limitsMemory' <<<"$out" | grep -v '^---$')
+hs=$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="haskell") | .spec.image + " " + .spec.limitsMemory' <<<"$out" | grep -v '^---$')
 if [[ "$hs" == "registry.example.edu/ide/haskell:2.1.0 4000M" \
-      && "$(app_names <<<"$out")" == "haskell-latest python-latest " \
-      && "$(offered_names <<<"$out")" == "haskell-latest python-latest " ]] \
+      && "$(app_names <<<"$out")" == "haskell python " \
+      && "$(offered_names <<<"$out")" == "haskell python " ]] \
    && preloaded_images <<<"$out" | grep -qx 'registry.example.edu/ide/haskell:2.1.0'; then
   ok "a custom app renders, is offered and preloaded, with its image passed through"
 else
@@ -167,13 +172,13 @@ else
 fi
 # An override changes one field and keeps the rest of the catalog entry.
 if grep -q 'appName: "Python 3"' <<<"$out" \
-   && [[ "$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="python-latest") | .spec.image' <<<"$out" | grep -v '^---$')" == ghcr.io/eduide/eduide/python:* ]]; then
+   && [[ "$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="python") | .spec.image' <<<"$out" | grep -v '^---$')" == ghcr.io/eduide/eduide/python:* ]]; then
   ok "an apps entry merges over its catalog entry"
 else
   bad "an apps entry must merge over its catalog entry, not replace it"
 fi
 # false has to win over the catalog too, which sprig's mergeOverwrite would drop.
-if render --set appDefinitions.apps.python-latest.landingPage.visible=false | grep -A2 'serviceAuthToken: "python-latest"' | grep -q 'visible: false'; then
+if render --set appDefinitions.apps.python.landingPage.visible=false | grep -A2 'serviceAuthToken: "python"' | grep -q 'visible: false'; then
   ok "an override can set a field to false"
 else
   bad "an override setting visible: false was lost"
@@ -181,21 +186,47 @@ fi
 
 # null is how every environment removed apps before enabled existed; it must
 # keep removing them, or upgrading the chart brings them all back.
-out=$(render --set-json 'appDefinitions.apps={"c-latest":null}')
-if ! grep -q 'c-latest' <<<"$(app_names <<<"$out") $(offered_names <<<"$out")" \
+out=$(render --set-json 'appDefinitions.apps={"c":null}')
+if ! tr ' ' '\n' <<<"$(app_names <<<"$out") $(offered_names <<<"$out")" | grep -qx 'c' \
    && ! preloaded_images <<<"$out" | grep -q '/c:'; then
   ok "apps.<name>: null removes an enabled app everywhere"
 else
   bad "apps.<name>: null did not remove the app" "defs=[$(app_names <<<"$out")]"
 fi
 
-if err=$(helm template t "$CHART" --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
-      --set keycloak.cookieSecret=test-render-secret --set-json 'appDefinitions.enabled=["no-such-app"]' 2>&1 >/dev/null); then
-  bad "an unknown name in enabled must fail the render"
-elif grep -q 'appDefinitions.enabled lists "no-such-app"' <<<"$err"; then
-  ok "an unknown name in enabled fails the render and names it"
+# An empty enabled offers every definition, the installation's own included.
+out=$(render --set-json 'appDefinitions.apps={"haskell":{"image":"registry.example.edu/ide/haskell:2.1.0"}}')
+if [[ "$(app_names <<<"$out")" == "$(echo $official haskell | tr ' ' '\n' | sort | tr '\n' ' ')" ]]; then
+  ok "an empty enabled renders the whole catalog plus apps"
 else
-  bad "an unknown name in enabled failed without saying why" "$err"
+  bad "an empty enabled did not render every definition" "defs=[$(app_names <<<"$out")]"
+fi
+# Once enabled lists names, an apps entry it does not name stays out, even an override.
+out=$(render --set-json 'appDefinitions.enabled=["python"]' --set appDefinitions.apps.c.minInstances=2)
+if [[ "$(app_names <<<"$out")" == "python " ]]; then
+  ok "an apps entry that enabled does not name is not rendered"
+else
+  bad "an apps entry rendered without being enabled" "defs=[$(app_names <<<"$out")]"
+fi
+
+# An unknown name is skipped and the install or upgrade warns about it.
+if notes=$(helm install t "$CHART" --dry-run=client --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
+      --set keycloak.cookieSecret=test-render-secret --set demoApplication.install=false \
+      --set-json 'appDefinitions.enabled=["python","no-such-app"]' 2>&1); then
+  if grep -q '^  - no-such-app$' <<<"$(sed -n '/^NOTES:/,$p' <<<"$notes")" \
+     && [[ "$(app_names <<<"$(sed '/^NOTES:/,$d' <<<"$notes")")" == "python " ]]; then
+    ok "an unknown name in enabled is skipped and named in a warning"
+  else
+    bad "an unknown name in enabled was not warned about" "$(sed -n '/^NOTES:/,$p' <<<"$notes" | tr '\n' ' ')"
+  fi
+else
+  bad "an unknown name in enabled must not fail the install" "$notes"
+fi
+if helm install t "$CHART" --dry-run=client --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
+      --set keycloak.cookieSecret=test-render-secret 2>&1 | sed -n '/^NOTES:/,$p' | grep -q WARNING; then
+  bad "the defaults print an unknown-app warning"
+else
+  ok "the defaults print no warning"
 fi
 
 # Every catalog entry has to render on its own, or enabling it is the first

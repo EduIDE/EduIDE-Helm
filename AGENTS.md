@@ -114,12 +114,22 @@ a human takes the release decision.
 
 ## eduide.apps is the single source of truth
 
-The `eduide.apps` helper merges `appDefinitions.catalog` (every image EduIDE
-builds), `appDefinitions.enabled` (which catalog names an installation offers)
-and `appDefinitions.apps` (its own apps and overrides) into one map. A new
-catalog entry renders nowhere until an installation enables it; that is the
-point, so do not add it to the default `enabled` list without deciding it for
-every installation on chart defaults, production included.
+The `eduide.apps` helper merges `appDefinitions.catalog` (the images EduIDE
+officially releases) with `appDefinitions.apps` (an installation's own apps and
+overrides), then keeps the names `appDefinitions.enabled` lists, or all of them
+when it is empty. A name in `enabled` with no definition is skipped and
+`NOTES.txt` warns about it on install and upgrade.
+
+**The catalog holds only official releases.** Every image in EduIDE's build
+matrix that is meant for any installation, and nothing else: a custom build for
+one installation (TH Mannheim's `thm-java-25`, for example) is defined in that
+installation's own `apps`. Every installation on chart defaults offers the
+whole catalog, production included, so adding an entry is a decision for all of
+them. `scripts/test-app-consistency.sh` writes the set out and fails when it
+changes.
+
+App names are the plain image name (`java-17`, `c-templates`), without the old
+`-latest` suffix.
 
 Three things derive from that map, each through the helper: the AppDefinition
 custom resources, the app list the landing page offers, and the images the

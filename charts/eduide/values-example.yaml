@@ -111,17 +111,18 @@ service:
 # ---------------------------------------------------------------------------
 # Applications
 # ---------------------------------------------------------------------------
-# The chart enables six by default: Java 17, C, JavaScript, Python and the Java
-# and C template variants. appDefinitions.catalog also has Java 25 and TH
-# Mannheim's Java 25. Each enabled app is preloaded onto every node, so trimming
-# the list to what your courses use saves a lot of disk and pull time.
+# The chart offers everything in appDefinitions.catalog by default: Java 17,
+# Java 25, C, JavaScript, Python and the Java and C template variants. Each
+# offered app is preloaded onto every node, so trimming the list to what your
+# courses use saves a lot of disk and pull time.
 #
 # appDefinitions:
-#   enabled:                  # pick from the catalog
-#     - java-25-templates-latest
-#     - python-latest
+#   enabled:                  # from the catalog or from apps below
+#     - java-25-templates
+#     - python
+#     - haskell
 #   apps:
-#     haskell-latest:         # add your own image
+#     haskell:                # add your own image
 #       image: registry.example.edu/ide/haskell:2.1.0
 #       landingPage:
 #         label: Haskell

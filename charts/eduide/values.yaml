@@ -140,7 +140,7 @@ landingPage:
   # is on this list. Otherwise the student has to click Launch.
   trustedArtemisHosts: []
   # -- the app id to launch
-  appDefinition: "java-17-templates-latest"
+  appDefinition: "java-17-templates"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage.
   ephemeralStorage: true
@@ -636,9 +636,10 @@ monitor:
 # preloaded onto every node. Offering a language is one entry here, not three
 # edits in two repositories.
 #
-# The list is `enabled` (names picked from `catalog`) plus every key in `apps`.
-# Each app is `defaults`, then its `catalog` entry, then its `apps` entry, the
-# later one winning field by field.
+# The definitions are `catalog` plus `apps`; `enabled` picks which of them this
+# installation offers, and empty means all of them. Each app is `defaults`, then
+# its `catalog` entry, then its `apps` entry, the later one winning field by
+# field.
 #
 # Each key is the AppDefinition name. `image` is a repository without a tag -
 # the tag comes from versions.ide (or the chart's appVersion), so a release
@@ -671,23 +672,18 @@ appDefinitions:
       # The monitor extension's own server. Not the app port: there the operator
       # would hit oauth2-proxy, which can never answer the activity poll.
       port: 8081
-  # -- Catalog names this installation offers. Pick from `catalog`; a name that
-  # is not there fails the render. Apps defined in `apps` render without being
-  # listed here.
-  enabled:
-    - java-17-latest
-    - java-17-templates-latest
-    - c-latest
-    - c-templates-latest
-    - javascript-latest
-    - python-latest
-  # -- Every IDE image EduIDE builds, ready to enable by name. Owned by the
-  # chart: change an entry for one installation through `apps`, not here.
-  # Nothing in the catalog renders unless `enabled` or `apps` names it, so a new
-  # entry cannot silently appear in an existing installation.
+  # -- The apps this installation offers, by name from `catalog` or `apps`.
+  # Empty offers every definition. A name with neither is skipped, and
+  # `helm install`/`helm upgrade` print a warning naming it.
+  enabled: []
+  # -- The IDE images EduIDE officially releases. An image only one
+  # installation uses (TH Mannheim's thm-java-25) belongs in that
+  # installation's `apps`, not here. Owned by the chart: change an entry for
+  # one installation through `apps`. An installation that lists `enabled` gets
+  # a new catalog entry only once it names it there.
   # @default -- (see values.yaml)
   catalog:
-    java-17-latest:
+    java-17:
       image: eduide/java-17
       requestsCpu: 500m
       limitsMemory: 3000M
@@ -698,7 +694,7 @@ appDefinitions:
         # Deployable and startable by name, but not offered in the drop-down -
         # the -templates variant is what students pick.
         visible: false
-    java-17-templates-latest:
+    java-17-templates:
       image: eduide/java-17-templates
       requestsCpu: 500m
       limitsMemory: 3000M
@@ -709,7 +705,7 @@ appDefinitions:
         buildSystems:
           - { id: maven, label: Maven }
           - { id: gradle, label: Gradle }
-    java-25-latest:
+    java-25:
       image: eduide/java-25
       requestsCpu: 500m
       limitsMemory: 3000M
@@ -720,7 +716,7 @@ appDefinitions:
         # "Java 25" becomes java-25-logo.png, which it does not ship, so the
         # tile would show a broken image. The general Java logo it does ship.
         image: java-logo.png
-    java-25-templates-latest:
+    java-25-templates:
       image: eduide/java-25-templates
       requestsCpu: 500m
       limitsMemory: 3000M
@@ -730,42 +726,36 @@ appDefinitions:
         buildSystems:
           - { id: maven, label: Maven }
           - { id: gradle, label: Gradle }
-    c-latest:
+    c:
       image: eduide/c
       landingPage:
         label: C
         visible: false
-    c-templates-latest:
+    c-templates:
       image: eduide/c-templates
       landingPage:
         label: C
         buildSystems:
           - { id: bazel, label: Bazel }
           - { id: make, label: Make }
-    javascript-latest:
+    javascript:
       image: eduide/javascript
       landingPage:
         label: Javascript
-    python-latest:
+    python:
       image: eduide/python
       landingPage:
         label: Python
-    # TH Mannheim's own Java 25 image. In EduIDE's build matrix, so it carries
-    # the same numbered tag as every other IDE image and needs no pin of its own.
-    thm-java-25-latest:
-      image: eduide/thm-java-25
-      landingPage:
-        label: Java 25
-        image: java-logo.png
-  # -- This installation's own apps, and overrides of catalog entries. Every
-  # key renders, enabled or not. A key matching a catalog entry is merged over
-  # it, so `java-17-latest: {minInstances: 10}` changes one field. `<name>: null`
-  # removes an app even when `enabled` lists it.
+  # -- This installation's own apps, and overrides of catalog entries. A key
+  # matching a catalog entry is merged over it, so
+  # `java-17: {minInstances: 10}` changes one field. `<name>: null`
+  # removes an app. Like catalog entries, these render only if `enabled` names
+  # them or `enabled` is empty.
   #
   # An app the catalog does not have, from your own registry:
   #
   #     apps:
-  #       haskell-latest:
+  #       haskell:
   #         image: registry.example.edu/ide/haskell:2.1.0
   #         limitsMemory: 4000M
   #         landingPage:

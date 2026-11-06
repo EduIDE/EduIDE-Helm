@@ -38,19 +38,22 @@ puts the rest of the namespace into `ImagePullBackOff`.
 
 ## Choosing and adding IDE apps
 
-`appDefinitions.catalog` holds every IDE image EduIDE builds. An installation
-picks from it with `appDefinitions.enabled`, and adds its own apps or changes a
-catalog entry under `appDefinitions.apps`:
+`appDefinitions.catalog` holds the IDE images EduIDE officially releases.
+An installation adds its own apps or changes a catalog entry under
+`appDefinitions.apps`, and picks what it offers with `appDefinitions.enabled`.
+An empty `enabled` (the default) offers every definition, catalog and `apps`
+alike:
 
 ```yaml
 appDefinitions:
-  enabled:                         # catalog names to offer
-    - java-25-templates-latest
-    - python-latest
+  enabled:                  # names from the catalog or from apps
+    - java-25-templates
+    - python
+    - haskell
   apps:
-    python-latest:                 # merged over the catalog entry
+    python:                 # merged over the catalog entry
       limitsMemory: 4000M
-    haskell-latest:                # your own image; renders without being enabled
+    haskell:                # your own image
       image: registry.example.edu/ide/haskell:2.1.0   # a tag or digest is used as given
       limitsMemory: 4000M
       landingPage:
@@ -60,8 +63,9 @@ appDefinitions:
 
 Each app is `appDefinitions.defaults`, then its catalog entry, then its `apps`
 entry. A bare repository such as `eduide/java-17` gets the tag from
-`versions.ide`. `apps.<name>: null` removes an app even if `enabled` lists it,
-and a name in `enabled` that the catalog does not have fails the render.
+`versions.ide`. `apps.<name>: null` removes an app. A name in `enabled` with
+no definition is skipped, and `helm install` or `helm upgrade` prints a warning
+naming it.
 
 That one merged list drives the AppDefinition custom resource, the landing
 page's app list, and the set of images preloaded onto every node. It used to be

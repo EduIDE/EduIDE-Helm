@@ -92,31 +92,57 @@ Call with (dict "app" $app "ctx" $).
 {{- end -}}
 
 {{/*
-The apps this installation renders, as JSON: every catalog entry named in
-appDefinitions.enabled, plus every key in appDefinitions.apps merged over its
-catalog entry. `apps.<name>: null` removes one. Every consumer reads this one
-map, so the AppDefinitions, the landing page and preloading cannot disagree.
-defaults are not merged in here; each consumer falls back to them per field.
+Every app definition this installation knows, as JSON: appDefinitions.catalog
+with each appDefinitions.apps entry merged over the catalog entry of the same
+name, or added if the catalog has none. `apps.<name>: null` removes one.
 */}}
-{{- define "eduide.apps" -}}
+{{- define "eduide.appDefinitions" -}}
 {{- $ad := .Values.appDefinitions | default dict -}}
-{{- $catalog := $ad.catalog | default dict -}}
-{{- $out := dict -}}
-{{- range $name := ($ad.enabled | default list) -}}
-{{- if not (hasKey $catalog $name) -}}
-{{- fail (printf "appDefinitions.enabled lists %q, which is not in appDefinitions.catalog. Define it under appDefinitions.apps instead" $name) -}}
-{{- end -}}
-{{- $_ := set $out $name (index $catalog $name | default dict) -}}
-{{- end -}}
+{{- $out := deepCopy ($ad.catalog | default dict) -}}
 {{- range $name, $app := ($ad.apps | default dict) -}}
 {{- if kindIs "invalid" $app -}}
 {{- $_ := unset $out $name -}}
 {{- else -}}
-{{- $base := get $out $name | default (get $catalog $name) | default dict -}}
-{{- $_ := set $out $name (include "eduide.deepMerge" (dict "base" $base "over" $app) | fromJson) -}}
+{{- $_ := set $out $name (include "eduide.deepMerge" (dict "base" (get $out $name | default dict) "over" $app) | fromJson) -}}
 {{- end -}}
 {{- end -}}
 {{- toJson $out -}}
+{{- end -}}
+
+{{/*
+The apps this installation renders, as JSON: the definitions appDefinitions.enabled
+names, or all of them when enabled is empty. A name with no definition is
+skipped, and NOTES.txt warns about it. Every consumer reads this one map, so the
+AppDefinitions, the landing page and preloading cannot disagree. defaults are
+not merged in here; each consumer falls back to them per field.
+*/}}
+{{- define "eduide.apps" -}}
+{{- $all := include "eduide.appDefinitions" . | fromJson -}}
+{{- $enabled := .Values.appDefinitions.enabled | default list -}}
+{{- if not $enabled -}}
+{{- toJson $all -}}
+{{- else -}}
+{{- $out := dict -}}
+{{- range $name := $enabled -}}
+{{- if hasKey $all $name -}}
+{{- $_ := set $out $name (get $all $name) -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Names in appDefinitions.enabled with no definition in the catalog or in apps,
+one per line. Usually a typo, or an app the chart no longer ships.
+*/}}
+{{- define "eduide.unknownEnabledApps" -}}
+{{- $all := include "eduide.appDefinitions" . | fromJson -}}
+{{- range $name := (.Values.appDefinitions.enabled | default list) -}}
+{{- if not (hasKey $all $name) }}
+{{ $name }}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
