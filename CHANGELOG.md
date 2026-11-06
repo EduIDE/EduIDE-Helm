@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.7.2] - 2026-11-06
+
+- [eduide] Fix image preloading on 2.7.1: the oauth2-proxy image is distroless, so the default `/bin/sh -c echo` init container could not start (`StartError`, CrashLoopBackOff on every node). It now runs `/bin/oauth2-proxy --version`, which exits 0
+
 ## [eduide 2.7.1] - 2026-11-06
 
 - [eduide] Preload the oauth2-proxy image (`quay.io/oauth2-proxy/oauth2-proxy:<operator.oAuth2ProxyVersion>`) when Keycloak is on. Every session pod runs it as a sidecar, so a node without it pulled it on the first session

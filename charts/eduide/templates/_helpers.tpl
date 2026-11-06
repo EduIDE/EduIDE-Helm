@@ -184,9 +184,11 @@ disagree with what the installation offers.
 {{- end -}}
 {{- /* With Keycloak the operator starts every session pod with an oauth2-proxy
 sidecar, so a cold node would pull it on the first session. Same image and tag
-the operator uses (its default is "latest"). */ -}}
+the operator uses (its default is "latest"). The image is distroless - no
+/bin/sh for the default echo - so it runs its own binary, which exits 0. */ -}}
 {{- if .Values.keycloak.enable -}}
-{{- $out = append $out (printf "quay.io/oauth2-proxy/oauth2-proxy:%s" (tpl (.Values.operator.oAuth2ProxyVersion | default "latest" | toString) .)) -}}
+{{- $proxy := printf "quay.io/oauth2-proxy/oauth2-proxy:%s" (tpl (.Values.operator.oAuth2ProxyVersion | default "latest" | toString) .) -}}
+{{- $out = append $out (dict "image" $proxy "command" (list "/bin/oauth2-proxy") "args" (list "--version")) -}}
 {{- end -}}
 {{- end -}}
 {{- range $extra := (.Values.preloading.images | default list) -}}
