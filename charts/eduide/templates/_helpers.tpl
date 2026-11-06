@@ -182,6 +182,12 @@ disagree with what the installation offers.
 {{- $out = append $out (include "eduide.appImage" (dict "app" $sc "ctx" $ctx)) -}}
 {{- end -}}
 {{- end -}}
+{{- /* With Keycloak the operator starts every session pod with an oauth2-proxy
+sidecar, so a cold node would pull it on the first session. Same image and tag
+the operator uses (its default is "latest"). */ -}}
+{{- if .Values.keycloak.enable -}}
+{{- $out = append $out (printf "quay.io/oauth2-proxy/oauth2-proxy:%s" (tpl (.Values.operator.oAuth2ProxyVersion | default "latest" | toString) .)) -}}
+{{- end -}}
 {{- end -}}
 {{- range $extra := (.Values.preloading.images | default list) -}}
 {{- $out = append $out $extra -}}

@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.7.1] - 2026-11-06
+
+- [eduide] Preload the oauth2-proxy image (`quay.io/oauth2-proxy/oauth2-proxy:<operator.oAuth2ProxyVersion>`) when Keycloak is on. Every session pod runs it as a sidecar, so a node without it pulled it on the first session
+
 ## [eduide 2.7.0] - 2026-11-06
 
 - [eduide] Split the app list into `appDefinitions.catalog` (the IDE images EduIDE officially releases), `appDefinitions.apps` (an installation's own apps and overrides, merged over the catalog entry of the same name) and `appDefinitions.enabled` (the names an installation offers; empty offers every definition)
