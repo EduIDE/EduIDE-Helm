@@ -51,7 +51,7 @@ env:
   # landed days later. A release would then have verified ten of twelve and
   # passed, while pinning two tags that were never pushed - which is precisely
   # the failure this job exists to prevent.
-  OTHER_IMAGES: "eduidec-landing-page"
+  OTHER_IMAGES: "eduide-landing-page"
 
 jobs:
   validate:
@@ -96,6 +96,12 @@ jobs:
         run: |
           set -euo pipefail
           wf=$([[ "${{ matrix.repo }}" == "EduIDE-Landing-Page" ]] && echo docker-build.yml || echo build.yml)
+          # The wait step looks for a run of this workflow created after this
+          # moment, not just the newest run of anything in the repository.
+          {
+            echo "WF=$wf"
+            echo "DISPATCHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_ENV"
           gh workflow run "$wf" --repo "EduIDE/${{ matrix.repo }}" --ref main -f image_tag="$V"
           echo "dispatched $wf on ${{ matrix.repo }} with image_tag=$V"
 
@@ -108,9 +114,14 @@ jobs:
           sleep 20
           for _ in $(seq 1 120); do
             read -r run_id status conclusion < <(
-              gh run list --repo "EduIDE/${{ matrix.repo }}" --limit 1 \
+              gh run list --repo "EduIDE/${{ matrix.repo }}" --workflow "$WF" \
+                --event workflow_dispatch --created ">=$DISPATCHED_AT" --limit 1 \
                 --json databaseId,status,conclusion \
-                --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"')
+                --jq '.[0] | "\(.databaseId) \(.status) \(.conclusion)"') || true
+            if [[ -z "${run_id:-}" || "$run_id" == "null" ]]; then
+              sleep 30
+              continue
+            fi
             if [[ "$status" == "completed" ]]; then
               if [[ "$conclusion" != "success" ]]; then
                 echo "::error::${{ matrix.repo }} build ${run_id} concluded ${conclusion}"
@@ -257,7 +268,9 @@ jobs:
           V: ${{ needs.validate.outputs.version }}
         run: |
           set -euo pipefail
-          git tag -a "v${V}" -m "EduIDE ${V}"
+          # Lightweight on purpose: `git tag -a` needs a committer identity,
+          # which actions/checkout does not configure.
+          git tag "v${V}"
           git push origin "v${V}"
 
       - name: Publish both charts
