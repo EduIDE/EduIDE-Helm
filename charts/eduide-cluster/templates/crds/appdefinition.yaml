@@ -148,7 +148,12 @@ spec:
           required:
             - spec
     - name: v1beta10
-      served: true
+      # Not served: the conversion webhook image has no mapper for v1beta11, so
+      # every read or write at this version fails. Serving it also made the
+      # apiserver's watch cache retry in a loop, ~6 errors a second, which
+      # drowned the k3s log. Nothing is stored at this version
+      # (storedVersions is v1beta11 only), so nothing needs migrating.
+      served: false
       storage: false
       # subresources describes the subresources for custom resources.
       subresources:
@@ -244,7 +249,12 @@ spec:
           required:
             - spec
     - name: v1beta9
-      served: true
+      # Not served: the conversion webhook image has no mapper for v1beta11, so
+      # every read or write at this version fails. Serving it also made the
+      # apiserver's watch cache retry in a loop, ~6 errors a second, which
+      # drowned the k3s log. Nothing is stored at this version
+      # (storedVersions is v1beta11 only), so nothing needs migrating.
+      served: false
       storage: false
       # subresources describes the subresources for custom resources.
       subresources:
@@ -332,7 +342,12 @@ spec:
           required:
             - spec
     - name: v1beta8
-      served: true
+      # Not served: the conversion webhook image has no mapper for v1beta11, so
+      # every read or write at this version fails. Serving it also made the
+      # apiserver's watch cache retry in a loop, ~6 errors a second, which
+      # drowned the k3s log. Nothing is stored at this version
+      # (storedVersions is v1beta11 only), so nothing needs migrating.
+      served: false
       storage: false
       # subresources describes the subresources for custom resources.
       subresources:
