@@ -30,7 +30,7 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
-          version: v3.14.0
+          version: v3.16.3
 
       - name: Login to GHCR
         env:
@@ -116,6 +116,8 @@ jobs:
 
       - name: Package and publish charts
         id: publish
+        env:
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
@@ -135,6 +137,12 @@ jobs:
             ref="${OCI_PREFIX}/${chart}"
 
             if helm show chart "${ref}" --version "${version}" >/dev/null 2>&1; then
+              # A chart change merged without a bump would otherwise vanish here:
+              # main has the fix, the published chart never gets it.
+              if [[ "$GITHUB_EVENT_NAME" == "push" ]] && ! git diff --quiet "$BEFORE" HEAD -- "charts/${chart}"; then
+                echo "::error file=charts/${chart}/Chart.yaml::${chart} changed in this push but ${version} is already published. Bump the chart version in a new pull request."
+                exit 1
+              fi
               echo "Chart ${chart}:${version} already published, skipping"
               continue
             fi
@@ -239,7 +247,7 @@ jobs:
       - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
-          version: v3.14.0
+          version: v3.16.3
 
       - name: Login to GHCR
         env:
