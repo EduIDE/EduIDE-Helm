@@ -96,7 +96,9 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.privacy.scientificUse | bool | `false` | State that anonymised usage data may also be used for scientific research. Leave off unless this installation has a legal basis for it: this is a processing purpose, not a cosmetic string. |
 | landingPage.replicas | int | `1` | Number of landing page pods. More than one keeps the landing page up when a node goes away, and turns on its PodDisruptionBudget. |
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
-| landingPage.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the landing page deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
+| landingPage.sentry.dsn | string | `""` | The Sentry endpoint the landing page reports to. The landing page has no built-in default. |
+| landingPage.sentry.enable | bool | `false` | Turn on Sentry browser monitoring on the landing page. Off by default, and it stays off until landingPage.sentry.dsn is set too. |
+| landingPage.trustedArtemisHosts | list | `[]` | Hostnames trusted to start a session from a link. A link with `artemisToken` only starts a session on its own when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch. |
 | maintenancePage | object | (see details below) | Static page shown instead of Envoy's raw error when the landing page is down |
 | maintenancePage.enabled | bool | `true` | Answer 502/503/504 on the landing route with files/maintenance.html ("EduIDE is currently unavailable") instead of Envoy's plain-text error. Covers the landing page only - the REST service and sessions keep their own errors. Needs Envoy Gateway (BackendTrafficPolicy responseOverride). |
 | monitor | object | (see details below) | Values to influence the monitor initialization on the operator |
