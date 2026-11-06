@@ -231,6 +231,16 @@ else
   bad "session egress must exclude private ranges and the metadata endpoint" "except=[$excluded]"
 fi
 
+# The footer version used to be a hand-set string that drifted from the deploy.
+footer_version() { render "$@" | grep -m1 -o 'version: "[^"]*"'; }
+expect_version() {
+  local want=$1; shift
+  if [[ "$(footer_version "$@")" == "version: \"$want\"" ]]; then ok "footer version $want"; else bad "footer version should be $want" "got: $(footer_version "$@")"; fi
+}
+expect_version "v$(yq -r .versions.landingPage "$CHART/values.yaml")"
+expect_version "pr-53" --set 'landingPage.image=ghcr.io/eduide/eduide-landing-page:pr-53'
+expect_version "Staging" --set landingPage.footerLinks.attribution.version=Staging
+
 echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"
 exit $FAILED

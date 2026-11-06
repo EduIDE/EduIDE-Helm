@@ -235,7 +235,8 @@ landingPage:
   #   text: "Built by TUM AET Team 👨‍💻"
   #   # -- URL to link to (e.g., team website)
   #   url: "https://aet.cit.tum.de/"
-  #   # -- Version string to display (e.g., "v1.0.0")
+  #   # -- Version string to display. Defaults to the tag of landingPage.image,
+  #   # with a "v" in front of a numeric tag (1.2.2 shows as "v1.2.2").
   #   version: "v1.0.0"
   #
   # # -- Optional: Bug report link
