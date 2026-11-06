@@ -92,6 +92,51 @@ Call with (dict "app" $app "ctx" $).
 {{- end -}}
 
 {{/*
+The apps this installation renders, as JSON: every catalog entry named in
+appDefinitions.enabled, plus every key in appDefinitions.apps merged over its
+catalog entry. `apps.<name>: null` removes one. Every consumer reads this one
+map, so the AppDefinitions, the landing page and preloading cannot disagree.
+defaults are not merged in here; each consumer falls back to them per field.
+*/}}
+{{- define "eduide.apps" -}}
+{{- $ad := .Values.appDefinitions | default dict -}}
+{{- $catalog := $ad.catalog | default dict -}}
+{{- $out := dict -}}
+{{- range $name := ($ad.enabled | default list) -}}
+{{- if not (hasKey $catalog $name) -}}
+{{- fail (printf "appDefinitions.enabled lists %q, which is not in appDefinitions.catalog. Define it under appDefinitions.apps instead" $name) -}}
+{{- end -}}
+{{- $_ := set $out $name (index $catalog $name | default dict) -}}
+{{- end -}}
+{{- range $name, $app := ($ad.apps | default dict) -}}
+{{- if kindIs "invalid" $app -}}
+{{- $_ := unset $out $name -}}
+{{- else -}}
+{{- $base := get $out $name | default (get $catalog $name) | default dict -}}
+{{- $_ := set $out $name (include "eduide.deepMerge" (dict "base" $base "over" $app) | fromJson) -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+
+{{/*
+`over` merged into `base`, map by map, as JSON. Not sprig's mergeOverwrite: it
+skips false and 0, so `visible: false` could not override a catalog entry.
+*/}}
+{{- define "eduide.deepMerge" -}}
+{{- $out := deepCopy .base -}}
+{{- range $k, $v := .over -}}
+{{- $cur := get $out $k -}}
+{{- if and (kindIs "map" $v) (kindIs "map" $cur) -}}
+{{- $_ := set $out $k (include "eduide.deepMerge" (dict "base" $cur "over" $v) | fromJson) -}}
+{{- else -}}
+{{- $_ := set $out $k $v -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+
+{{/*
 Every image this installation needs on every node: one per app, one per
 sidecar, plus the landing page. Derived rather than listed, so it cannot
 disagree with what the installation offers.
@@ -103,8 +148,9 @@ disagree with what the installation offers.
 {{- $out = append $out (tpl (.Values.landingPage.image | toString) .) -}}
 {{- end -}}
 {{- $ctx := . -}}
-{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) -}}
-{{- $app := index $ctx.Values.appDefinitions.apps $name -}}
+{{- $apps := include "eduide.apps" . | fromJson -}}
+{{- range $name := ($apps | keys | sortAlpha) -}}
+{{- $app := index $apps $name -}}
 {{- $out = append $out (include "eduide.appImage" (dict "app" $app "ctx" $ctx)) -}}
 {{- range $sc := ($app.sidecars | default list) -}}
 {{- $out = append $out (include "eduide.appImage" (dict "app" $sc "ctx" $ctx)) -}}

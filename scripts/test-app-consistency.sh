@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The three consumers of appDefinitions.apps must agree.
+# The three consumers of the app list must agree.
 #
 # An installation offers an app in three places: the AppDefinition custom
 # resource that makes it deployable, the landing page entry that lets a student
@@ -9,8 +9,9 @@
 # everything except c-templates - students picking it waited for a cold
 # multi-gigabyte pull.
 #
-# They are all derived from one map now. This asserts the derivation, so a
-# template change cannot quietly reintroduce the skew.
+# They are all derived from one map now (eduide.apps: the catalog entries
+# appDefinitions.enabled names, plus appDefinitions.apps). This asserts the
+# derivation, so a template change cannot quietly reintroduce the skew.
 
 set -uo pipefail
 
@@ -39,7 +40,16 @@ echo "=== app definitions, landing page and preloading agree ==="
 
 OUT=$(render) || { echo "  chart does not render"; exit 1; }
 
-declared=$(yq -r '.appDefinitions.apps | keys | .[]' "$CHART/values.yaml" | sort)
+declared=$(yq -r '.appDefinitions.enabled[]' "$CHART/values.yaml" | sort)
+# Written out on purpose: every installation that keeps the defaults gets this
+# set, so adding to it is a decision for each of them, not a side effect of
+# adding an image to the catalog.
+default_set=$(printf '%s\n' c-latest c-templates-latest java-17-latest java-17-templates-latest javascript-latest python-latest)
+if [[ "$declared" == "$default_set" ]]; then
+  ok "the chart enables exactly the default set"
+else
+  bad "appDefinitions.enabled is not the default set" "$(diff <(echo "$default_set") <(echo "$declared") | tr '\n' ' ')"
+fi
 defs=$(yq -r 'select(.kind=="AppDefinition") | .metadata.name' <<<"$OUT" | grep -v '^---$' | sort)
 
 if [[ "$declared" == "$defs" ]]; then
@@ -84,7 +94,7 @@ fi
 # The landing page must not advertise an app that was never deployed.
 offered=$(yq -r 'select(.kind=="ConfigMap" and (.metadata.name|test("landing")))
                  | .data | to_entries[0].value' <<<"$OUT" \
-          | sed -n '/additionalApps: \[/,/^ *\],/p' \
+          | sed -n '/additionalApps: \[/,/^  \],/p' \
           | grep -oE 'serviceAuthToken: "[^"]+"' | sed 's/.*"\(.*\)"/\1/' | sort -u)
 if [[ -z "$offered" ]]; then
   bad "landing page offers no apps at all" ""
@@ -104,6 +114,101 @@ if grep -qx "$default" <<<"$defs"; then
   ok "landingPage.appDefinition '$default' exists"
 else
   bad "landingPage.appDefinition '$default' has no AppDefinition" ""
+fi
+
+echo
+echo "=== enabled, catalog and apps ==="
+
+app_names() { yq -r 'select(.kind=="AppDefinition") | .metadata.name' | grep -v '^---$' | sort | tr '\n' ' '; }
+offered_names() {
+  yq -r 'select(.kind=="ConfigMap" and .metadata.name=="landing-page-config") | .data."config.js"' \
+    | sed -n '/additionalApps: \[/,/^  \],/p' | grep -oE 'serviceAuthToken: "[^"]+"' \
+    | sed 's/.*"\(.*\)"/\1/' | sort | tr '\n' ' '
+}
+preloaded_images() {
+  yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading") | .spec.template.spec.initContainers[].image' \
+    | grep -v '^---$' | sort
+}
+
+out=$(render --set-json 'appDefinitions.enabled=["java-17-latest","python-latest"]')
+if [[ "$(app_names <<<"$out")" == "java-17-latest python-latest " \
+      && "$(offered_names <<<"$out")" == "java-17-latest python-latest " ]]; then
+  ok "enabled restricts the AppDefinitions and the landing page"
+else
+  bad "enabled does not restrict the app list" "defs=[$(app_names <<<"$out")] offered=[$(offered_names <<<"$out")]"
+fi
+
+# Another university's own image: a foreign registry and a tag, used as given.
+custom=$(mktemp)
+cat > "$custom" <<'EOF'
+appDefinitions:
+  enabled: [python-latest]
+  apps:
+    haskell-latest:
+      image: registry.example.edu/ide/haskell:2.1.0
+      limitsMemory: 4000M
+      landingPage:
+        label: Haskell
+        image: theia-logo.png
+    python-latest:
+      landingPage:
+        label: Python 3
+EOF
+out=$(render -f "$custom")
+rm -f "$custom"
+hs=$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="haskell-latest") | .spec.image + " " + .spec.limitsMemory' <<<"$out" | grep -v '^---$')
+if [[ "$hs" == "registry.example.edu/ide/haskell:2.1.0 4000M" \
+      && "$(app_names <<<"$out")" == "haskell-latest python-latest " \
+      && "$(offered_names <<<"$out")" == "haskell-latest python-latest " ]] \
+   && preloaded_images <<<"$out" | grep -qx 'registry.example.edu/ide/haskell:2.1.0'; then
+  ok "a custom app renders, is offered and preloaded, with its image passed through"
+else
+  bad "a custom app did not reach all three consumers" "appdef=[$hs] defs=[$(app_names <<<"$out")] offered=[$(offered_names <<<"$out")]"
+fi
+# An override changes one field and keeps the rest of the catalog entry.
+if grep -q 'appName: "Python 3"' <<<"$out" \
+   && [[ "$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="python-latest") | .spec.image' <<<"$out" | grep -v '^---$')" == ghcr.io/eduide/eduide/python:* ]]; then
+  ok "an apps entry merges over its catalog entry"
+else
+  bad "an apps entry must merge over its catalog entry, not replace it"
+fi
+# false has to win over the catalog too, which sprig's mergeOverwrite would drop.
+if render --set appDefinitions.apps.python-latest.landingPage.visible=false | grep -A2 'serviceAuthToken: "python-latest"' | grep -q 'visible: false'; then
+  ok "an override can set a field to false"
+else
+  bad "an override setting visible: false was lost"
+fi
+
+# null is how every environment removed apps before enabled existed; it must
+# keep removing them, or upgrading the chart brings them all back.
+out=$(render --set-json 'appDefinitions.apps={"c-latest":null}')
+if ! grep -q 'c-latest' <<<"$(app_names <<<"$out") $(offered_names <<<"$out")" \
+   && ! preloaded_images <<<"$out" | grep -q '/c:'; then
+  ok "apps.<name>: null removes an enabled app everywhere"
+else
+  bad "apps.<name>: null did not remove the app" "defs=[$(app_names <<<"$out")]"
+fi
+
+if err=$(helm template t "$CHART" --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
+      --set keycloak.cookieSecret=test-render-secret --set-json 'appDefinitions.enabled=["no-such-app"]' 2>&1 >/dev/null); then
+  bad "an unknown name in enabled must fail the render"
+elif grep -q 'appDefinitions.enabled lists "no-such-app"' <<<"$err"; then
+  ok "an unknown name in enabled fails the render and names it"
+else
+  bad "an unknown name in enabled failed without saying why" "$err"
+fi
+
+# Every catalog entry has to render on its own, or enabling it is the first
+# time anyone finds out it is broken.
+broken=""
+for name in $(yq -r '.appDefinitions.catalog | keys | .[]' "$CHART/values.yaml"); do
+  out=$(render --set-json "appDefinitions.enabled=[\"$name\"]")
+  [[ "$(app_names <<<"$out")" == "$name " && "$(offered_names <<<"$out")" == "$name " ]] || broken+="$name "
+done
+if [[ -z "$broken" ]]; then
+  ok "every catalog entry renders and is offered alone"
+else
+  bad "catalog entries that do not render alone" "$broken"
 fi
 
 echo

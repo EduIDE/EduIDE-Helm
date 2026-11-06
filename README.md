@@ -36,23 +36,37 @@ override names exactly one. A blanket tag would be wrong: a pull request only
 builds the images of the repo it came from, so pointing everything at `pr-451`
 puts the rest of the namespace into `ImagePullBackOff`.
 
-## Adding a language
+## Choosing and adding IDE apps
 
-One entry in `appDefinitions.apps`:
+`appDefinitions.catalog` holds every IDE image EduIDE builds. An installation
+picks from it with `appDefinitions.enabled`, and adds its own apps or changes a
+catalog entry under `appDefinitions.apps`:
 
 ```yaml
 appDefinitions:
+  enabled:                         # catalog names to offer
+    - java-25-templates-latest
+    - python-latest
   apps:
-    haskell-latest:
-      image: eduide/haskell        # tag comes from versions.ide
+    python-latest:                 # merged over the catalog entry
+      limitsMemory: 4000M
+    haskell-latest:                # your own image; renders without being enabled
+      image: registry.example.edu/ide/haskell:2.1.0   # a tag or digest is used as given
+      limitsMemory: 4000M
       landingPage:
-        label: Haskell             # omit this key to deploy it but hide it
+        label: Haskell             # omit landingPage to deploy it but hide it
+        image: theia-logo.png      # a logo the landing page ships, or a path starting with /
 ```
 
-That single map drives the AppDefinition custom resource, the landing page's
-app list, and the set of images preloaded onto every node. It used to be three
-hand-maintained lists across two repositories, the preload one addressed by
-array index - which is how production came to offer `c-templates` while
+Each app is `appDefinitions.defaults`, then its catalog entry, then its `apps`
+entry. A bare repository such as `eduide/java-17` gets the tag from
+`versions.ide`. `apps.<name>: null` removes an app even if `enabled` lists it,
+and a name in `enabled` that the catalog does not have fails the render.
+
+That one merged list drives the AppDefinition custom resource, the landing
+page's app list, and the set of images preloaded onto every node. It used to be
+three hand-maintained lists across two repositories, the preload one addressed
+by array index - which is how production came to offer `c-templates` while
 preloading everything except `c-templates`.
 `scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
 

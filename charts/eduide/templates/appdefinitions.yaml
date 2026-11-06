@@ -1,5 +1,5 @@
 {{- /*
-One AppDefinition per entry in appDefinitions.apps. The same map drives the
+One AppDefinition per app eduide.apps returns. The same map drives the
 landing page's app list and the preloading DaemonSet, so the three cannot
 disagree.
 
@@ -8,8 +8,9 @@ changes rather than reordering.
 */ -}}
 {{- $ctx := . -}}
 {{- $d := .Values.appDefinitions.defaults | default dict -}}
-{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
-{{- $app := index $ctx.Values.appDefinitions.apps $name }}
+{{- $apps := include "eduide.apps" . | fromJson -}}
+{{- range $name := ($apps | keys | sortAlpha) }}
+{{- $app := index $apps $name }}
 {{- if not $app.image }}
 {{- fail (printf "appDefinitions.apps.%s has no image" $name) }}
 {{- end }}

@@ -630,16 +630,22 @@ monitor:
     interval: 1
 # -- The IDE applications this installation offers.
 #
-# This map is the single source of truth for three things that used to be
-# configured separately and drifted apart: the AppDefinition custom resources,
-# the app list the landing page shows, and the set of images preloaded onto
-# every node. Adding a language is one entry here, not three edits in two
-# repositories.
+# One merged list is the single source of truth for three things that used to
+# be configured separately and drifted apart: the AppDefinition custom
+# resources, the app list the landing page shows, and the set of images
+# preloaded onto every node. Offering a language is one entry here, not three
+# edits in two repositories.
+#
+# The list is `enabled` (names picked from `catalog`) plus every key in `apps`.
+# Each app is `defaults`, then its `catalog` entry, then its `apps` entry, the
+# later one winning field by field.
 #
 # Each key is the AppDefinition name. `image` is a repository without a tag -
 # the tag comes from versions.ide (or the chart's appVersion), so a release
-# moves every IDE image at once. An entry with a `landingPage` key is offered in
-# the landing page drop-down; one without is deployable but hidden.
+# moves every IDE image at once. A full reference with a tag or digest is used
+# as given, which is how an installation runs an image from its own registry.
+# An entry with a `landingPage` key is offered in the landing page drop-down;
+# one without is deployable but hidden.
 # @default -- (see details below)
 appDefinitions:
   # -- Applied to every app that does not state its own. Only the four scaling
@@ -665,8 +671,22 @@ appDefinitions:
       # The monitor extension's own server. Not the app port: there the operator
       # would hit oauth2-proxy, which can never answer the activity poll.
       port: 8081
-  # -- The applications. Key is the AppDefinition name.
-  apps:
+  # -- Catalog names this installation offers. Pick from `catalog`; a name that
+  # is not there fails the render. Apps defined in `apps` render without being
+  # listed here.
+  enabled:
+    - java-17-latest
+    - java-17-templates-latest
+    - c-latest
+    - c-templates-latest
+    - javascript-latest
+    - python-latest
+  # -- Every IDE image EduIDE builds, ready to enable by name. Owned by the
+  # chart: change an entry for one installation through `apps`, not here.
+  # Nothing in the catalog renders unless `enabled` or `apps` names it, so a new
+  # entry cannot silently appear in an existing installation.
+  # @default -- (see values.yaml)
+  catalog:
     java-17-latest:
       image: eduide/java-17
       requestsCpu: 500m
@@ -689,6 +709,27 @@ appDefinitions:
         buildSystems:
           - { id: maven, label: Maven }
           - { id: gradle, label: Gradle }
+    java-25-latest:
+      image: eduide/java-25
+      requestsCpu: 500m
+      limitsMemory: 3000M
+      landingPage:
+        label: Java 25
+        visible: false
+        # The landing page derives the icon from the label when this is unset:
+        # "Java 25" becomes java-25-logo.png, which it does not ship, so the
+        # tile would show a broken image. The general Java logo it does ship.
+        image: java-logo.png
+    java-25-templates-latest:
+      image: eduide/java-25-templates
+      requestsCpu: 500m
+      limitsMemory: 3000M
+      landingPage:
+        label: Java 25
+        image: java-logo.png
+        buildSystems:
+          - { id: maven, label: Maven }
+          - { id: gradle, label: Gradle }
     c-latest:
       image: eduide/c
       landingPage:
@@ -705,18 +746,35 @@ appDefinitions:
       image: eduide/javascript
       landingPage:
         label: Javascript
-    ocaml-latest:
-      image: eduide/ocaml
-      landingPage:
-        label: Ocaml
     python-latest:
       image: eduide/python
       landingPage:
         label: Python
-    rust-latest:
-      image: eduide/rust
+    # TH Mannheim's own Java 25 image. In EduIDE's build matrix, so it carries
+    # the same numbered tag as every other IDE image and needs no pin of its own.
+    thm-java-25-latest:
+      image: eduide/thm-java-25
       landingPage:
-        label: Rust
+        label: Java 25
+        image: java-logo.png
+  # -- This installation's own apps, and overrides of catalog entries. Every
+  # key renders, enabled or not. A key matching a catalog entry is merged over
+  # it, so `java-17-latest: {minInstances: 10}` changes one field. `<name>: null`
+  # removes an app even when `enabled` lists it.
+  #
+  # An app the catalog does not have, from your own registry:
+  #
+  #     apps:
+  #       haskell-latest:
+  #         image: registry.example.edu/ide/haskell:2.1.0
+  #         limitsMemory: 4000M
+  #         landingPage:
+  #           label: Haskell
+  #           # A file name from the landing page's public/assets/logos/, or
+  #           # a path starting with "/". Unset, the page derives one from
+  #           # the label (haskell-logo.png), which it does not ship.
+  #           image: theia-logo.png
+  apps: {}
 
 # -- Values to configure preloading of images on Kubernetes nodes.
 # @default -- (see details below)
@@ -736,7 +794,7 @@ preloading:
   nodeSelector: {}
   # -- Extra images to preload, on top of the ones derived automatically.
   #
-  # Leave this empty. The chart preloads every appDefinitions.apps image, every
+  # Leave this empty. The chart preloads the image of every app it renders, every
   # sidecar image and the landing page image without being told, so the list
   # cannot fall out of step with what the installation actually offers. It used
   # to be written out by hand per environment and addressed by array index,

@@ -18,8 +18,8 @@ data:
       serviceUrl: "{{ include "theia-cloud.url.service" . }}",
       appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
       {{- /*
-      The app list is derived from appDefinitions.apps: every entry carrying a
-      `landingPage` key is offered, in the order it is declared there. That is
+      The app list is derived from eduide.apps: every app carrying a
+      `landingPage` key is offered, sorted by name. That is
       the same map the AppDefinitions and the preloading DaemonSet come from, so
       the page cannot advertise an app that was never deployed - which is what
       happened when this was a separate hand-maintained map.
@@ -29,8 +29,9 @@ data:
       {{- if not $apps }}
       {{- $apps = dict }}
       {{- $ctx := . }}
-      {{- range $n := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
-      {{- $a := index $ctx.Values.appDefinitions.apps $n }}
+      {{- $all := include "eduide.apps" . | fromJson }}
+      {{- range $n := ($all | keys | sortAlpha) }}
+      {{- $a := index $all $n }}
       {{- if $a.landingPage }}{{ $apps = set $apps $n $a.landingPage }}{{ end }}
       {{- end }}
       {{- end }}
@@ -109,7 +110,7 @@ data:
       */}}
       {{- $maxSession := ($appDefaults.timeout | default 1440) | int }}
       {{- $maxIdle := (((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60) | int }}
-      {{- range $name, $app := (.Values.appDefinitions).apps | default dict }}
+      {{- range $name, $app := (include "eduide.apps" . | fromJson) }}
       {{- if and $app $app.landingPage }}
       {{- $t := ($app.timeout | default $appDefaults.timeout | default 1440) | int }}
       {{- if gt $t $maxSession }}{{ $maxSession = $t }}{{ end }}

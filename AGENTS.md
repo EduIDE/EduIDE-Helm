@@ -112,11 +112,18 @@ two things done by hand before it merges:
 That is the intended shape while automerge is off: the bot proposes the version,
 a human takes the release decision.
 
-## appDefinitions.apps is the single source of truth
+## eduide.apps is the single source of truth
 
-Three things derive from it: the AppDefinition custom resources, the app list
-the landing page offers, and the images the preloading DaemonSet pulls onto
-every node. **Never write a preload list, and never add an app in two places.**
+The `eduide.apps` helper merges `appDefinitions.catalog` (every image EduIDE
+builds), `appDefinitions.enabled` (which catalog names an installation offers)
+and `appDefinitions.apps` (its own apps and overrides) into one map. A new
+catalog entry renders nowhere until an installation enables it; that is the
+point, so do not add it to the default `enabled` list without deciding it for
+every installation on chart defaults, production included.
+
+Three things derive from that map, each through the helper: the AppDefinition
+custom resources, the app list the landing page offers, and the images the
+preloading DaemonSet pulls onto every node. **Never write a preload list, and never add an app in two places.**
 
 They used to be three hand-maintained lists across two repositories, the
 preload one addressed by array index, with production's list one shorter than
