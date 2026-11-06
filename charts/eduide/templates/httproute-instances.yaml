@@ -1,18 +1,39 @@
 {{- if and .Values.gateway.enabled .Values.gateway.routes.enabled }}
+{{- $redirect := .Values.gateway.routes.sessionEndedRedirect }}
+{{- $emitRedirect := and $redirect.enabled .Values.landingPage.enabled }}
+{{- $code := default 302 $redirect.statusCode }}
 {{/*
-  `rules` is deliberately ABSENT, not empty. The operator patches one rule per
-  live session into this route at runtime, so the chart must not state a value
-  for the field at all.
+  The app-level route. This is a TEMPLATE the operator reads, not one it writes:
+  for each session it copies this route's `parentRefs` and `hostnames` onto a
+  brand-new HTTPRoute of its own (`IngressManager.buildSessionRoute` in
+  EduIDE-Cloud), owner-referenced to the Session so Kubernetes garbage-collects
+  it when the session ends. Nothing ever patches rules into this object.
 
-  `rules: []` was wrong twice over. Gateway API v1.5 added `minItems: 1`, so the
-  API server rejects the create outright - v1.3 accepted it, which is why this
-  only surfaced on a newer cluster. And because Helm would then carry `rules: []`
-  as desired state, every `helm upgrade` would patch the live route back to zero
-  rules and cut routing to every running session until the operator caught up.
+  THE ONE RULE HERE IS THE CATCH-ALL, and it has to live on this route rather
+  than on a route of its own.
 
-  Omitting the field avoids both: nothing to reject, and no patch generated for
-  a field the chart does not own.
+  Gateway API DEFAULTS an omitted `spec.rules` to a single
+  `PathPrefix: /` rule with no backendRefs - see the `default:` on
+  `spec.rules` in the HTTPRoute CRD. So this route always has a `/` rule
+  whether we write one or not, and an empty one merely answers 5xx.
+
+  A second route carrying its own `/` rule therefore cannot win: matches are
+  ranked by hostname, then by characters in the path, so the two `/` rules tie,
+  and the tie is broken by the older creation timestamp - which on any upgrade
+  is this route. Putting the redirect here replaces the defaulted rule instead
+  of losing to it.
+
+  Session routes are unaffected: their `/<uid>/` prefix and `Exact` rules are
+  longer than `/` and outrank it, and the operator copies only parentRefs and
+  hostnames from here - never rules.
+
+  `rules: []` would be wrong twice over. Gateway API v1.5 added `minItems: 1`, so
+  the API server rejects it outright, and Helm would carry it as desired state
+  and patch the live route back to zero rules on every upgrade.
 */}}
+{{- if and $emitRedirect (ne (int $code) 302) }}
+{{- fail (printf "gateway.routes.sessionEndedRedirect.statusCode is %v; only 302 is allowed. Eager sessions reuse instance paths, so a cached 301 would permanently break an instance in the user's browser." $code) }}
+{{- end }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -24,4 +45,20 @@ spec:
   hostnames:
   - {{ include "theia-cloud.host.instance" . | quote }}
   {{- include "theia-cloud.host.wildcardInstances" . | trim | nindent 2 }}
+  {{- if $emitRedirect }}
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        hostname: {{ include "theia-cloud.host.landing" . | quote }}
+        statusCode: {{ int $code }}
+        path:
+          type: ReplaceFullPath
+          replaceFullPath: {{ $redirect.path | quote }}
+  {{- end }}
 {{- end }}
