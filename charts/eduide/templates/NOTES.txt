@@ -1,0 +1,8 @@
+{{- $unknown := include "eduide.unknownEnabledApps" . | trim -}}
+{{- if $unknown }}
+WARNING: appDefinitions.enabled lists apps that are neither in
+appDefinitions.catalog nor in appDefinitions.apps. They are not deployed:
+{{- range (splitList "\n" $unknown) }}
+  - {{ . }}
+{{- end }}
+{{- end }}

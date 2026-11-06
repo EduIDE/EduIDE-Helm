@@ -111,17 +111,22 @@ service:
 # ---------------------------------------------------------------------------
 # Applications
 # ---------------------------------------------------------------------------
-# The chart ships eight by default: Java 17, C, JavaScript, OCaml, Python, Rust
-# and the Java and C template variants. Each is preloaded onto every node, so
-# trimming the list to what your courses use saves a lot of disk and pull time.
+# The chart offers everything in appDefinitions.catalog by default: Java 17,
+# Java 25, C, JavaScript, Python and the Java and C template variants. Each
+# offered app is preloaded onto every node, so trimming the list to what your
+# courses use saves a lot of disk and pull time.
 #
 # appDefinitions:
+#   enabled:                  # from the catalog or from apps below
+#     - java-25-templates
+#     - python
+#     - haskell
 #   apps:
-#     ocaml-latest: null      # remove one
-#     haskell-latest:         # add one
-#       image: eduide/haskell
+#     haskell:                # add your own image
+#       image: registry.example.edu/ide/haskell:2.1.0
 #       landingPage:
 #         label: Haskell
+#         image: theia-logo.png
 
 # ---------------------------------------------------------------------------
 # The Gradle and Maven dependency cache - optional, and off by default

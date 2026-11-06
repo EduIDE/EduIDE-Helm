@@ -1,5 +1,21 @@
 # Changelog
 
+## [eduide 2.7.0] - 2026-11-06
+
+- [eduide] Split the app list into `appDefinitions.catalog` (the IDE images EduIDE officially releases), `appDefinitions.apps` (an installation's own apps and overrides, merged over the catalog entry of the same name) and `appDefinitions.enabled` (the names an installation offers; empty offers every definition)
+- [eduide] Rename every app to its plain image name: `java-17-latest` becomes `java-17`, `c-templates-latest` becomes `c-templates`, and so on. `landingPage.appDefinition` defaults to `java-17-templates`
+- [eduide] Add Java 25 (`java-25`, `java-25-templates` with Maven and Gradle) to the catalog
+- [eduide] Remove `rust-latest` and `ocaml-latest`. EduIDE no longer builds these images, so the next EduIDE release publishes no tag for them
+- [eduide] A name in `appDefinitions.enabled` with no definition is skipped, and `helm install`/`helm upgrade` print a warning naming it
+- [eduide] Pin EduIDE 1.5.0 (`appVersion`): IDE images with data bridge v0.0.17, scorpio 2.1.1, theia-cloud-monitor v1.2.2 and without SCANOSS; no rust, haskell or ocaml images
+
+Upgrade notes:
+
+- Installations on chart defaults lose Rust and OCaml, keep the other six apps and gain Java 25 and Java 25 templates. Release this chart before any installation moves `versions.ide` to an EduIDE release without rust and ocaml images: on an older chart, the defaults point at tags that do not exist
+- **The rename replaces every AppDefinition.** Helm deletes the `-latest` ones, which also deletes the session ingresses, prewarmed pods and sidecars they own, so running sessions end. Anything that refers to an app by name has to move to the new name: Artemis exercises (`theiaImage`), saved workspaces, `landingPage.appDefinition` and `apps` overrides in values files
+- `apps.<name>: null` still removes an app. To migrate a null list, replace it with `enabled: [...]` naming what the installation offers
+- With a non-empty `enabled`, an `apps` entry renders only if `enabled` names it. Add an installation's own app to `enabled` as well
+
 ## [eduide 2.6.2] - 2026-11-06
 
 - [eduide] Pin EduIDE-Cloud 1.2.2, the release after the remaining dependency security fixes. The operator, service and webhook code is unchanged from 1.2.1
