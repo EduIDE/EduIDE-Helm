@@ -69,6 +69,12 @@ data:
       loadingText: "{{ tpl (.Values.landingPage.loadingText | toString) . }}",
       {{- end }}
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
+      {{- if .Values.landingPage.sentry.dsn }}
+      sentryDsn: {{ tpl (.Values.landingPage.sentry.dsn | toString) . | quote }},
+      {{- end }}
+      {{- if .Values.landingPage.trustedArtemisHosts }}
+      trustedArtemisHosts: {{ .Values.landingPage.trustedArtemisHosts | toJson }},
+      {{- end }}
       {{- /*
       What the privacy page is allowed to state about this installation.
 
@@ -146,21 +152,26 @@ data:
           email: {{ $dpo.email | quote }},
         },
       },
-      {{- if .Values.landingPage.footerLinks }}
+      {{- /*
+      The footer shows the tag of the image that actually runs, so it cannot
+      drift from the deploy. attribution.version still overrides it.
+      */}}
+      {{- $attribution := (.Values.landingPage.footerLinks).attribution | default dict }}
+      {{- $tag := regexReplaceAll "^[^@:]+:?([^@]*).*$" (base (tpl (.Values.landingPage.image | toString) .)) "${1}" }}
+      {{- $version := ternary (tpl ($attribution.version | toString) .) (regexMatch "^[0-9]" $tag | ternary (printf "v%s" $tag) $tag) (not (empty $attribution.version)) }}
       footerLinks: {
-        {{- if .Values.landingPage.footerLinks.attribution }}
         attribution: {
-          {{- if .Values.landingPage.footerLinks.attribution.text }}
-          text: "{{ tpl (.Values.landingPage.footerLinks.attribution.text | toString) . }}",
+          {{- if $attribution.text }}
+          text: "{{ tpl ($attribution.text | toString) . }}",
           {{- end }}
-          {{- if .Values.landingPage.footerLinks.attribution.url }}
-          url: "{{ tpl (.Values.landingPage.footerLinks.attribution.url | toString) . }}",
+          {{- if $attribution.url }}
+          url: "{{ tpl ($attribution.url | toString) . }}",
           {{- end }}
-          {{- if .Values.landingPage.footerLinks.attribution.version }}
-          version: "{{ tpl (.Values.landingPage.footerLinks.attribution.version | toString) . }}",
+          {{- if $version }}
+          version: {{ $version | quote }},
           {{- end }}
         },
-        {{- end }}
+        {{- if .Values.landingPage.footerLinks }}
         {{- if .Values.landingPage.footerLinks.bugReport }}
         bugReport: {
           {{- if .Values.landingPage.footerLinks.bugReport.text }}
@@ -209,8 +220,8 @@ data:
           {{- end }}
         },
         {{- end }}
+        {{- end }}
       },
-      {{- end }}
       sentryEnvironment: "{{ .Release.Namespace }}",
     };
 
