@@ -210,24 +210,28 @@ else
 fi
 
 # An unknown name is skipped and the install or upgrade warns about it.
-if notes=$(helm install t "$CHART" --dry-run=client --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
-      --set keycloak.cookieSecret=test-render-secret --set demoApplication.install=false \
-      --set-json 'appDefinitions.enabled=["python","no-such-app"]' 2>&1); then
-  if grep -q '^  - no-such-app$' <<<"$(sed -n '/^NOTES:/,$p' <<<"$notes")" \
-     && [[ "$(app_names <<<"$(sed '/^NOTES:/,$d' <<<"$notes")")" == "python " ]]; then
-    ok "an unknown name in enabled is skipped and named in a warning"
-  else
-    bad "an unknown name in enabled was not warned about" "$(sed -n '/^NOTES:/,$p' <<<"$notes" | tr '\n' ' ')"
-  fi
+# helm template never prints NOTES.txt and helm 3 cannot dry-run an install
+# without a cluster, so render a copy of it as an ordinary template.
+notes_chart=$(mktemp -d)
+cp -R "$CHART" "$notes_chart/"
+cp "$CHART/templates/NOTES.txt" "$notes_chart/eduide/templates/notes-render.txt"
+notes() {
+  helm template t "$notes_chart/eduide" --show-only templates/notes-render.txt --set skipPreflight=true \
+    --set keycloak.allowUnauthenticated=true --set keycloak.cookieSecret=test-render-secret "$@" 2>&1
+}
+out=$(render --set-json 'appDefinitions.enabled=["python","no-such-app"]')
+if [[ "$(app_names <<<"$out")" == "python " ]] \
+   && notes --set-json 'appDefinitions.enabled=["python","no-such-app"]' | grep -qx '  - no-such-app'; then
+  ok "an unknown name in enabled is skipped and named in a warning"
 else
-  bad "an unknown name in enabled must not fail the install" "$notes"
+  bad "an unknown name in enabled was not skipped with a warning" "defs=[$(app_names <<<"$out")] notes=[$(notes --set-json 'appDefinitions.enabled=["python","no-such-app"]' | tr '\n' ' ')]"
 fi
-if helm install t "$CHART" --dry-run=client --set skipPreflight=true --set keycloak.allowUnauthenticated=true \
-      --set keycloak.cookieSecret=test-render-secret 2>&1 | sed -n '/^NOTES:/,$p' | grep -q WARNING; then
+if notes | grep -q WARNING; then
   bad "the defaults print an unknown-app warning"
 else
   ok "the defaults print no warning"
 fi
+rm -rf "$notes_chart"
 
 # Every catalog entry has to render on its own, or enabling it is the first
 # time anyone finds out it is broken.
