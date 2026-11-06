@@ -88,6 +88,10 @@ landingPage:
   sentry:
     enable: false
     dsn: ""
+  # A link with artemisToken starts a session on its own only when the host in
+  # both gitUri and artemisUrl is listed here. Otherwise the student clicks Launch.
+  trustedArtemisHosts:
+    - artemis.example.edu
   infoTitle: Welcome to EduIDE
 
 # ---------------------------------------------------------------------------

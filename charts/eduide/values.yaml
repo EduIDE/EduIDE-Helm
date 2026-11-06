@@ -131,6 +131,10 @@ landingPage:
     # -- The Sentry endpoint the landing page reports to. The landing page has no
     # built-in default.
     dsn: ""
+  # -- Hostnames trusted to start a session from a link. A link with `artemisToken`
+  # only starts a session on its own when the host in both `gitUri` and `artemisUrl`
+  # is on this list. Otherwise the student has to click Launch.
+  trustedArtemisHosts: []
   # -- the app id to launch
   appDefinition: "java-17-templates-latest"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
@@ -231,7 +235,8 @@ landingPage:
   #   text: "Built by TUM AET Team 👨‍💻"
   #   # -- URL to link to (e.g., team website)
   #   url: "https://aet.cit.tum.de/"
-  #   # -- Version string to display (e.g., "v1.0.0")
+  #   # -- Version string to display. Defaults to the tag of landingPage.image,
+  #   # with a "v" in front of a numeric tag (1.2.2 shows as "v1.2.2").
   #   version: "v1.0.0"
   #
   # # -- Optional: Bug report link

@@ -4,6 +4,14 @@
 
 - [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
 - [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
+- [eduide] Run the landing page without root: port 8080 in the container (the Service stays on 80), `runAsNonRoot`, a read-only root filesystem, no capabilities, the `RuntimeDefault` seccomp profile, and an `emptyDir` on `/tmp`
+- [eduide] Add `landingPage.trustedArtemisHosts`. A link with `artemisToken` starts a session on its own only when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch
+- [eduide] The landing page footer shows the tag of the running landing page image (`v1.2.2`, or `pr-53` for a test image) instead of a hand-set string. `landingPage.footerLinks.attribution.version` still overrides it, so drop that value from an environment to get the real version
+
+Upgrade notes:
+
+- This chart needs a landing page image that listens on 8080: the release containing the non-root change. An older image runs as root, so its pods do not start under `runAsNonRoot`. If you override `versions.landingPage` or `landingPage.image`, move them to that release
+- Installations relying on Artemis auto-start must set `landingPage.trustedArtemisHosts`. The default is empty, so every such link waits for a click
 
 ## [eduide 2.5.1] - 2026-10-10
 
