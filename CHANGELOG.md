@@ -7,6 +7,7 @@
 - [eduide] Add Java 25 (`java-25`, `java-25-templates` with Maven and Gradle) to the catalog
 - [eduide] Remove `rust-latest` and `ocaml-latest`. EduIDE no longer builds these images, so the next EduIDE release publishes no tag for them
 - [eduide] A name in `appDefinitions.enabled` with no definition is skipped, and `helm install`/`helm upgrade` print a warning naming it
+- [eduide] Pin EduIDE 1.5.0 (`appVersion`): IDE images with data bridge v0.0.17, scorpio 2.1.1, theia-cloud-monitor v1.2.2 and without SCANOSS; no rust, haskell or ocaml images
 
 Upgrade notes:
 
