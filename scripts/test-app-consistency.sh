@@ -95,6 +95,15 @@ if proxy_render | yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-pr
 else
   bad "oauth2-proxy must be preloaded at the operator's version (${proxy_version}) when Keycloak is on"
 fi
+# The proxy image has no shell, so the default `/bin/sh -c echo` cannot start
+# there; its init container has to run the proxy binary itself.
+proxy_cmd=$(proxy_render | yq -o=json -I=0 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
+             | .spec.template.spec.initContainers[] | select(.image | test("oauth2-proxy")) | [.command, .args]' | grep -vxE -- '---|\[\]')
+if [[ "$proxy_cmd" == '[["/bin/oauth2-proxy"],["--version"]]' ]]; then
+  ok "oauth2-proxy preloads with its own binary, not a shell"
+else
+  bad "oauth2-proxy has no /bin/sh; its preload must run /bin/oauth2-proxy --version" "got: $proxy_cmd"
+fi
 if [[ "$(render --set keycloak.enable=false | proxy_preloaded)" == 0 ]]; then
   ok "no oauth2-proxy preloading without Keycloak"
 else
