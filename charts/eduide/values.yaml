@@ -12,7 +12,7 @@ versions:
   # of the IDE images, so it carries its own version.
   # 1.2.1 is the first release that accepts the env-injection allowlist flags
   # (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them.
-  cloud: "1.2.1"
+  cloud: "1.2.2"
   # -- EduIDE-Landing-Page. Released independently as well.
   # 1.2.2 is the first release whose privacy page reads the `landingPage.privacy`
   # block below. 2.2.0 shipped that block while still pinning 1.2.1, which

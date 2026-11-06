@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.6.2] - 2026-11-06
+
+- [eduide] Pin EduIDE-Cloud 1.2.2, the release after the remaining dependency security fixes. The operator, service and webhook code is unchanged from 1.2.1
+
 ## [eduide 2.6.1] - 2026-11-06
 
 - [eduide] Pin EduIDE-Landing-Page 1.3.1, which carries the remaining dependency security fixes
