@@ -1,5 +1,14 @@
 # Changelog
 
+## [eduide 2.7.0] - unreleased
+
+- [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Pair this with a landing page image that serves `/session-ended`. An older image falls back to its start page, which is still better than the 5xx it replaces
+
 ## [eduide 2.6.2] - 2026-11-06
 
 - [eduide] Pin EduIDE-Cloud 1.2.2, the release after the remaining dependency security fixes. The operator, service and webhook code is unchanged from 1.2.1
