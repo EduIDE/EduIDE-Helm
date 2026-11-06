@@ -6,6 +6,7 @@
 - [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
 - [eduide] Run the landing page without root: port 8080 in the container (the Service stays on 80), `runAsNonRoot`, a read-only root filesystem, no capabilities, the `RuntimeDefault` seccomp profile, and an `emptyDir` on `/tmp`
 - [eduide] Add `landingPage.trustedArtemisHosts`. A link with `artemisToken` starts a session on its own only when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch
+- [eduide] Pin EduIDE-Cloud 1.2.1 and EduIDE-Landing-Page 1.3.0, the releases this chart's operator flags and landing page settings need
 - [eduide] The landing page footer shows the tag of the running landing page image (`v1.2.2`, or `pr-53` for a test image) instead of a hand-set string. `landingPage.footerLinks.attribution.version` still overrides it, so drop that value from an environment to get the real version
 
 Upgrade notes:
