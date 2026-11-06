@@ -19,7 +19,8 @@ versions:
   # ignores it, so every installation kept the hardcoded text the block exists
   # to replace.
   # 1.3.0 listens on 8080 as non-root, which the landing page Deployment needs.
-  landingPage: "1.3.0"
+  # 1.3.1 adds the remaining dependency security fixes.
+  landingPage: "1.3.1"
 
 # -- The container registry every EduIDE image is pulled from.
 imageRegistry: ghcr.io/eduide

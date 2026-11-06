@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.6.1] - 2026-11-06
+
+- [eduide] Pin EduIDE-Landing-Page 1.3.1, which carries the remaining dependency security fixes
+
 ## [eduide 2.6.0] - 2026-11-06
 
 - [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
