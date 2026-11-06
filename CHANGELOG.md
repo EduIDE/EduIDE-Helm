@@ -1,8 +1,34 @@
 # Changelog
 
-## [eduide 2.6.0] - 2026-11-02
+## [eduide 2.6.0] - 2026-11-06
 
 - [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
+- [eduide-cluster] [eduide] Stop serving AppDefinition versions the conversion webhook cannot map ([#52](https://github.com/EduIDE/EduIDE-Helm/pull/52)). This merged after 2.5.1 was published without a version bump, so 2.6.0 is the first chart that carries it
+
+## [eduide 2.5.1] - 2026-11-06
+
+- [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
+- [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
+- [eduide] Run the landing page without root: port 8080 in the container (the Service stays on 80), `runAsNonRoot`, a read-only root filesystem, no capabilities, the `RuntimeDefault` seccomp profile, and an `emptyDir` on `/tmp`
+- [eduide] Add `landingPage.trustedArtemisHosts`. A link with `artemisToken` starts a session on its own only when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch
+- [eduide] Pin EduIDE-Cloud 1.2.1 and EduIDE-Landing-Page 1.3.0, the releases this chart's operator flags and landing page settings need
+- [eduide] The landing page footer shows the tag of the running landing page image (`v1.2.2`, or `pr-53` for a test image) instead of a hand-set string. `landingPage.footerLinks.attribution.version` still overrides it, so drop that value from an environment to get the real version
+
+Upgrade notes:
+
+- This chart needs a landing page image that listens on 8080: the release containing the non-root change. An older image runs as root, so its pods do not start under `runAsNonRoot`. If you override `versions.landingPage` or `landingPage.image`, move them to that release
+- Installations relying on Artemis auto-start must set `landingPage.trustedArtemisHosts`. The default is empty, so every such link waits for a click
+
+Security hardening (secure-by-default; environments already override the sensitive values):
+
+- [eduide] Wire the operator session env-injection allowlist (`operator.allowedEnvFromSecrets`, `operator.allowedEnvFromConfigMaps`, `operator.allowCustomEnvFromMap`), passed as `--allowedEnvFromSecrets` / `--allowedEnvFromConfigMaps` / `--allowCustomEnvFromMap`. Empty = deny, matching EduIDE-Cloud [#144](https://github.com/EduIDE/EduIDE-Cloud/pull/144)
+- [eduide] Add NetworkPolicies isolating session pods (`networkPolicies.enabled`, default on): default-deny ingress/egress, DNS egress always allowed, general outbound egress allowed by default (`networkPolicies.allowExternalEgress`, set `false` for DNS only), ingress to session ports from the gateway namespace, and an explicit block of the cloud metadata IP `169.254.169.254/32`
+- [eduide] Allow the operator to reach session pods on the data bridge and monitor ports (`networkPolicies.dataBridgePort`, `networkPolicies.monitorPort`), so the default-deny does not drop environment injection into eager sessions or stall the activity tracker. Eager pods are only selected from EduIDE-Cloud #146 on.
+- [eduide] Exclude private ranges from session egress (`networkPolicies.privateEgressCidrs`) so sessions cannot reach the cluster's pods and services, and allow language server sidecars explicitly (`session-allow-sidecars`). Clusters whose pod or service CIDRs are outside the private ranges must add them.
+- [eduide] Default `appDefinitions.defaults.monitor.port` and `networkPolicies.monitorPort` to 8081, the monitor extension's own server
+- [eduide] Namespace-scope the operator RBAC: bind the broad namespaced verbs through a RoleBinding by default (`operator.clusterWideRbac`, default false) instead of a cluster-wide ClusterRoleBinding. The genuinely cluster-scoped resources the operator cannot avoid (read-only `customresourcedefinitions`, listed at startup, and read-only `persistentvolumes`, with write access only for the `MINIKUBE` provider that creates them) are granted separately via a dedicated minimal per-namespace ClusterRole + ClusterRoleBinding that is always rendered, so the default binding no longer leaves the operator unable to list CRDs and crashlooping
+- [eduide] Move `SERVICE_AUTH_TOKEN` and `KEYCLOAK_CLIENTSECRET` out of the `service-config` ConfigMap into the `service-config-secret` Secret, and source the operator's `--serviceAuthToken` from that Secret instead of a plaintext arg
+- [eduide] Require a unique per-environment `keycloak.cookieSecret` (removed the committed default; the template now fails if it is unset), and set oauth2-proxy `cookie_secure="true"`
 
 ## [eduide 2.4.0] - 2026-09-28
 

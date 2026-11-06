@@ -52,8 +52,11 @@ keycloak:
   authUrl: https://sso.example.edu/
   realm: your-realm
   clientId: eduide
-  # cookieSecret goes in secrets.yaml - the chart's default is a placeholder
-  # published in a public repository and MUST be replaced.
+  # Unique per environment and never committed to a real values file - keep the
+  # real one in secrets.yaml. The chart ships no default, so the value below is
+  # an obvious placeholder that only lets this example render; replace it with
+  # `openssl rand -base64 32 | tr -- '+/' '-_'`.
+  cookieSecret: REPLACE-WITH-A-UNIQUE-PER-ENVIRONMENT-COOKIE-SECRET
 
 # No identity provider yet? Comment out the block above and uncomment this. It
 # means the installation has NO AUTHENTICATION; do not expose it.
@@ -81,15 +84,22 @@ operator:
 app:
   name: EduIDE
 landingPage:
+  # To turn it on, set enable: true and dsn to your own Sentry endpoint.
   sentry:
     enable: false
+    dsn: ""
+  # A link with artemisToken starts a session on its own only when the host in
+  # both gitUri and artemisUrl is listed here. Otherwise the student clicks Launch.
+  trustedArtemisHosts:
+    - artemis.example.edu
   infoTitle: Welcome to EduIDE
 
 # ---------------------------------------------------------------------------
 # Telemetry - off by default for installations outside TUM
 # ---------------------------------------------------------------------------
-# The Sentry DSN is compiled into the images and points at TUM's Sentry, so
-# leaving these on sends your hostnames and namespace names there.
+# The service and operator images have TUM's Sentry DSN compiled in, so turning
+# these on sends your hostnames and namespace names there. The landing page has
+# no built-in DSN and reports only to landingPage.sentry.dsn.
 service:
   sentry:
     enable: false

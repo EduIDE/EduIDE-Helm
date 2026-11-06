@@ -23,6 +23,7 @@ spec:
       annotations:
         helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/service-config-secret.yaml") . | sha256sum }}
     spec:
       # we need to be able to create and read sessions
       automountServiceAccountToken: true
@@ -51,6 +52,8 @@ spec:
         envFrom:
         - configMapRef:
             name: service-config
+        - secretRef:
+            name: service-config-secret
         env:
         - name: SENTRY_ENABLE
           value: {{ tpl (.Values.service.sentry.enable | toString) . | quote }}
