@@ -77,6 +77,30 @@ else
   bad "images offered but not preloaded" "$(tr '\n' ' ' <<<"$missing")"
 fi
 
+# With Keycloak every session pod also runs the oauth2-proxy sidecar, so its
+# image belongs on the node too, at the version the operator is told to use.
+proxy_render() {
+  render --set keycloak.enable=true --set keycloak.authUrl=https://kc.example/ \
+    --set keycloak.realm=r --set keycloak.clientId=c "$@"
+}
+proxy_preloaded() {
+  yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
+         | .spec.template.spec.initContainers[].image' | grep -c '^quay.io/oauth2-proxy/oauth2-proxy:' || true
+}
+proxy_version=$(proxy_render | yq -r 'select(.kind=="Deployment" and .metadata.name=="operator-deployment")
+                 | .spec.template.spec.containers[0].args' | grep -A1 -- '--oAuth2ProxyVersion' | tail -1 | tr -d '" -')
+if proxy_render | yq -r 'select(.kind=="DaemonSet" and .metadata.name=="image-preloading")
+                         | .spec.template.spec.initContainers[].image' | grep -qx "quay.io/oauth2-proxy/oauth2-proxy:${proxy_version}"; then
+  ok "oauth2-proxy ${proxy_version} is preloaded when Keycloak is on"
+else
+  bad "oauth2-proxy must be preloaded at the operator's version (${proxy_version}) when Keycloak is on"
+fi
+if [[ "$(render --set keycloak.enable=false | proxy_preloaded)" == 0 ]]; then
+  ok "no oauth2-proxy preloading without Keycloak"
+else
+  bad "oauth2-proxy must not be preloaded without Keycloak"
+fi
+
 # Unset has to stay absent rather than render an empty nodeSelector: production
 # and parma have no node pool, and their DaemonSets must not change.
 preload_selector() {
