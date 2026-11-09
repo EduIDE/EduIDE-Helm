@@ -15,7 +15,7 @@ type: application
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
-version: 2.7.2
+version: 2.7.3
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
@@ -40,7 +40,7 @@ dependencies:
     repository: "oci://ghcr.io/eduide/charts"
     condition: eduide-shared-cache.enabled
   - name: theia-workspace-garbage-collector
-    version: "0.1.0"
+    version: "0.1.1"
     repository: "oci://ghcr.io/eduide/charts"
     condition: theia-workspace-garbage-collector.enabled
 
