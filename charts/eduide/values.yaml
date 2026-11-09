@@ -828,14 +828,14 @@ eduide-shared-cache:
 theia-workspace-garbage-collector:
   enabled: true
   image:
-    # The garbage collector has never been released with a version tag - GHCR
+    # The garbage collector has never published a versioned image - GHCR
     # holds only `latest`, `main` and per-commit SHAs. Its own chart defaults to
     # `latest`, which would mean a release of this chart installs whatever was
     # built most recently, and `helm upgrade` would see no diff when it changed.
-    # Pinned to the commit that `latest` pointed at on 2026-08-25 so a 2.0.0
-    # install is reproducible. Replace this with a semver tag once the
-    # workspace-garbage-collector repo cuts a release.
-    tag: "599557839e5c5893eb0c20785dac671ae70f7e8a"
+    # Pinned to the commit behind its 0.1.1 chart release so an install is
+    # reproducible. Replace this with a semver tag once the
+    # workspace-garbage-collector repo publishes versioned images.
+    tag: "5896ca3b55324af4b195256dd5c198fb751f5cb8"
 
 # -- Skip the check that eduide-cluster is installed on this cluster.
 # Only useful for rendering against a cluster that intentionally lacks it.

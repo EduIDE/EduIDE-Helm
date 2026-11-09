@@ -158,11 +158,11 @@ file for no gain.
 
 ## The garbage collector is pinned to a commit, not a version
 
-Its repository has never cut a release - GHCR holds only `latest`, `main` and
+Its repository has never published a versioned image - GHCR holds only `latest`, `main` and
 per-commit SHAs - and its own chart defaults to `latest`. A released chart must
 not install whatever was built most recently, and `helm upgrade` would see no
 diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
-Replace it with a semver tag when that repo starts releasing.
+Replace it with a semver tag when that repo starts publishing versioned images.
 
 ## Dependency aliases must be lowercase
 

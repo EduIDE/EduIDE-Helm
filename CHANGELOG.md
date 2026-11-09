@@ -1,5 +1,9 @@
 # Changelog
 
+## [eduide 2.7.3] - 2026-11-09
+
+- [eduide] Update the workspace garbage collector to chart 0.1.1 and image `5896ca3`, with the security dependency fixes and the Go 1.26 build
+
 ## [eduide 2.7.2] - 2026-11-06
 
 - [eduide] Fix image preloading on 2.7.1: the oauth2-proxy image is distroless, so the default `/bin/sh -c echo` init container could not start (`StartError`, CrashLoopBackOff on every node). It now runs `/bin/oauth2-proxy --version`, which exits 0
