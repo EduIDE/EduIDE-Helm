@@ -41,8 +41,9 @@ certmanager:
 
 global:
   # -- Node labels the conversion webhook must run on, e.g.
-  # `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, so one value
-  # pins both. Empty schedules anywhere.
+  # `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, but the two are
+  # separate releases: pass the value to this release and to every eduide
+  # release, or each schedules anywhere. Empty schedules anywhere.
   nodeSelector: {}
 
 # --- CRDs and the conversion webhook ---

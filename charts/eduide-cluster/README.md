@@ -40,7 +40,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | gatewayClass.create | bool | `false` |  |
 | gatewayClass.labels | object | `{}` |  |
 | gatewayClass.parametersRef | object | `{}` |  |
-| global.nodeSelector | object | `{}` | Node labels the conversion webhook must run on, e.g. `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, so one value pins both. Empty schedules anywhere. |
+| global.nodeSelector | object | `{}` | Node labels the conversion webhook must run on, e.g. `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, but the two are separate releases: pass the value to this release and to every eduide release, or each schedules anywhere. Empty schedules anywhere. |
 | issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
 | issuerca.enable | bool | `true` | whether to install the CA certificate signer |
 | issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |

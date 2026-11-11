@@ -1,9 +1,11 @@
 global:
   # -- Node labels every EduIDE pod must match, e.g. `aet.cit.tum.de/pool: pve`.
   # Sessions, the operator, the REST service, the landing page, image preloading
-  # and (from their next chart versions) the subcharts land on matching nodes only. A plain node selector, so
-  # the nodes need no taint. Empty schedules anywhere, as before. Sessions follow
-  # only with an operator that accepts `--sessionNodeSelector`.
+  # and (from its next chart version) the workspace garbage collector land on
+  # matching nodes only. A plain node selector, so the nodes need no taint. Empty
+  # schedules anywhere, as before. Sessions follow only with an operator that
+  # accepts `--sessionNodeSelector`. The conversion webhook is in the separate
+  # eduide-cluster release, which needs the same value passed to it.
   nodeSelector: {}
 
 # -- Image versions, one per source repository. Every image the chart deploys
