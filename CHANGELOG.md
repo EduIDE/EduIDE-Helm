@@ -5,10 +5,14 @@
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
 - [eduide] `preloading.nodeSelector` falls back to `global.nodeSelector` when empty. Set, it still wins
 
+- [eduide] Pin EduIDE-Cloud 1.3.0, the first release with `--sessionNodeSelector`, which also rejects selector entries that are not valid Kubernetes labels at startup
+- [eduide] Update the workspace garbage collector to chart 0.2.0, which reads `global.nodeSelector`
+
 Upgrade notes:
 
-- `global.nodeSelector` pins sessions only with an operator image that supports `--sessionNodeSelector`. This chart still pins EduIDE-Cloud 1.2.2, which does not, so leave the value unset until `versions.cloud` moves to the EduIDE-Cloud release that adds it: an operator that does not know the option rejects it and does not start
-- The workspace garbage collector reads `global.nodeSelector` from its next chart version. Until that dependency bump follows, it still schedules anywhere. The shared cache does not read it; it is off in every installation
+- `global.nodeSelector` pins sessions only with an operator that supports `--sessionNodeSelector`. An installation that overrides `versions.cloud` with a release before 1.3.0 must leave it unset: such an operator rejects the option and does not start
+- Prewarmed instances created before the upgrade keep running where they are until they are replaced. Delete them once after setting the value
+- The shared cache does not read `global.nodeSelector`; it is off in every installation
 - Set the same `global.nodeSelector` on `eduide-cluster` to pin the conversion webhook
 
 ## [eduide 2.7.3] - 2026-11-09

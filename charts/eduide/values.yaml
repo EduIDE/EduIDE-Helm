@@ -22,7 +22,9 @@ versions:
   # of the IDE images, so it carries its own version.
   # 1.2.1 is the first release that accepts the env-injection allowlist flags
   # (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them.
-  cloud: "1.2.2"
+  # 1.3.0 is the first release that accepts --sessionNodeSelector, which this
+  # chart renders when global.nodeSelector is set; older operators reject it.
+  cloud: "1.3.0"
   # -- EduIDE-Landing-Page. Released independently as well.
   # 1.2.2 is the first release whose privacy page reads the `landingPage.privacy`
   # block below. 2.2.0 shipped that block while still pinning 1.2.1, which
@@ -845,7 +847,7 @@ theia-workspace-garbage-collector:
     # `latest`, which would mean a release of this chart installs whatever was
     # built most recently, and `helm upgrade` would see no diff when it changed.
     # Pinned to the commit behind its 0.1.1 chart release so an install is
-    # reproducible. Replace this with a semver tag once the
+    # reproducible; chart 0.2.0 changed only the chart, not the image. Replace this with a semver tag once the
     # workspace-garbage-collector repo publishes versioned images.
     tag: "5896ca3b55324af4b195256dd5c198fb751f5cb8"
 

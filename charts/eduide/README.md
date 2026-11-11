@@ -13,7 +13,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | Repository | Name | Version |
 |------------|------|---------|
 | oci://ghcr.io/eduide/charts | eduide-shared-cache | 0.5.3 |
-| oci://ghcr.io/eduide/charts | theia-workspace-garbage-collector | 0.1.1 |
+| oci://ghcr.io/eduide/charts | theia-workspace-garbage-collector | 0.2.0 |
 
 ## Values
 
@@ -182,7 +182,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
 | theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"5896ca3b55324af4b195256dd5c198fb751f5cb8"}}` | Reaps workspaces whose sessions are long gone. |
 | versions | object | (see details below) | Image versions, one per source repository. Every image the chart deploys derives its tag from one of these three, so a release is three numbers rather than nineteen image strings scattered across environment values files. |
-| versions.cloud | string | `"1.2.2"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. 1.2.1 is the first release that accepts the env-injection allowlist flags (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them. |
+| versions.cloud | string | `"1.3.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. 1.2.1 is the first release that accepts the env-injection allowlist flags (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them. 1.3.0 is the first release that accepts --sessionNodeSelector, which this chart renders when global.nodeSelector is set; older operators reject it. |
 | versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
 | versions.landingPage | string | `"1.3.1"` | EduIDE-Landing-Page. Released independently as well. 1.2.2 is the first release whose privacy page reads the `landingPage.privacy` block below. 2.2.0 shipped that block while still pinning 1.2.1, which ignores it, so every installation kept the hardcoded text the block exists to replace. 1.3.0 listens on 8080 as non-root, which the landing page Deployment needs. 1.3.1 adds the remaining dependency security fixes. |
 
