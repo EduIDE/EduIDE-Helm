@@ -146,6 +146,45 @@ other workloads. With too few labelled nodes, sessions stay `Pending`.
 `preloading.nodeSelector` still works on its own and wins when set.
 `scripts/test-node-selector.sh` checks every workload gets the selector.
 
+## Deployer ServiceAccounts
+
+A deploy workflow should not hold cluster-admin. `eduide-cluster` can create,
+per tenant namespace, a ServiceAccount that installs, upgrades, rolls back and
+uninstalls the `eduide` chart there and does nothing else:
+
+```yaml
+deployers:
+  enabled: true
+  namespaces: [eduide-test1, eduide-test2]
+```
+
+Each namespace gets the ServiceAccount `eduide-deployer`, its token Secret
+`eduide-deployer-token`, a Role and RoleBinding for what the chart renders, a
+Role in `eduide-system` to read the `eduide-cluster-identity` ConfigMap, and a
+ClusterRole `eduide-deployer-<namespace>` for the operator's one cluster-scoped
+grant. Read the token with:
+
+```bash
+kubectl -n eduide-test1 get secret eduide-deployer-token -o jsonpath='{.data.token}' | base64 -d
+```
+
+They live in the cluster chart because it is installed with cluster-admin.
+From the tenant chart they would be chicken-and-egg, and `helm uninstall`
+would delete the access along with the release. The namespaces must exist
+first: the chart does not create or own them, so its uninstall cannot delete a
+tenant.
+
+Kubernetes refuses to let the deployer create a Role with rights it does not
+hold itself, so the deployer holds every right the chart's own Roles grant -
+which is why it can delete pods. `scripts/test-deployers.sh` renders `eduide`
+with every optional kind on and fails when it renders a kind, or a Role rule,
+the deployer does not cover. Adding either to `eduide` means updating
+`charts/eduide-cluster/templates/rbac/deployers.yaml` in the same change.
+
+`operator.clusterWideRbac: true` and `operator.cloudProvider: MINIKUBE` grant
+the operator cluster-wide rights the deployer lacks, so those installations
+need a broader kubeconfig.
+
 ## Checking a change
 
 ```bash

@@ -1,0 +1,177 @@
+{{- /*
+One ServiceAccount per tenant namespace with exactly the rights to install,
+upgrade, roll back and uninstall the eduide chart there. Its token is what a
+deploy workflow's kubeconfig should hold.
+
+The namespaces are not created here: an uninstall of this chart would delete
+them, and every tenant release with them.
+
+The rules follow what the eduide chart in this repository renders.
+scripts/test-deployers.sh fails when the eduide chart renders a kind, or a
+Role rule, that the deployer cannot create.
+*/ -}}
+{{- if .Values.deployers.enabled }}
+{{- $sa := .Values.deployers.name }}
+{{- range $ns := .Values.deployers.namespaces }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $sa }}-token
+  namespace: {{ $ns }}
+  annotations:
+    kubernetes.io/service-account.name: {{ $sa }}
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $ns }}
+rules:
+  # What the eduide chart renders. Helm reads each object by name.
+  - apiGroups: [""]
+    resources: ["configmaps", "services", "serviceaccounts"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["gateway.envoyproxy.io"]
+    resources: ["backendtrafficpolicies"]
+    verbs: ["get", "create", "update", "patch", "delete"]
+  # Listed as well: Helm keeps its releases in Secrets and finds them by label;
+  # the live summary lists Deployments and AppDefinitions, `rollout status`
+  # watches; the chart looks up existing AppDefinitions.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["theia.cloud"]
+    resources: ["appdefinitions"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # The chart's Role for the operator grants exactly this on HTTPRoutes, and
+  # Kubernetes only lets a ServiceAccount grant what it holds itself.
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # helm --wait follows a Deployment through its ReplicaSets. The chart's
+  # Roles for the operator and the garbage collector grant these pod and
+  # workspace rights, so the deployer has to hold them too.
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete", "deletecollection"]
+  - apiGroups: ["theia.cloud"]
+    resources: ["workspaces"]
+    verbs: ["get", "list", "watch", "delete"]
+  # --create-namespace looks the namespace up first.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
+    resourceNames: [{{ $ns | quote }}]
+  # The chart's RoleBindings reference these two ClusterRoles from this chart.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: [{{ $.Values.operatorrole.name | quote }}, {{ $.Values.servicerole.name | quote }}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $sa }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+---
+# The deploy compares the cluster's name, written here by the bootstrap
+# workflow, with the environment's before it touches anything.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $sa }}-identity-{{ $ns }}
+  namespace: {{ $.Release.Namespace }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+    resourceNames: ["eduide-cluster-identity"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $sa }}-identity-{{ $ns }}
+  namespace: {{ $.Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $sa }}-identity-{{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $sa }}-{{ $ns }}
+rules:
+  # The chart's one cluster-scoped grant for the operator, and its binding.
+  # Kubernetes cannot limit `create` to a name.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "update", "patch", "delete"]
+    resourceNames: ["{{ $.Values.operatorrole.name }}-cluster-{{ $ns }}"]
+  # That grant is read access to these two, which the deployer must hold to
+  # hand it on. The deploy also checks the AppDefinition CRD and counts nodes.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $sa }}-{{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $sa }}-{{ $ns }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ns }}
+{{- end }}
+{{- end }}

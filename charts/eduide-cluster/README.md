@@ -1,6 +1,6 @@
 # eduide-cluster
 
-![Version: 2.8.0](https://img.shields.io/badge/Version-2.8.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
+![Version: 2.9.0](https://img.shields.io/badge/Version-2.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
 cert-manager issuers. Install once per cluster, before any eduide release.
@@ -17,6 +17,9 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | conversion.certMountPath | string | `"/etc/webhook/certs"` | The location of where the certificates are mounted into the container (needs to match with application.properties) |
 | conversion.certReloadPeriod | int | `604800` | The certificate reload period in seconds |
 | conversion.image | string | `"theiacloud/theia-cloud-conversion-webhook:1.2.0-next"` | The image of the webhook container |
+| deployers.enabled | bool | `false` | Create a deployer ServiceAccount, its token Secret and its RBAC in each of `deployers.namespaces`. |
+| deployers.name | string | `"eduide-deployer"` | Name of the ServiceAccount, its Role and RoleBinding. The token Secret is `<name>-token`; the identity Role and the ClusterRole are suffixed with the namespace. |
+| deployers.namespaces | list | `[]` | Tenant namespaces to create a deployer in. They must exist already: this chart never creates or owns a tenant namespace, so uninstalling it cannot delete one. |
 | envoyProxy.annotations | object | `{}` |  |
 | envoyProxy.create | bool | `false` |  |
 | envoyProxy.labels | object | `{}` |  |

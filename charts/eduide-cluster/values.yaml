@@ -35,6 +35,22 @@ servicerole:
   # -- name for the services' cluster role
   name: service-api-access
 
+# A ServiceAccount per tenant namespace that can deploy the eduide chart there
+# and nothing else, with a long-lived token for a deploy workflow's kubeconfig:
+# `kubectl -n <ns> get secret <name>-token -o jsonpath='{.data.token}' | base64 -d`
+deployers:
+  # -- Create a deployer ServiceAccount, its token Secret and its RBAC in each
+  # of `deployers.namespaces`.
+  enabled: false
+  # -- Tenant namespaces to create a deployer in. They must exist already: this
+  # chart never creates or owns a tenant namespace, so uninstalling it cannot
+  # delete one.
+  namespaces: []
+  # -- Name of the ServiceAccount, its Role and RoleBinding. The token Secret is
+  # `<name>-token`; the identity Role and the ClusterRole are suffixed with the
+  # namespace.
+  name: eduide-deployer
+
 certmanager:
   # -- the namespace where the cert-manager is installed
   namespace: cert-manager

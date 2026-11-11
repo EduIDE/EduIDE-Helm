@@ -57,6 +57,11 @@ and `theia-cloud.url.service` in `_helpers.tpl`. Before those existed the same
 two-line `printf` was re-derived inline in about a dozen places, each wrapped in
 `tpl (X | toString) .`.
 
+**A new kind or Role rule in `eduide` needs the deployer too.**
+`charts/eduide-cluster/templates/rbac/deployers.yaml` is the minimal RBAC a
+deploy workflow holds, and Kubernetes refuses it any object or grant it does not
+cover. `scripts/test-deployers.sh` fails until both are updated together.
+
 ## `lookup` makes rendering nondeterministic
 
 `theia-appdefinitions` preserves live scaling values and `theia-shared-cache`

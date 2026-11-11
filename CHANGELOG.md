@@ -1,5 +1,30 @@
 # Changelog
 
+## [eduide 2.9.0] - 2026-11-12
+
+- [eduide-cluster] Add `deployers`: with `deployers.enabled: true`, a ServiceAccount `eduide-deployer` with a long-lived token Secret in each of `deployers.namespaces`, allowed to install, upgrade, roll back and uninstall the eduide chart there and nothing else. Its token is what a deploy workflow's kubeconfig should hold. Default off, which renders exactly as before
+- [eduide-cluster] `scripts/test-deployers.sh` fails when the eduide chart renders a kind, or grants a right in a Role, that the deployer cannot create. A change that adds either updates `templates/rbac/deployers.yaml` in the same pull request
+- [eduide] No change; released at the same version
+
+Upgrade notes:
+
+- The namespaces must exist before `eduide-cluster` is upgraded with them. The chart never creates or owns a tenant namespace, so uninstalling it cannot delete one
+- Helm refuses to take over objects of the same names created by hand, such as the ones `docs/github-environments.md` in EduIDE-deployment describes. Adopt them first, for each namespace `NS`, with the cluster chart's release `eduide-cluster` in `eduide-system`:
+
+  ```bash
+  NS=eduide-tum-production REL=eduide-cluster RELNS=eduide-system
+  adopt() {
+    kubectl label "$@" app.kubernetes.io/managed-by=Helm --overwrite
+    kubectl annotate "$@" meta.helm.sh/release-name="$REL" meta.helm.sh/release-namespace="$RELNS" --overwrite
+  }
+  adopt -n "$NS" serviceaccount/eduide-deployer secret/eduide-deployer-token role/eduide-deployer rolebinding/eduide-deployer
+  adopt -n "$RELNS" role/eduide-deployer-identity-"$NS" rolebinding/eduide-deployer-identity-"$NS"
+  adopt clusterrole/eduide-deployer-"$NS" clusterrolebinding/eduide-deployer-"$NS"
+  ```
+
+  The token Secret keeps its token, so existing kubeconfigs keep working
+- The deployer covers the eduide chart with `operator.clusterWideRbac: false` (the default) and a `cloudProvider` other than `MINIKUBE`. Either of those grants the operator cluster-wide rights the deployer does not hold, and the deploy is refused
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
