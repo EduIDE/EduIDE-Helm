@@ -31,6 +31,10 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       {{- include "eduide.spreadAcrossNodes" "landing-page" | nindent 6 }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: landing-page-container
           image: {{ tpl (.Values.landingPage.image | toString) . }}

@@ -29,6 +29,10 @@ spec:
       automountServiceAccountToken: true
       serviceAccountName: service-api-service-account
       {{- include "eduide.spreadAcrossNodes" "service" | nindent 6 }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: service-container
         image: {{ tpl (.Values.service.image | toString) . }}

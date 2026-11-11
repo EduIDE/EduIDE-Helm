@@ -67,7 +67,7 @@ spec:
     spec:
       # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
       terminationGracePeriodSeconds: 0
-      {{- with .Values.preloading.nodeSelector }}
+      {{- with .Values.preloading.nodeSelector | default .Values.global.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}

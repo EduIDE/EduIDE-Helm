@@ -1,5 +1,16 @@
 # Changelog
 
+## [eduide 2.8.0] - unreleased
+
+- [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
+- [eduide] `preloading.nodeSelector` falls back to `global.nodeSelector` when empty. Set, it still wins
+
+Upgrade notes:
+
+- `global.nodeSelector` pins sessions only with an operator image that supports `--sessionNodeSelector`. This chart still pins EduIDE-Cloud 1.2.2, which does not, so leave the value unset until `versions.cloud` moves to the EduIDE-Cloud release that adds it: an operator that does not know the option rejects it and does not start
+- The workspace garbage collector reads `global.nodeSelector` from its next chart version. Until that dependency bump follows, it still schedules anywhere. The shared cache does not read it; it is off in every installation
+- Set the same `global.nodeSelector` on `eduide-cluster` to pin the conversion webhook
+
 ## [eduide 2.7.3] - 2026-11-09
 
 - [eduide] Update the workspace garbage collector to chart 0.1.1 and image `5896ca3`, with the security dependency fixes and the Go 1.26 build
