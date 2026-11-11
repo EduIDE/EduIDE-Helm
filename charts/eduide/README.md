@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.7.3](https://img.shields.io/badge/Version-2.7.3-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
+![Version: 2.8.0](https://img.shields.io/badge/Version-2.8.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -13,7 +13,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | Repository | Name | Version |
 |------------|------|---------|
 | oci://ghcr.io/eduide/charts | eduide-shared-cache | 0.5.3 |
-| oci://ghcr.io/eduide/charts | theia-workspace-garbage-collector | 0.1.1 |
+| oci://ghcr.io/eduide/charts | theia-workspace-garbage-collector | 0.2.0 |
 
 ## Values
 
@@ -52,6 +52,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | gateway.routes.enabled | bool | `true` | Whether to render HTTPRoute resources. |
 | gateway.serviceRouteRequestTimeout | string | `"60s"` | HTTPRoute request timeout for service-route (Envoy default can be 15s) |
 | gateway.tls | bool | `true` | Does Theia Cloud expect TLS connections (true) or is TLS terminated outside of Theia Cloud (false) |
+| global.nodeSelector | object | `{}` | Node labels every EduIDE pod must match, e.g. `aet.cit.tum.de/pool: pve`. Sessions, the operator, the REST service, the landing page, image preloading and (from its next chart version) the workspace garbage collector land on matching nodes only. A plain node selector, so the nodes need no taint. Empty schedules anywhere, as before. Sessions follow only with an operator that accepts `--sessionNodeSelector`. The conversion webhook is in the separate eduide-cluster release, which needs the same value passed to it. |
 | hosts | object | (see details below) | You may adjust the hostname below. |
 | hosts.allWildcardInstances | list | `["*.webview."]` | Hostname prefixes that session webviews are served from, relative to the instance host. Sessions render previews, notebooks and embedded docs on these, so with an empty list webviews 404 - the session itself still starts, so this is discovered by a user rather than by the installer.  Every AppDefinition already defaults to the matching `ingressHostnamePrefixes: ["*.webview."]`, so this default makes the two agree. It has two consequences you must plan for:    DNS   `*.webview.instance.<host>` must resolve.   TLS   you need a WILDCARD certificate for it. ACME cannot issue a wildcard         over HTTP-01, so either configure a DNS-01 solver         (`gatewayAcmeIssuer.solvers` in the eduide-cluster chart) or obtain         the certificate separately and supply it as a Secret.  Set to [] only if you genuinely do not want webviews. |
 | hosts.configuration | object | (see details below) | Configuration for the hostnames. Contains the baseHost and afixes for all services |
@@ -162,7 +163,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | preloading.imagePullPolicy | string | `nil` | Optional: Override the imagePullPolicy for the image preloading containers. If this is omitted or empty, the root at .Values.imagePullPolicy is used. |
 | preloading.images | list | `[]` | Extra images to preload, on top of the ones derived automatically.  Leave this empty. The chart preloads the image of every app it renders, every sidecar image and the landing page image without being told, so the list cannot fall out of step with what the installation actually offers. It used to be written out by hand per environment and addressed by array index, which is how production ended up offering c-templates while preloading everything except c-templates.  Each item is either an image reference string or a map: `{ image: "...", args: ["--version"] }` to use the image entrypoint (distroless-friendly), or `{ image: "...", command: [...], args: [...] }` for a full override. If only strings are used, the chart runs `/bin/sh -c 'echo …; exit 0'` (shell required in the image). |
 | preloading.maxUnavailable | string | `"100%"` | How many nodes may pull at once when the image set changes, as a count or a percentage. The Kubernetes default of 1 walks the cluster one node at a time, each waiting for its whole image set, which on a large cluster means the last node starts long after the first has finished. These pods carry no traffic, so there is nothing to protect by staging the rollout. |
-| preloading.nodeSelector | object | `{}` | Preload only onto nodes carrying these labels. Empty means every node. Set this when some nodes cannot hold the images: the exited init containers keep them in use, so kubelet image GC cannot free that disk space. Sessions are not pinned by this, so one landing on another node pulls its image cold. |
+| preloading.nodeSelector | object | `{}` | Preload only onto nodes carrying these labels. Empty falls back to `global.nodeSelector`, and with both empty preloading runs on every node. Set this when some nodes cannot hold the images: the exited init containers keep them in use, so kubelet image GC cannot free that disk space. Sessions are not pinned by this, so one landing on another node pulls its image cold: pin both with `global.nodeSelector` instead. |
 | service | object | (see details below) | Values of the Theia Cloud REST service |
 | service.adminApiToken | string | `""` | Base64-encoded admin API token. Only read when adminApiTokenSecret.create is true. Comes from a deployment secret, never from a file in git. |
 | service.adminApiTokenSecret | object | `{"create":false,"external":false,"key":"ADMIN_API_TOKEN","name":"service-admin-api-token"}` | The Kubernetes Secret holding the bearer token for admin API token protected endpoints. Set `create: true` and supply `adminApiToken` to have the chart manage it, or leave `create: false` and reference one you created yourself. |
@@ -181,7 +182,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
 | theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"5896ca3b55324af4b195256dd5c198fb751f5cb8"}}` | Reaps workspaces whose sessions are long gone. |
 | versions | object | (see details below) | Image versions, one per source repository. Every image the chart deploys derives its tag from one of these three, so a release is three numbers rather than nineteen image strings scattered across environment values files. |
-| versions.cloud | string | `"1.2.2"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. 1.2.1 is the first release that accepts the env-injection allowlist flags (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them. |
+| versions.cloud | string | `"1.3.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. 1.2.1 is the first release that accepts the env-injection allowlist flags (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them. 1.3.0 is the first release that accepts --sessionNodeSelector, which this chart renders when global.nodeSelector is set; older operators reject it. |
 | versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
 | versions.landingPage | string | `"1.3.1"` | EduIDE-Landing-Page. Released independently as well. 1.2.2 is the first release whose privacy page reads the `landingPage.privacy` block below. 2.2.0 shipped that block while still pinning 1.2.1, which ignores it, so every installation kept the hardcoded text the block exists to replace. 1.3.0 listens on 8080 as non-root, which the landing page Deployment needs. 1.3.1 adds the remaining dependency security fixes. |
 

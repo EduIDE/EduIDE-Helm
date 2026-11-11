@@ -1,3 +1,13 @@
+global:
+  # -- Node labels every EduIDE pod must match, e.g. `aet.cit.tum.de/pool: pve`.
+  # Sessions, the operator, the REST service, the landing page, image preloading
+  # and (from its next chart version) the workspace garbage collector land on
+  # matching nodes only. A plain node selector, so the nodes need no taint. Empty
+  # schedules anywhere, as before. Sessions follow only with an operator that
+  # accepts `--sessionNodeSelector`. The conversion webhook is in the separate
+  # eduide-cluster release, which needs the same value passed to it.
+  nodeSelector: {}
+
 # -- Image versions, one per source repository. Every image the chart deploys
 # derives its tag from one of these three, so a release is three numbers rather
 # than nineteen image strings scattered across environment values files.
@@ -12,7 +22,9 @@ versions:
   # of the IDE images, so it carries its own version.
   # 1.2.1 is the first release that accepts the env-injection allowlist flags
   # (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them.
-  cloud: "1.2.2"
+  # 1.3.0 is the first release that accepts --sessionNodeSelector, which this
+  # chart renders when global.nodeSelector is set; older operators reject it.
+  cloud: "1.3.0"
   # -- EduIDE-Landing-Page. Released independently as well.
   # 1.2.2 is the first release whose privacy page reads the `landingPage.privacy`
   # block below. 2.2.0 shipped that block while still pinning 1.2.1, which
@@ -777,10 +789,12 @@ preloading:
   # the last node starts long after the first has finished. These pods carry no
   # traffic, so there is nothing to protect by staging the rollout.
   maxUnavailable: "100%"
-  # -- Preload only onto nodes carrying these labels. Empty means every node.
+  # -- Preload only onto nodes carrying these labels. Empty falls back to
+  # `global.nodeSelector`, and with both empty preloading runs on every node.
   # Set this when some nodes cannot hold the images: the exited init containers
   # keep them in use, so kubelet image GC cannot free that disk space. Sessions
-  # are not pinned by this, so one landing on another node pulls its image cold.
+  # are not pinned by this, so one landing on another node pulls its image cold:
+  # pin both with `global.nodeSelector` instead.
   nodeSelector: {}
   # -- Extra images to preload, on top of the ones derived automatically.
   #
@@ -833,7 +847,7 @@ theia-workspace-garbage-collector:
     # `latest`, which would mean a release of this chart installs whatever was
     # built most recently, and `helm upgrade` would see no diff when it changed.
     # Pinned to the commit behind its 0.1.1 chart release so an install is
-    # reproducible. Replace this with a semver tag once the
+    # reproducible; chart 0.2.0 changed only the chart, not the image. Replace this with a semver tag once the
     # workspace-garbage-collector repo publishes versioned images.
     tag: "5896ca3b55324af4b195256dd5c198fb751f5cb8"
 
