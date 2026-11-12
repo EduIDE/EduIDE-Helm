@@ -1,5 +1,5 @@
 {{- /*
-One AppDefinition per entry in appDefinitions.apps. The same map drives the
+One AppDefinition per app eduide.apps returns. The same map drives the
 landing page's app list and the preloading DaemonSet, so the three cannot
 disagree.
 
@@ -8,8 +8,9 @@ changes rather than reordering.
 */ -}}
 {{- $ctx := . -}}
 {{- $d := .Values.appDefinitions.defaults | default dict -}}
-{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
-{{- $app := index $ctx.Values.appDefinitions.apps $name }}
+{{- $apps := include "eduide.apps" . | fromJson -}}
+{{- range $name := ($apps | keys | sortAlpha) }}
+{{- $app := index $apps $name }}
 {{- if not $app.image }}
 {{- fail (printf "appDefinitions.apps.%s has no image" $name) }}
 {{- end }}
@@ -64,7 +65,7 @@ spec:
   mountPath: {{ $app.mountPath | default $d.mountPath | default "/home/project" }}
   timeout: {{ $app.timeout | default $d.timeout | default 1440 }}
   monitor:
-    port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 3000 }}
+    port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 8081 }}
     activityTracker:
       timeoutAfter: {{ ((($app.monitor).activityTracker).timeoutAfter) | default ((($d.monitor).activityTracker).timeoutAfter) | default 60 }}
       notifyAfter: {{ ((($app.monitor).activityTracker).notifyAfter) | default ((($d.monitor).activityTracker).notifyAfter) | default 55 }}

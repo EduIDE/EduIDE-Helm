@@ -31,6 +31,19 @@ loop. One owner removes the race instead of retrying through it.
 It also means a tenant upgrade cannot touch a CRD, so it cannot break the other
 environments on the same cluster.
 
+The one cluster-scoped exception the tenant chart owns is the operator's
+unavoidable cluster-scoped access: it lists `customresourcedefinitions`
+(read-only) at startup and reads `persistentvolumes`, writing them for workspace
+storage only when `operator.cloudProvider` is `MINIKUBE`. A namespaced RoleBinding
+can grant neither. The tenant chart therefore
+renders a minimal `operator-api-access-cluster-<namespace>` ClusterRole and
+ClusterRoleBinding, named per namespace so tenants never collide on them. The
+broad, namespaced operator verbs stay bound through the shared
+`operator-api-access` ClusterRole (a RoleBinding by default, see
+`operator.clusterWideRbac`). That role includes write verbs on
+`persistentvolumes` and `customresourcedefinitions`, so setting
+`operator.clusterWideRbac=true` grants those writes cluster-wide.
+
 ### The conversion webhook belongs to the cluster
 
 A CRD's `conversion.webhook.clientConfig.service` names one namespace and one
@@ -110,6 +123,28 @@ So that deploys rarely show it:
 - `landingPage.replicas` / `service.replicas` above 1 add a
   PodDisruptionBudget each (`podDisruptionBudget.enabled`, off on single-node
   clusters, where it would block every drain) and prefer different nodes
+
+## Pinning EduIDE to a node pool
+
+`global.nodeSelector` pins every EduIDE pod to the nodes carrying those labels,
+so sessions start where their images are preloaded. Set it on both charts:
+
+```yaml
+global:
+  nodeSelector:
+    aet.cit.tum.de/pool: pve
+```
+
+The `eduide` chart renders it on the operator, the REST service, the landing
+page and image preloading, and passes it to the operator as
+`--sessionNodeSelector aet.cit.tum.de/pool=pve` for the session pods it creates.
+`eduide-cluster` renders it on the conversion webhook. Helm hands `global` to
+the garbage collector, which reads it from its next chart version. The shared
+cache does not read it. It is a plain node selector: the nodes need no taint and stay open to
+other workloads. With too few labelled nodes, sessions stay `Pending`.
+
+`preloading.nodeSelector` still works on its own and wins when set.
+`scripts/test-node-selector.sh` checks every workload gets the selector.
 
 ## Checking a change
 

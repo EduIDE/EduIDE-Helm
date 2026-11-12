@@ -18,8 +18,8 @@ data:
       serviceUrl: "{{ include "theia-cloud.url.service" . }}",
       appDefinition: "{{ tpl (.Values.landingPage.appDefinition | toString) . }}",
       {{- /*
-      The app list is derived from appDefinitions.apps: every entry carrying a
-      `landingPage` key is offered, in the order it is declared there. That is
+      The app list is derived from eduide.apps: every app carrying a
+      `landingPage` key is offered, sorted by name. That is
       the same map the AppDefinitions and the preloading DaemonSet come from, so
       the page cannot advertise an app that was never deployed - which is what
       happened when this was a separate hand-maintained map.
@@ -29,8 +29,9 @@ data:
       {{- if not $apps }}
       {{- $apps = dict }}
       {{- $ctx := . }}
-      {{- range $n := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) }}
-      {{- $a := index $ctx.Values.appDefinitions.apps $n }}
+      {{- $all := include "eduide.apps" . | fromJson }}
+      {{- range $n := ($all | keys | sortAlpha) }}
+      {{- $a := index $all $n }}
       {{- if $a.landingPage }}{{ $apps = set $apps $n $a.landingPage }}{{ end }}
       {{- end }}
       {{- end }}
@@ -78,6 +79,12 @@ data:
       sessionEnv: {{ . | toJson }},
       {{- end }}
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
+      {{- if .Values.landingPage.sentry.dsn }}
+      sentryDsn: {{ tpl (.Values.landingPage.sentry.dsn | toString) . | quote }},
+      {{- end }}
+      {{- if .Values.landingPage.trustedArtemisHosts }}
+      trustedArtemisHosts: {{ .Values.landingPage.trustedArtemisHosts | toJson }},
+      {{- end }}
       {{- /*
       What the privacy page is allowed to state about this installation.
 
@@ -112,7 +119,7 @@ data:
       */}}
       {{- $maxSession := ($appDefaults.timeout | default 1440) | int }}
       {{- $maxIdle := (((($appDefaults.monitor).activityTracker).timeoutAfter) | default 60) | int }}
-      {{- range $name, $app := (.Values.appDefinitions).apps | default dict }}
+      {{- range $name, $app := (include "eduide.apps" . | fromJson) }}
       {{- if and $app $app.landingPage }}
       {{- $t := ($app.timeout | default $appDefaults.timeout | default 1440) | int }}
       {{- if gt $t $maxSession }}{{ $maxSession = $t }}{{ end }}
@@ -155,21 +162,26 @@ data:
           email: {{ $dpo.email | quote }},
         },
       },
-      {{- if .Values.landingPage.footerLinks }}
+      {{- /*
+      The footer shows the tag of the image that actually runs, so it cannot
+      drift from the deploy. attribution.version still overrides it.
+      */}}
+      {{- $attribution := (.Values.landingPage.footerLinks).attribution | default dict }}
+      {{- $tag := regexReplaceAll "^[^@:]+:?([^@]*).*$" (base (tpl (.Values.landingPage.image | toString) .)) "${1}" }}
+      {{- $version := ternary (tpl ($attribution.version | toString) .) (regexMatch "^[0-9]" $tag | ternary (printf "v%s" $tag) $tag) (not (empty $attribution.version)) }}
       footerLinks: {
-        {{- if .Values.landingPage.footerLinks.attribution }}
         attribution: {
-          {{- if .Values.landingPage.footerLinks.attribution.text }}
-          text: "{{ tpl (.Values.landingPage.footerLinks.attribution.text | toString) . }}",
+          {{- if $attribution.text }}
+          text: "{{ tpl ($attribution.text | toString) . }}",
           {{- end }}
-          {{- if .Values.landingPage.footerLinks.attribution.url }}
-          url: "{{ tpl (.Values.landingPage.footerLinks.attribution.url | toString) . }}",
+          {{- if $attribution.url }}
+          url: "{{ tpl ($attribution.url | toString) . }}",
           {{- end }}
-          {{- if .Values.landingPage.footerLinks.attribution.version }}
-          version: "{{ tpl (.Values.landingPage.footerLinks.attribution.version | toString) . }}",
+          {{- if $version }}
+          version: {{ $version | quote }},
           {{- end }}
         },
-        {{- end }}
+        {{- if .Values.landingPage.footerLinks }}
         {{- if .Values.landingPage.footerLinks.bugReport }}
         bugReport: {
           {{- if .Values.landingPage.footerLinks.bugReport.text }}
@@ -218,8 +230,8 @@ data:
           {{- end }}
         },
         {{- end }}
+        {{- end }}
       },
-      {{- end }}
       sentryEnvironment: "{{ .Release.Namespace }}",
     };
 

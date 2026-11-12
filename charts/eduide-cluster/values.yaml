@@ -39,6 +39,13 @@ certmanager:
   # -- the namespace where the cert-manager is installed
   namespace: cert-manager
 
+global:
+  # -- Node labels the conversion webhook must run on, e.g.
+  # `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, but the two are
+  # separate releases: pass the value to this release and to every eduide
+  # release, or each schedules anywhere. Empty schedules anywhere.
+  nodeSelector: {}
+
 # --- CRDs and the conversion webhook ---
 conversion:
   # -- The image of the webhook container

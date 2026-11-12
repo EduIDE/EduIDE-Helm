@@ -112,11 +112,28 @@ two things done by hand before it merges:
 That is the intended shape while automerge is off: the bot proposes the version,
 a human takes the release decision.
 
-## appDefinitions.apps is the single source of truth
+## eduide.apps is the single source of truth
 
-Three things derive from it: the AppDefinition custom resources, the app list
-the landing page offers, and the images the preloading DaemonSet pulls onto
-every node. **Never write a preload list, and never add an app in two places.**
+The `eduide.apps` helper merges `appDefinitions.catalog` (the images EduIDE
+officially releases) with `appDefinitions.apps` (an installation's own apps and
+overrides), then keeps the names `appDefinitions.enabled` lists, or all of them
+when it is empty. A name in `enabled` with no definition is skipped and
+`NOTES.txt` warns about it on install and upgrade.
+
+**The catalog holds only official releases.** Every image in EduIDE's build
+matrix that is meant for any installation, and nothing else: a custom build for
+one installation (TH Mannheim's `thm-java-25`, for example) is defined in that
+installation's own `apps`. Every installation on chart defaults offers the
+whole catalog, production included, so adding an entry is a decision for all of
+them. `scripts/test-app-consistency.sh` writes the set out and fails when it
+changes.
+
+App names are the plain image name (`java-17`, `c-templates`), without the old
+`-latest` suffix.
+
+Three things derive from that map, each through the helper: the AppDefinition
+custom resources, the app list the landing page offers, and the images the
+preloading DaemonSet pulls onto every node. **Never write a preload list, and never add an app in two places.**
 
 They used to be three hand-maintained lists across two repositories, the
 preload one addressed by array index, with production's list one shorter than
@@ -141,11 +158,11 @@ file for no gain.
 
 ## The garbage collector is pinned to a commit, not a version
 
-Its repository has never cut a release - GHCR holds only `latest`, `main` and
+Its repository has never published a versioned image - GHCR holds only `latest`, `main` and
 per-commit SHAs - and its own chart defaults to `latest`. A released chart must
 not install whatever was built most recently, and `helm upgrade` would see no
 diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
-Replace it with a semver tag when that repo starts releasing.
+Replace it with a semver tag when that repo starts publishing versioned images.
 
 ## Dependency aliases must be lowercase
 

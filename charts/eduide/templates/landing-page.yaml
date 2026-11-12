@@ -26,22 +26,32 @@ spec:
         checksum/config: {{ include (print $.Template.BasePath "/landing-page-config-map.yaml") . | sha256sum }}
     spec:
       automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       {{- include "eduide.spreadAcrossNodes" "landing-page" | nindent 6 }}
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: landing-page-container
           image: {{ tpl (.Values.landingPage.image | toString) . }}
           imagePullPolicy: {{ if .Values.landingPage.imagePullPolicy }}{{ tpl (.Values.landingPage.imagePullPolicy | toString) . }}{{ else }}{{ tpl (.Values.imagePullPolicy | toString) . }}{{ end }}
-          env:
-            - name: SENTRY_ENABLE
-              value: {{ tpl (.Values.landingPage.sentry.enable | toString) . | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           readinessProbe:
             httpGet:
               path: /config.js
-              port: 80
+              port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
           lifecycle:
@@ -55,6 +65,9 @@ spec:
               mountPath: /usr/share/nginx/html/logo.png
               subPath: logo.png
           {{- end }}
+            {{- /* nginx-unprivileged keeps its pid file and temp paths here. */}}
+            - name: tmp
+              mountPath: /tmp
       {{- if .Values.landingPage.imagePullSecret }}
       imagePullSecrets:
         - name: {{ tpl (.Values.landingPage.imagePullSecret | toString) . }}
@@ -63,6 +76,8 @@ spec:
         - name: landing-page-config
           configMap:
             name: landing-page-config
+        - name: tmp
+          emptyDir: {}
 {{- end}}
 ---
 {{- if .Values.landingPage.enabled }}
@@ -81,5 +96,5 @@ spec:
     - name: http
       protocol: TCP
       port: 80
-      targetPort: 80
+      targetPort: 8080
 {{- end }}

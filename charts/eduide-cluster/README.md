@@ -1,6 +1,6 @@
 # eduide-cluster
 
-![Version: 2.5.0](https://img.shields.io/badge/Version-2.5.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.4.0](https://img.shields.io/badge/AppVersion-1.4.0-informational?style=flat-square)
+![Version: 2.9.0](https://img.shields.io/badge/Version-2.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
 cert-manager issuers. Install once per cluster, before any eduide release.
@@ -40,6 +40,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | gatewayClass.create | bool | `false` |  |
 | gatewayClass.labels | object | `{}` |  |
 | gatewayClass.parametersRef | object | `{}` |  |
+| global.nodeSelector | object | `{}` | Node labels the conversion webhook must run on, e.g. `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, but the two are separate releases: pass the value to this release and to every eduide release, or each schedules anywhere. Empty schedules anywhere. |
 | issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
 | issuerca.enable | bool | `true` | whether to install the CA certificate signer |
 | issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |

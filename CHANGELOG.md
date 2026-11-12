@@ -1,9 +1,90 @@
 # Changelog
 
-## [eduide 2.6.0] - unreleased
+## [eduide 2.9.0] - unreleased
 
 - [eduide] `landingPage.allowedGitHosts` (default `github.com`): hosts a git link without an Artemis token may clone from, as checked by EduIDE-Landing-Page
 - [eduide] `landingPage.sessionEnv`: public environment variables added to every session, e.g. Scorpio's `SCORPIO_GITHUB_CLIENT_ID`
+
+## [eduide 2.8.0] - 2026-11-11
+
+- [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
+- [eduide] `preloading.nodeSelector` falls back to `global.nodeSelector` when empty. Set, it still wins
+
+- [eduide] Pin EduIDE-Cloud 1.3.0, the first release with `--sessionNodeSelector`, which also rejects selector entries that are not valid Kubernetes labels at startup
+- [eduide] Update the workspace garbage collector to chart 0.2.0, which reads `global.nodeSelector`
+
+Upgrade notes:
+
+- `global.nodeSelector` pins sessions only with an operator that supports `--sessionNodeSelector`. An installation that overrides `versions.cloud` with a release before 1.3.0 must leave it unset: such an operator rejects the option and does not start
+- Prewarmed instances created before the upgrade keep running where they are until they are replaced. Delete them once after setting the value
+- The shared cache does not read `global.nodeSelector`; it is off in every installation
+- Set the same `global.nodeSelector` on `eduide-cluster` to pin the conversion webhook
+
+## [eduide 2.7.3] - 2026-11-09
+
+- [eduide] Update the workspace garbage collector to chart 0.1.1 and image `5896ca3`, with the security dependency fixes and the Go 1.26 build
+
+## [eduide 2.7.2] - 2026-11-06
+
+- [eduide] Fix image preloading on 2.7.1: the oauth2-proxy image is distroless, so the default `/bin/sh -c echo` init container could not start (`StartError`, CrashLoopBackOff on every node). It now runs `/bin/oauth2-proxy --version`, which exits 0
+
+## [eduide 2.7.1] - 2026-11-06
+
+- [eduide] Preload the oauth2-proxy image (`quay.io/oauth2-proxy/oauth2-proxy:<operator.oAuth2ProxyVersion>`) when Keycloak is on. Every session pod runs it as a sidecar, so a node without it pulled it on the first session
+
+## [eduide 2.7.0] - 2026-11-06
+
+- [eduide] Split the app list into `appDefinitions.catalog` (the IDE images EduIDE officially releases), `appDefinitions.apps` (an installation's own apps and overrides, merged over the catalog entry of the same name) and `appDefinitions.enabled` (the names an installation offers; empty offers every definition)
+- [eduide] Rename every app to its plain image name: `java-17-latest` becomes `java-17`, `c-templates-latest` becomes `c-templates`, and so on. `landingPage.appDefinition` defaults to `java-17-templates`
+- [eduide] Add Java 25 (`java-25`, `java-25-templates` with Maven and Gradle) to the catalog
+- [eduide] Remove `rust-latest` and `ocaml-latest`. EduIDE no longer builds these images, so the next EduIDE release publishes no tag for them
+- [eduide] A name in `appDefinitions.enabled` with no definition is skipped, and `helm install`/`helm upgrade` print a warning naming it
+- [eduide] Pin EduIDE 1.5.0 (`appVersion`): IDE images with data bridge v0.0.17, scorpio 2.1.1, theia-cloud-monitor v1.2.2 and without SCANOSS; no rust, haskell or ocaml images
+
+Upgrade notes:
+
+- Installations on chart defaults lose Rust and OCaml, keep the other six apps and gain Java 25 and Java 25 templates. Release this chart before any installation moves `versions.ide` to an EduIDE release without rust and ocaml images: on an older chart, the defaults point at tags that do not exist
+- **The rename replaces every AppDefinition.** Helm deletes the `-latest` ones, which also deletes the session ingresses, prewarmed pods and sidecars they own, so running sessions end. Anything that refers to an app by name has to move to the new name: Artemis exercises (`theiaImage`), saved workspaces, `landingPage.appDefinition` and `apps` overrides in values files
+- `apps.<name>: null` still removes an app. To migrate a null list, replace it with `enabled: [...]` naming what the installation offers
+- With a non-empty `enabled`, an `apps` entry renders only if `enabled` names it. Add an installation's own app to `enabled` as well
+
+## [eduide 2.6.2] - 2026-11-06
+
+- [eduide] Pin EduIDE-Cloud 1.2.2, the release after the remaining dependency security fixes. The operator, service and webhook code is unchanged from 1.2.1
+
+## [eduide 2.6.1] - 2026-11-06
+
+- [eduide] Pin EduIDE-Landing-Page 1.3.1, which carries the remaining dependency security fixes
+
+## [eduide 2.6.0] - 2026-11-06
+
+- [eduide] Add `preloading.nodeSelector`, so the preloading DaemonSet can run on selected nodes only. Default empty, which renders exactly as before
+- [eduide-cluster] [eduide] Stop serving AppDefinition versions the conversion webhook cannot map ([#52](https://github.com/EduIDE/EduIDE-Helm/pull/52)). This merged after 2.5.1 was published without a version bump, so 2.6.0 is the first chart that carries it
+
+## [eduide 2.5.1] - 2026-11-06
+
+- [eduide] Add `landingPage.sentry.dsn`. The landing page no longer has a built-in Sentry endpoint, so an installation with `landingPage.sentry.enable: true` must set it, or Sentry stays off
+- [eduide] Remove the `SENTRY_ENABLE` env var from the landing page deployment. The landing page reads its config from `config.js`, so nothing used it
+- [eduide] Run the landing page without root: port 8080 in the container (the Service stays on 80), `runAsNonRoot`, a read-only root filesystem, no capabilities, the `RuntimeDefault` seccomp profile, and an `emptyDir` on `/tmp`
+- [eduide] Add `landingPage.trustedArtemisHosts`. A link with `artemisToken` starts a session on its own only when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch
+- [eduide] Pin EduIDE-Cloud 1.2.1 and EduIDE-Landing-Page 1.3.0, the releases this chart's operator flags and landing page settings need
+- [eduide] The landing page footer shows the tag of the running landing page image (`v1.2.2`, or `pr-53` for a test image) instead of a hand-set string. `landingPage.footerLinks.attribution.version` still overrides it, so drop that value from an environment to get the real version
+
+Upgrade notes:
+
+- This chart needs a landing page image that listens on 8080: the release containing the non-root change. An older image runs as root, so its pods do not start under `runAsNonRoot`. If you override `versions.landingPage` or `landingPage.image`, move them to that release
+- Installations relying on Artemis auto-start must set `landingPage.trustedArtemisHosts`. The default is empty, so every such link waits for a click
+
+Security hardening (secure-by-default; environments already override the sensitive values):
+
+- [eduide] Wire the operator session env-injection allowlist (`operator.allowedEnvFromSecrets`, `operator.allowedEnvFromConfigMaps`, `operator.allowCustomEnvFromMap`), passed as `--allowedEnvFromSecrets` / `--allowedEnvFromConfigMaps` / `--allowCustomEnvFromMap`. Empty = deny, matching EduIDE-Cloud [#144](https://github.com/EduIDE/EduIDE-Cloud/pull/144)
+- [eduide] Add NetworkPolicies isolating session pods (`networkPolicies.enabled`, default on): default-deny ingress/egress, DNS egress always allowed, general outbound egress allowed by default (`networkPolicies.allowExternalEgress`, set `false` for DNS only), ingress to session ports from the gateway namespace, and an explicit block of the cloud metadata IP `169.254.169.254/32`
+- [eduide] Allow the operator to reach session pods on the data bridge and monitor ports (`networkPolicies.dataBridgePort`, `networkPolicies.monitorPort`), so the default-deny does not drop environment injection into eager sessions or stall the activity tracker. Eager pods are only selected from EduIDE-Cloud #146 on.
+- [eduide] Exclude private ranges from session egress (`networkPolicies.privateEgressCidrs`) so sessions cannot reach the cluster's pods and services, and allow language server sidecars explicitly (`session-allow-sidecars`). Clusters whose pod or service CIDRs are outside the private ranges must add them.
+- [eduide] Default `appDefinitions.defaults.monitor.port` and `networkPolicies.monitorPort` to 8081, the monitor extension's own server
+- [eduide] Namespace-scope the operator RBAC: bind the broad namespaced verbs through a RoleBinding by default (`operator.clusterWideRbac`, default false) instead of a cluster-wide ClusterRoleBinding. The genuinely cluster-scoped resources the operator cannot avoid (read-only `customresourcedefinitions`, listed at startup, and read-only `persistentvolumes`, with write access only for the `MINIKUBE` provider that creates them) are granted separately via a dedicated minimal per-namespace ClusterRole + ClusterRoleBinding that is always rendered, so the default binding no longer leaves the operator unable to list CRDs and crashlooping
+- [eduide] Move `SERVICE_AUTH_TOKEN` and `KEYCLOAK_CLIENTSECRET` out of the `service-config` ConfigMap into the `service-config-secret` Secret, and source the operator's `--serviceAuthToken` from that Secret instead of a plaintext arg
+- [eduide] Require a unique per-environment `keycloak.cookieSecret` (removed the committed default; the template now fails if it is unset), and set oauth2-proxy `cookie_secure="true"`
 
 ## [eduide 2.4.0] - 2026-09-28
 
