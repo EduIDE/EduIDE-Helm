@@ -1,5 +1,10 @@
 # Changelog
 
+## [eduide 2.9.0] - unreleased
+
+- [eduide] `landingPage.allowedGitHosts` (default `github.com`): hosts a git link without an Artemis token may clone from, as checked by EduIDE-Landing-Page
+- [eduide] `landingPage.sessionEnv`: public environment variables added to every session, e.g. Scorpio's `SCORPIO_GITHUB_CLIENT_ID`
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))

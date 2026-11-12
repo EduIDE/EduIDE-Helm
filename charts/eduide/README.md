@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.8.0](https://img.shields.io/badge/Version-2.8.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
+![Version: 2.9.0](https://img.shields.io/badge/Version-2.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -73,6 +73,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | keycloak.realm | string | `"TheiaCloud"` | The Keycloak Realm. Only has to be specified when enable: true |
 | landingPage | object | (see details below) | Values related to the landing page |
 | landingPage.additionalApps | string | `nil` | The page may show these additional apps in a drop down. This is a map. The key maps to the app definition name The value contains the label shown in the UI and may optionally contain an image override that is forwarded to the landing page config.  Example: different-app-definition:   label: "Different App Definition"   image: "different-app-definition"   visible: false further-app-definition:   label: "Further App Definition" |
+| landingPage.allowedGitHosts | list | `["github.com"]` | Hosts a git link without an Artemis token may clone from, e.g. one from the "Open in EduIDE" browser extension. Such links are also refused when they are not HTTPS or carry credentials. An empty list allows no host. |
 | landingPage.appDefinition | string | `"java-17-templates"` | the app id to launch |
 | landingPage.disableInfo | bool | `false` | Should showing info title and text below the launch button be disabled true hides the info title and text false shows the info title and text |
 | landingPage.enabled | bool | `true` | Whether the landing page shall be enabled |
@@ -101,6 +102,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | landingPage.sentry | object | (see details below) | Values related to Sentry on the landing page. |
 | landingPage.sentry.dsn | string | `""` | The Sentry endpoint the landing page reports to. The landing page has no built-in default. |
 | landingPage.sentry.enable | bool | `false` | Turn on Sentry browser monitoring on the landing page. Off by default, and it stays off until landingPage.sentry.dsn is set too. |
+| landingPage.sessionEnv | object | `{}` | Environment variables added to every session the landing page starts, for per-installation settings such as Scorpio's `SCORPIO_GITHUB_CLIENT_ID`. **Public**: they are rendered into config.js, which every visitor can read. Never put a secret here. |
 | landingPage.trustedArtemisHosts | list | `[]` | Hostnames trusted to start a session from a link. A link with `artemisToken` only starts a session on its own when the host in both `gitUri` and `artemisUrl` is on this list. Otherwise the student has to click Launch. |
 | maintenancePage | object | (see details below) | Static page shown instead of Envoy's raw error when the landing page is down |
 | maintenancePage.enabled | bool | `true` | Answer 502/503/504 on the landing route with files/maintenance.html ("EduIDE is currently unavailable") instead of Envoy's plain-text error. Covers the landing page only - the REST service and sessions keep their own errors. Needs Envoy Gateway (BackendTrafficPolicy responseOverride). |
