@@ -1,7 +1,7 @@
 {{ if .Values.preloading.enable -}}
 
 {{- /*
-The list is derived from appDefinitions.apps, their sidecars and the landing
+The list is derived from the apps eduide.apps returns, their sidecars and the landing
 page, with preloading.images appended. Nothing has to be listed by hand, so the
 preloaded set cannot disagree with what the installation actually offers - the
 old hand-written, index-addressed list is why production offered c-templates
@@ -12,7 +12,7 @@ while preloading everything except c-templates.
   {{- $images = list .Values.demoApplication.name -}}
 {{- end -}}
 {{- if not $images -}}
-{{- fail "preloading.enable is true but no images resolved: set appDefinitions.apps, or preloading.images, or disable preloading" -}}
+{{- fail "preloading.enable is true but no images resolved: set appDefinitions.enabled or appDefinitions.apps, or preloading.images, or disable preloading" -}}
 {{- end -}}
 
 {{- /* Set image pull policy to local variable for increase readability. */ -}}
@@ -67,7 +67,7 @@ spec:
     spec:
       # The pod can be killed instantly because it doesn't do any work requiring graceful shutdown
       terminationGracePeriodSeconds: 0
-      {{- with .Values.preloading.nodeSelector }}
+      {{- with .Values.preloading.nodeSelector | default .Values.global.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}

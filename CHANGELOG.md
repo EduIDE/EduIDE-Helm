@@ -1,8 +1,59 @@
 # Changelog
 
-## [eduide 2.7.0] - 2026-11-06
+## [eduide 2.9.0] - 2026-11-12
 
 - [eduide] Let the operator get, create, update, patch and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections ([EduIDE-Cloud#157](https://github.com/EduIDE/EduIDE-Cloud/issues/157)). No list or watch: the operator reads each Secret by name
+
+## [eduide 2.8.0] - 2026-11-11
+
+- [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
+- [eduide] `preloading.nodeSelector` falls back to `global.nodeSelector` when empty. Set, it still wins
+
+- [eduide] Pin EduIDE-Cloud 1.3.0, the first release with `--sessionNodeSelector`, which also rejects selector entries that are not valid Kubernetes labels at startup
+- [eduide] Update the workspace garbage collector to chart 0.2.0, which reads `global.nodeSelector`
+
+Upgrade notes:
+
+- `global.nodeSelector` pins sessions only with an operator that supports `--sessionNodeSelector`. An installation that overrides `versions.cloud` with a release before 1.3.0 must leave it unset: such an operator rejects the option and does not start
+- Prewarmed instances created before the upgrade keep running where they are until they are replaced. Delete them once after setting the value
+- The shared cache does not read `global.nodeSelector`; it is off in every installation
+- Set the same `global.nodeSelector` on `eduide-cluster` to pin the conversion webhook
+
+## [eduide 2.7.3] - 2026-11-09
+
+- [eduide] Update the workspace garbage collector to chart 0.1.1 and image `5896ca3`, with the security dependency fixes and the Go 1.26 build
+
+## [eduide 2.7.2] - 2026-11-06
+
+- [eduide] Fix image preloading on 2.7.1: the oauth2-proxy image is distroless, so the default `/bin/sh -c echo` init container could not start (`StartError`, CrashLoopBackOff on every node). It now runs `/bin/oauth2-proxy --version`, which exits 0
+
+## [eduide 2.7.1] - 2026-11-06
+
+- [eduide] Preload the oauth2-proxy image (`quay.io/oauth2-proxy/oauth2-proxy:<operator.oAuth2ProxyVersion>`) when Keycloak is on. Every session pod runs it as a sidecar, so a node without it pulled it on the first session
+
+## [eduide 2.7.0] - 2026-11-06
+
+- [eduide] Split the app list into `appDefinitions.catalog` (the IDE images EduIDE officially releases), `appDefinitions.apps` (an installation's own apps and overrides, merged over the catalog entry of the same name) and `appDefinitions.enabled` (the names an installation offers; empty offers every definition)
+- [eduide] Rename every app to its plain image name: `java-17-latest` becomes `java-17`, `c-templates-latest` becomes `c-templates`, and so on. `landingPage.appDefinition` defaults to `java-17-templates`
+- [eduide] Add Java 25 (`java-25`, `java-25-templates` with Maven and Gradle) to the catalog
+- [eduide] Remove `rust-latest` and `ocaml-latest`. EduIDE no longer builds these images, so the next EduIDE release publishes no tag for them
+- [eduide] A name in `appDefinitions.enabled` with no definition is skipped, and `helm install`/`helm upgrade` print a warning naming it
+- [eduide] Pin EduIDE 1.5.0 (`appVersion`): IDE images with data bridge v0.0.17, scorpio 2.1.1, theia-cloud-monitor v1.2.2 and without SCANOSS; no rust, haskell or ocaml images
+
+Upgrade notes:
+
+- Installations on chart defaults lose Rust and OCaml, keep the other six apps and gain Java 25 and Java 25 templates. Release this chart before any installation moves `versions.ide` to an EduIDE release without rust and ocaml images: on an older chart, the defaults point at tags that do not exist
+- **The rename replaces every AppDefinition.** Helm deletes the `-latest` ones, which also deletes the session ingresses, prewarmed pods and sidecars they own, so running sessions end. Anything that refers to an app by name has to move to the new name: Artemis exercises (`theiaImage`), saved workspaces, `landingPage.appDefinition` and `apps` overrides in values files
+- `apps.<name>: null` still removes an app. To migrate a null list, replace it with `enabled: [...]` naming what the installation offers
+- With a non-empty `enabled`, an `apps` entry renders only if `enabled` names it. Add an installation's own app to `enabled` as well
+
+## [eduide 2.6.2] - 2026-11-06
+
+- [eduide] Pin EduIDE-Cloud 1.2.2, the release after the remaining dependency security fixes. The operator, service and webhook code is unchanged from 1.2.1
+
+## [eduide 2.6.1] - 2026-11-06
+
+- [eduide] Pin EduIDE-Landing-Page 1.3.1, which carries the remaining dependency security fixes
 
 ## [eduide 2.6.0] - 2026-11-06
 

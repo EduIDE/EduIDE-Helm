@@ -26,6 +26,10 @@ spec:
       # we need to be able to create and read operators
       automountServiceAccountToken: true
       serviceAccountName: operator-api-service-account
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: operator-container
         image: {{ tpl (.Values.operator.image | toString) . }}
@@ -125,6 +129,14 @@ spec:
           - "{{ join "," . }}"
           {{- end }}
           - "--allowCustomEnvFromMap={{ .Values.operator.allowCustomEnvFromMap }}"
+          {{- with .Values.global.nodeSelector }}
+          {{- $pairs := list }}
+          {{- range $key, $value := . }}
+          {{- $pairs = append $pairs (printf "%s=%s" $key $value) }}
+          {{- end }}
+          - "--sessionNodeSelector"
+          - {{ join "," $pairs | quote }}
+          {{- end }}
         {{- if .Values.operator.logging.override }}
         volumeMounts:
           - name: operator-logging-config

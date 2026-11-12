@@ -4,6 +4,6 @@ dependencies:
   version: 0.5.3
 - name: theia-workspace-garbage-collector
   repository: oci://ghcr.io/eduide/charts
-  version: 0.1.0
-digest: sha256:b17d9558356c541259bf6d69b0d86c10e324bd7bc53ea54d2050c705d0f9b5b6
-generated: "2026-08-26T17:09:32.134187+02:00"
+  version: 0.2.0
+digest: sha256:c2817ff7ec2e07c2daab4836114ab435a6c2482a8b32a1f73cea5f0b34897665
+generated: "2026-11-11T23:12:53.929933+01:00"

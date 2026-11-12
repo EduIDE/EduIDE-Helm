@@ -49,6 +49,9 @@ jobs:
       - name: Maintenance page and rolling updates
         run: ./scripts/test-maintenance-page.sh
 
+      - name: global.nodeSelector reaches every workload
+        run: ./scripts/test-node-selector.sh
+
       # AGENTS.md says the two charts are released together at the same version
       # and nothing checked it, so they drifted to 2.2.1 and 2.2.2 across a pair
       # of unrelated fixes. One repository tag and one GitHub release name one

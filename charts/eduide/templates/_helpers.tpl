@@ -92,6 +92,77 @@ Call with (dict "app" $app "ctx" $).
 {{- end -}}
 
 {{/*
+Every app definition this installation knows, as JSON: appDefinitions.catalog
+with each appDefinitions.apps entry merged over the catalog entry of the same
+name, or added if the catalog has none. `apps.<name>: null` removes one.
+*/}}
+{{- define "eduide.appDefinitions" -}}
+{{- $ad := .Values.appDefinitions | default dict -}}
+{{- $out := deepCopy ($ad.catalog | default dict) -}}
+{{- range $name, $app := ($ad.apps | default dict) -}}
+{{- if kindIs "invalid" $app -}}
+{{- $_ := unset $out $name -}}
+{{- else -}}
+{{- $_ := set $out $name (include "eduide.deepMerge" (dict "base" (get $out $name | default dict) "over" $app) | fromJson) -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+
+{{/*
+The apps this installation renders, as JSON: the definitions appDefinitions.enabled
+names, or all of them when enabled is empty. A name with no definition is
+skipped, and NOTES.txt warns about it. Every consumer reads this one map, so the
+AppDefinitions, the landing page and preloading cannot disagree. defaults are
+not merged in here; each consumer falls back to them per field.
+*/}}
+{{- define "eduide.apps" -}}
+{{- $all := include "eduide.appDefinitions" . | fromJson -}}
+{{- $enabled := .Values.appDefinitions.enabled | default list -}}
+{{- if not $enabled -}}
+{{- toJson $all -}}
+{{- else -}}
+{{- $out := dict -}}
+{{- range $name := $enabled -}}
+{{- if hasKey $all $name -}}
+{{- $_ := set $out $name (get $all $name) -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Names in appDefinitions.enabled with no definition in the catalog or in apps,
+one per line. Usually a typo, or an app the chart no longer ships.
+*/}}
+{{- define "eduide.unknownEnabledApps" -}}
+{{- $all := include "eduide.appDefinitions" . | fromJson -}}
+{{- range $name := (.Values.appDefinitions.enabled | default list) -}}
+{{- if not (hasKey $all $name) }}
+{{ $name }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+`over` merged into `base`, map by map, as JSON. Not sprig's mergeOverwrite: it
+skips false and 0, so `visible: false` could not override a catalog entry.
+*/}}
+{{- define "eduide.deepMerge" -}}
+{{- $out := deepCopy .base -}}
+{{- range $k, $v := .over -}}
+{{- $cur := get $out $k -}}
+{{- if and (kindIs "map" $v) (kindIs "map" $cur) -}}
+{{- $_ := set $out $k (include "eduide.deepMerge" (dict "base" $cur "over" $v) | fromJson) -}}
+{{- else -}}
+{{- $_ := set $out $k $v -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+
+{{/*
 Every image this installation needs on every node: one per app, one per
 sidecar, plus the landing page. Derived rather than listed, so it cannot
 disagree with what the installation offers.
@@ -103,12 +174,21 @@ disagree with what the installation offers.
 {{- $out = append $out (tpl (.Values.landingPage.image | toString) .) -}}
 {{- end -}}
 {{- $ctx := . -}}
-{{- range $name := (.Values.appDefinitions.apps | default dict | keys | sortAlpha) -}}
-{{- $app := index $ctx.Values.appDefinitions.apps $name -}}
+{{- $apps := include "eduide.apps" . | fromJson -}}
+{{- range $name := ($apps | keys | sortAlpha) -}}
+{{- $app := index $apps $name -}}
 {{- $out = append $out (include "eduide.appImage" (dict "app" $app "ctx" $ctx)) -}}
 {{- range $sc := ($app.sidecars | default list) -}}
 {{- $out = append $out (include "eduide.appImage" (dict "app" $sc "ctx" $ctx)) -}}
 {{- end -}}
+{{- end -}}
+{{- /* With Keycloak the operator starts every session pod with an oauth2-proxy
+sidecar, so a cold node would pull it on the first session. Same image and tag
+the operator uses (its default is "latest"). The image is distroless - no
+/bin/sh for the default echo - so it runs its own binary, which exits 0. */ -}}
+{{- if .Values.keycloak.enable -}}
+{{- $proxy := printf "quay.io/oauth2-proxy/oauth2-proxy:%s" (tpl (.Values.operator.oAuth2ProxyVersion | default "latest" | toString) .) -}}
+{{- $out = append $out (dict "image" $proxy "command" (list "/bin/oauth2-proxy") "args" (list "--version")) -}}
 {{- end -}}
 {{- end -}}
 {{- range $extra := (.Values.preloading.images | default list) -}}

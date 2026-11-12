@@ -23,10 +23,11 @@ cannot reach them because the external-egress allow excludes private ranges.
 {{- if and .Values.demoApplication.install .Values.demoApplication.monitor }}
 {{- $monitorPorts = append $monitorPorts (int (tpl (.Values.demoApplication.monitor.port | toString) .)) }}
 {{- end }}
-{{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
+{{- $apps := include "eduide.apps" . | fromJson }}
+{{- range $name, $app := $apps }}
 {{- $monitorPorts = append $monitorPorts (int (($app.monitor).port | default ($d.monitor).port | default 8081)) }}
 {{- end }}
-{{- range $name, $app := (.Values.appDefinitions.apps | default dict) }}
+{{- range $name, $app := $apps }}
 {{- $port := (($app.options | default $d.options) | default dict).dataBridgePort }}
 {{- if and $port (ne (toString $port) (toString $np.dataBridgePort)) }}
 {{- fail (printf "appDefinitions.apps.%s uses dataBridgePort %v but networkPolicies.dataBridgePort is %v, so the default-deny would drop its data injection" $name $port $np.dataBridgePort) }}
