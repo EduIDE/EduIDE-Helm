@@ -1,0 +1,144 @@
+{{- if and .Values.poolScaler.enabled .Values.poolScaler.monitoring.enabled }}
+{{- /*
+The scaler brings its own board, scrape config and alerts. Unlike the platform
+monitoring in eduide-cluster they are per environment, so every name carries
+the release namespace: tenants sharing a cluster would otherwise overwrite one
+another in the shared monitoring and dashboard namespaces.
+*/}}
+{{- $m := .Values.poolScaler.monitoring }}
+{{- $ns := .Release.Namespace }}
+{{- $sel := printf `namespace="%s"` $ns }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: pool-scaler-{{ $ns }}
+  namespace: {{ $m.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+spec:
+  selector:
+    matchLabels:
+      app: pool-scaler
+  namespaceSelector:
+    matchNames:
+      - {{ $ns }}
+  podMetricsEndpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pool-scaler-dashboard-{{ $ns }}
+  namespace: {{ $m.dashboardNamespace }}
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+data:
+  pool-scaler-{{ $ns }}.json: |-
+    {{- .Files.Get "files/pool-scaler-dashboard.json" | replace "__NAMESPACE__" $ns | replace "__UID__" (printf "pool-scaler-%s" $ns | trunc 40) | nindent 4 }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: pool-scaler-{{ $ns }}
+  namespace: {{ $m.namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+spec:
+  groups:
+    - name: eduide.pool-scaler.{{ $ns }}
+      rules:
+        - alert: PoolScalerDown
+          expr: absent(up{{ "{" }}{{ $sel }}, pod=~"pool-scaler-.*"} == 1)
+          for: 10m
+          labels: &labels
+            severity: warning
+            # Routing labels, as on the platform alerts in eduide-cluster.
+            namespace: {{ $m.namespace }}
+            eduide_namespace: {{ $ns }}
+          annotations:
+            summary: 'The pool scaler in {{ $ns }} is not running'
+            description: >-
+              No pool scaler target in {{ $ns }} has been up for 10 minutes. Pools stay as
+              they are (targetIdle is not changed), so nothing breaks right away, but
+              demand changes are no longer followed.
+        - alert: PoolScalerDecisionStale
+          expr: time() - pool_scaler_last_decision_timestamp_seconds{{ "{" }}{{ $sel }}} > {{ $m.decisionStaleSeconds }}
+          for: 5m
+          labels: *labels
+          annotations:
+            summary: 'The pool scaler in {{ $ns }} has stopped deciding'
+            description: >-
+              The last completed decision round is older than {{ $m.decisionStaleSeconds }} seconds. Usually the
+              Kubernetes API is unreachable for the scaler; check its log.
+        - alert: PoolScalerProviderFailing
+          expr: pool_scaler_provider_up{{ "{" }}{{ $sel }}} == 0
+          for: 15m
+          labels: *labels
+          annotations:
+            summary: 'Pool scaler provider {{ "{{" }} $labels.provider {{ "}}" }} is failing in {{ $ns }}'
+            description: >-
+              The scaler falls back (Prometheus down: last valid value; Artemis down: last known
+              events). Check pool_scaler_provider_errors_total and the scaler log.
+        - alert: PoolScalerPatchFailing
+          expr: increase(pool_scaler_patches_total{{ "{" }}{{ $sel }}, result="error"}[15m]) > 0
+          for: 10m
+          labels: *labels
+          annotations:
+            summary: 'The pool scaler cannot patch {{ "{{" }} $labels.appdef {{ "}}" }} in {{ $ns }}'
+            description: >-
+              Patching spec.targetIdle fails. Check the scaler's RBAC and that the CRD has the
+              targetIdle field (eduide-cluster 2.9.0 or later).
+        - alert: PoolScalerBudgetClamped
+          expr: increase(pool_scaler_budget_clamped_total{{ "{" }}{{ $sel }}}[30m]) > 0
+          for: 30m
+          labels: *labels
+          annotations:
+            summary: 'The budget keeps cutting {{ "{{" }} $labels.appdef {{ "}}" }} in {{ $ns }}'
+            description: >-
+              For 30 minutes the free quota, node capacity or memory headroom has been smaller
+              than the idle pods the scaler wants. Students may see more cold starts.
+              The budget panels of the pool scaler board show which limit binds.
+        - alert: PoolScalerTargetNotReached
+          expr: |-
+            (
+              max by (namespace, appdef) (pool_scaler_target_idle{{ "{" }}{{ $sel }}})
+              - on (namespace, appdef)
+              max by (namespace, appdef) (label_replace(
+                sum by (namespace, app_definition) (eduide_pool_instances{{ "{" }}{{ $sel }}, state=~"idle_ready|idle_starting"}),
+                "appdef", "$1", "app_definition", "(.*)"))
+            ) > 0
+            and on (namespace) max by (namespace) (pool_scaler_mode{{ "{" }}{{ $sel }}, mode="active"}) == 1
+          for: 15m
+          labels: *labels
+          annotations:
+            summary: 'The operator does not reach targetIdle for {{ "{{" }} $labels.appdef {{ "}}" }} in {{ $ns }}'
+            description: >-
+              For 15 minutes there have been fewer free pool pods than the scaler set. Under
+              capacity pressure the operator keeps no free pods on purpose (check
+              eduide_session_rejected_total and PoolScalerBudgetClamped). Otherwise it may be
+              failing to create them (image pulls), or it does not support targetIdle yet.
+        - alert: PoolScalerStrategyFallback
+          expr: sum by (namespace, strategy, reason) (increase(pool_scaler_strategy_fallbacks_total{{ "{" }}{{ $sel }}}[5m])) > 0
+          for: 15m
+          labels: *labels
+          annotations:
+            summary: 'The active strategy {{ "{{" }} $labels.strategy {{ "}}" }} has been falling back for 15 minutes in {{ $ns }}'
+            description: >-
+              Reason: {{ "{{" }} $labels.reason {{ "}}" }}. The scaler keeps working on the next strategy in the
+              chain (predictive, reactive, last valid value, floor), but the experiment
+              no longer measures the strategy it is meant to.
+        - alert: PoolScalerOverrideLong
+          expr: min_over_time(pool_scaler_override_active{{ "{" }}{{ $sel }}}[24h]) == 1
+          labels: *labels
+          annotations:
+            summary: 'A manual override on {{ "{{" }} $labels.appdef {{ "}}" }} has been active for 24 hours in {{ $ns }}'
+            description: >-
+              pool-scaler.eduide/override-target-idle is still in force. Remove the annotation
+              or shorten pool-scaler.eduide/override-until if it was meant for one event.
+{{- end }}

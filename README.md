@@ -30,6 +30,7 @@ A bare `--version 2.0.0` with no overrides pins every image. Nothing floats.
 | `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
 | `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.2.0` |
 | `versions.landingPage` | EduIDE-Landing-Page | `1.2.0` |
+| `versions.poolScaler` | EduIDE-pool-scaler (only with `poolScaler.enabled`) | `0.1.0` |
 
 The three release on their own cadence, so each has its own knob and an
 override names exactly one. A blanket tag would be wrong: a pull request only
@@ -73,6 +74,22 @@ three hand-maintained lists across two repositories, the preload one addressed
 by array index - which is how production came to offer `c-templates` while
 preloading everything except `c-templates`.
 `scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
+
+## Scaling the prewarmed pool
+
+`poolScaler.enabled` deploys the
+[pool scaler](https://github.com/EduIDE/EduIDE-pool-scaler), which decides how
+many free prewarmed pods each AppDefinition keeps by patching
+`spec.targetIdle`. It starts in `mode: shadow` (decide and export, patch
+nothing). Its configuration goes under `poolScaler.config` as in the scaler's
+`examples/config.yaml`; `poolScaler.monitoring.enabled` adds its Grafana board,
+PodMonitor and alerts, named per namespace.
+
+`targetIdle` is preserved on upgrade like `minInstances` and `maxInstances`: the
+live value wins. An installation with the scaler sets `minInstances` to 0 or a
+small emergency value, since it stays the lower bound of the whole pool.
+The scaler and the "Warm pool" panels read the operator's pool metrics, served
+on `operator.metricsPort`.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.

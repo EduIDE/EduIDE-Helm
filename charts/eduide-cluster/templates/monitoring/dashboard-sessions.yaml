@@ -1,7 +1,8 @@
 {{- if .Values.monitoring.enabled }}
 {{- /*
 Sessions overview. Everything here comes from cAdvisor, kubelet and
-kube-state-metrics, plus the one startup timer the REST service exports.
+kube-state-metrics, plus the startup timer the REST service exports and the
+sessions-ended counter the operator exports (podmonitor-operator.yaml).
 Session pods themselves expose no metrics endpoint - they serve HTML - so
 nothing on this dashboard needs a PodMonitor against them.
 */}}
@@ -124,7 +125,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Pods named instance-*: started ahead of demand so a student does not wait for a cold start. If this reaches 0 the next student waits.",
+          "description": "Free prewarmed pods (ready or still starting), from the operator's eduide_pool_instances. Claimed pool pods are not counted. If this reaches 0 the next student waits for a cold start.",
           "gridPos": {
             "h": 5,
             "w": 6,
@@ -139,7 +140,7 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "count(kube_pod_info{namespace=~\"$namespace\", pod=~\"instance-.*\"}) or vector(0)",
+              "expr": "sum(eduide_pool_instances{namespace=~\"$namespace\", state=~\"idle_ready|idle_starting\"}) or vector(0)",
               "format": "time_series",
               "instant": false,
               "legendFormat": "",
@@ -435,7 +436,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Unclaimed instance-* pods. Flat lines at 0 mean every start is a cold start; see the startup latency panel below for what that costs.",
+          "description": "Free prewarmed pods (ready or still starting), from the operator's eduide_pool_instances. Flat lines at 0 mean every start is a cold start; see the startup latency panel below for what that costs.",
           "gridPos": {
             "h": 8,
             "w": 12,
@@ -450,7 +451,7 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "count by (namespace) (kube_pod_info{namespace=~\"$namespace\", pod=~\"instance-.*\"})",
+              "expr": "sum by (namespace) (eduide_pool_instances{namespace=~\"$namespace\", state=~\"idle_ready|idle_starting\"})",
               "format": "time_series",
               "instant": false,
               "legendFormat": "{{ "{{" }}namespace{{ "}}" }}",
@@ -819,12 +820,107 @@ data:
           }
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Sessions the operator stopped: inactivity is the idle timeout, lifetime is the app definition's maximum session time. Sessions a student or admin stopped are not counted. Empty until the operator runs with operator.metricsPort set.",
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 23
+          },
+          "id": 116,
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "editorMode": "code",
+              "expr": "sum by (namespace, reason) (rate(theiacloud_sessions_ended_total{namespace=~\"$namespace\"}[15m])) * 3600",
+              "format": "time_series",
+              "instant": false,
+              "legendFormat": "{{ "{{" }}reason{{ "}}" }} {{ "{{" }}namespace{{ "}}" }}",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Sessions ended per hour, by reason",
+          "type": "timeseries",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 0,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "linear",
+                "lineWidth": 1,
+                "pointSize": 5,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "unit": "none",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "maxHeight": 600,
+              "mode": "multi",
+              "sort": "desc"
+            }
+          }
+        },
+        {
           "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 23
+            "y": 31
           },
           "id": 120,
           "panels": [],
@@ -841,7 +937,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 24
+            "y": 32
           },
           "id": 121,
           "targets": [
@@ -949,7 +1045,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 24
+            "y": 32
           },
           "id": 122,
           "targets": [
@@ -1057,7 +1153,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 32
+            "y": 40
           },
           "id": 123,
           "targets": [
@@ -1153,7 +1249,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 32
+            "y": 40
           },
           "id": 124,
           "targets": [
@@ -1226,7 +1322,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 40
+            "y": 48
           },
           "id": 130,
           "panels": [],
@@ -1243,7 +1339,7 @@ data:
             "h": 5,
             "w": 6,
             "x": 0,
-            "y": 41
+            "y": 49
           },
           "id": 131,
           "targets": [
@@ -1308,7 +1404,7 @@ data:
             "h": 5,
             "w": 6,
             "x": 6,
-            "y": 41
+            "y": 49
           },
           "id": 132,
           "targets": [
@@ -1377,7 +1473,7 @@ data:
             "h": 5,
             "w": 6,
             "x": 12,
-            "y": 41
+            "y": 49
           },
           "id": 133,
           "targets": [
@@ -1442,7 +1538,7 @@ data:
             "h": 5,
             "w": 6,
             "x": 18,
-            "y": 41
+            "y": 49
           },
           "id": 134,
           "targets": [
@@ -1515,7 +1611,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 46
+            "y": 54
           },
           "id": 135,
           "targets": [
@@ -1612,7 +1708,7 @@ data:
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 46
+            "y": 54
           },
           "id": 136,
           "targets": [
@@ -1705,7 +1801,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 54
+            "y": 62
           },
           "id": 140,
           "panels": [],
@@ -1722,7 +1818,7 @@ data:
             "h": 9,
             "w": 24,
             "x": 0,
-            "y": 55
+            "y": 63
           },
           "id": 141,
           "targets": [

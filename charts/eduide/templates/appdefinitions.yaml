@@ -21,12 +21,20 @@ but the admin scaling API mutates them on the live resource, and Helm must not
 reset that on every upgrade. The lookup reads back what is there. It returns
 empty under `helm template`, which is why both fields are masked in the render
 diff - see AGENTS.md.
+
+targetIdle belongs to the pool scaler, which patches it on the live resource.
+It is optional: unset means the operator keeps minInstances as the pool size.
+A value from the chart is a bootstrap default like min and max, and the live
+value always wins, so an upgrade never resets what the scaler decided.
 */ -}}
 {{- $live := (lookup "theia.cloud/v1beta11" "AppDefinition" $ctx.Release.Namespace $name).spec | default dict }}
 {{- $min := $app.minInstances | default $d.minInstances | default 0 }}
 {{- if hasKey $live "minInstances" }}{{ $min = get $live "minInstances" }}{{ end }}
 {{- $max := $app.maxInstances | default $d.maxInstances | default 10 }}
 {{- if hasKey $live "maxInstances" }}{{ $max = get $live "maxInstances" }}{{ end }}
+{{- $targetIdle := "" }}
+{{- if hasKey $app "targetIdle" }}{{ $targetIdle = $app.targetIdle }}{{ else if hasKey $d "targetIdle" }}{{ $targetIdle = $d.targetIdle }}{{ end }}
+{{- if hasKey $live "targetIdle" }}{{ $targetIdle = get $live "targetIdle" }}{{ end }}
 ---
 apiVersion: theia.cloud/v1beta11
 kind: AppDefinition
@@ -56,6 +64,9 @@ spec:
     {{- end }}
   minInstances: {{ $min }}
   maxInstances: {{ $max }}
+  {{- if ne (toString $targetIdle) "" }}
+  targetIdle: {{ $targetIdle }}
+  {{- end }}
   requestsMemory: {{ $app.requestsMemory | default $d.requestsMemory }}
   requestsCpu: {{ $app.requestsCpu | default $d.requestsCpu }}
   limitsMemory: {{ $app.limitsMemory | default $d.limitsMemory }}

@@ -1,0 +1,73 @@
+{{- if .Values.poolScaler.enabled }}
+{{- /*
+The scaler writes exactly one thing: spec.targetIdle on AppDefinitions in its
+own namespace. Everything else is read-only. Nodes, and pods on every
+namespace, are read cluster-wide for the node budget: other tenants' pods use
+the same nodes. The ClusterRole carries the namespace in its name, so tenants
+sharing a cluster do not collide.
+*/}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pool-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+rules:
+  - apiGroups: ["theia.cloud"]
+    resources: ["appdefinitions"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: [""]
+    resources: ["resourcequotas"]
+    verbs: ["get", "list", "watch"]
+  # Pool state: a pool Deployment owned by a Session as well is claimed.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pool-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pool-scaler
+subjects:
+  - kind: ServiceAccount
+    name: pool-scaler
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pool-scaler-{{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pool-scaler-{{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: pool-scaler-{{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: pool-scaler
+    namespace: {{ .Release.Namespace }}
+{{- end }}

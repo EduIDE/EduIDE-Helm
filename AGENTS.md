@@ -59,7 +59,8 @@ two-line `printf` was re-derived inline in about a dozen places, each wrapped in
 
 ## `lookup` makes rendering nondeterministic
 
-`theia-appdefinitions` preserves live scaling values and `theia-shared-cache`
+`theia-appdefinitions` preserves live scaling values (`minInstances`,
+`maxInstances`, and `targetIdle`, which belongs to the pool scaler) and `theia-shared-cache`
 generates a Redis password when its lookup finds nothing. Both are correct, but
 `lookup` returns empty under `helm template`, so both are masked in
 `scripts/render-envs.sh`. **Add any new `lookup` to the mask list**, or

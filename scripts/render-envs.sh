@@ -99,12 +99,14 @@ mkdir -p "$OUT"
 #                        under `helm template` they fall back to bootstrap
 #                        defaults. (Lives in EduIDE-deployment, listed here so
 #                        the mask set stays in one place.)
+#   targetIdle           the same lookup preserves what the pool scaler set.
 mask() {
   sed -E \
     -e 's/^([[:space:]]*redis-password:).*/\1 <masked>/' \
     -e 's/^([[:space:]]*prometheusPassword:).*/\1 <masked>/' \
     -e 's/^([[:space:]]*minInstances:).*/\1 <masked>/' \
-    -e 's/^([[:space:]]*maxInstances:).*/\1 <masked>/'
+    -e 's/^([[:space:]]*maxInstances:).*/\1 <masked>/' \
+    -e 's/^([[:space:]]*targetIdle:).*/\1 <masked>/'
 }
 
 # Rendering the same input twice must produce the same output. This is what

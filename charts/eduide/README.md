@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.8.0](https://img.shields.io/badge/Version-2.8.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
+![Version: 2.9.0](https://img.shields.io/badge/Version-2.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -146,6 +146,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.leaderElection | object | (see details below) | Options to influence the operator's leader election |
 | operator.logging | object | (see details below) | Allows to override the operator's log4j configuration |
 | operator.maxWatchIdleTime | string | `"3600000"` | Configures the timeout in milliseconds when a watcher for either AppDefinitions, Workspaces, or Sessions is assumed to be not working. When this is detected the operator instance will stop and a new operator will set up fresh watchers. |
+| operator.metricsPort | int | `0` | Port on which the operator serves Prometheus metrics at /metrics, such as theiacloud_sessions_ended_total by reason (inactivity, lifetime). The eduide-cluster chart's PodMonitor scrapes it. 0 serves nothing. Needs an operator image that knows --metricsPort; older ones fail to start with it. |
 | operator.oAuth2ProxyVersion | string | `"v7.12.0"` | The version to use of the quay.io/oauth2-proxy/oauth2-proxy image |
 | operator.replicas | int | `1` | Number of operator instances to create |
 | operator.requestedStorage | string | `"250Mi"` | The amount of requested storage for each persistent volume claim (PVC) for workspaces. This is directly passed to created PVCs and must be a valid Kubernetes quantity. See https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/ |
@@ -157,6 +158,22 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operatorrole.name | string | `"operator-api-access"` |  |
 | podDisruptionBudget | object | (see details below) | PodDisruptionBudgets for the landing page and REST service |
 | podDisruptionBudget.enabled | bool | `true` | Render a PodDisruptionBudget (minAvailable: 1) for every Deployment above that runs more than one replica. Turn this off on single-node clusters: there a drain can never reschedule the evicted replica, so it waits on the last one forever. |
+| poolScaler | object | (see details below) | The pool scaler: decides how many free prewarmed pods each AppDefinition keeps, by patching `spec.targetIdle`. See the EduIDE-pool-scaler README. |
+| poolScaler.calendar | list | `[]` | Events for the static calendar provider, rendered into a ConfigMap and re-read by the scaler every round. Each needs `appDefinition`, `kind` (`exam`, `release`, `due`), `time` (RFC3339) and `participants`. |
+| poolScaler.config | object | `{}` | The scaler configuration file, as in EduIDE-pool-scaler's examples/config.yaml. `namespace`, `mode` and `metricsAddr` are set by the chart. `budget.nodeSelector` defaults to `global.nodeSelector`, the nodes session pods run on.    config:     timezone: Europe/Berlin     strategies: [reactive, predictive]     prometheus:       url: http://prometheus-operated.cattle-monitoring-system:9090     appLimits:       java-17: {floor: 2, ceiling: 80} |
+| poolScaler.enabled | bool | `false` | Deploy the pool scaler. One replica, `Recreate`, no leader election. |
+| poolScaler.image | string | `"{{ .Values.imageRegistry }}/eduide-pool-scaler:{{ .Values.versions.poolScaler }}"` | The pool scaler image. Templated, so the tag follows versions.poolScaler unless the whole string is overridden. |
+| poolScaler.imagePullPolicy | string | `nil` | Optional: override the root imagePullPolicy. |
+| poolScaler.mode | string | `"shadow"` | `shadow` computes and exports every decision but patches nothing; `active` patches `spec.targetIdle`. Start in shadow. |
+| poolScaler.monitoring.dashboardNamespace | string | `"cattle-dashboards"` | Namespace of the dashboard ConfigMap, watched by Grafana's sidecar. |
+| poolScaler.monitoring.decisionStaleSeconds | int | `600` | Decision round older than this, in seconds, fires PoolScalerDecisionStale. |
+| poolScaler.monitoring.enabled | bool | `false` | Create them. Needs the Prometheus Operator CRDs. |
+| poolScaler.monitoring.namespace | string | `"cattle-monitoring-system"` | Namespace of the PodMonitor and the PrometheusRule. Must be one your Prometheus discovers; also the `namespace` label the alerts carry for routing, as in eduide-cluster's `monitoring.alerting.namespace`. |
+| poolScaler.resources | object | `{"limits":{"memory":"256Mi"},"requests":{"cpu":"50m","memory":"64Mi"}}` | Resources of the scaler container. |
+| poolScaler.secret.artemisToken | string | `""` | Artemis pre-shared token. Only read when `create` is true. Comes from a deployment secret, never from a file in git. |
+| poolScaler.secret.create | bool | `false` | Have the chart create the Secret from the two tokens below. Off means it already exists, or no token is needed. |
+| poolScaler.secret.decisionModelToken | string | `""` | Decision model bearer token. Only read when `create` is true. |
+| poolScaler.secret.name | string | `"pool-scaler-tokens"` | Name of the Secret. |
 | preloading | object | (see details below) | Values to configure preloading of images on Kubernetes nodes. |
 | preloading.deriveFromApps | bool | `true` | Set to false to preload only preloading.images and nothing derived. |
 | preloading.enable | bool | `true` | Is image preloading enabled. |
@@ -185,6 +202,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | versions.cloud | string | `"1.3.0"` | EduIDE-Cloud: the operator and the REST service. Released independently of the IDE images, so it carries its own version. 1.2.1 is the first release that accepts the env-injection allowlist flags (--allowCustomEnvFromMap and friends) this chart renders; 1.2.0 rejects them. 1.3.0 is the first release that accepts --sessionNodeSelector, which this chart renders when global.nodeSelector is set; older operators reject it. |
 | versions.ide | string | `""` | The IDE images from the EduIDE repository (java-17, c, python, ...). Empty falls through to the chart's appVersion, which is what a release sets, so a plain `helm install --version 2.0.0` pins every IDE image to the tag that release published. |
 | versions.landingPage | string | `"1.3.1"` | EduIDE-Landing-Page. Released independently as well. 1.2.2 is the first release whose privacy page reads the `landingPage.privacy` block below. 2.2.0 shipped that block while still pinning 1.2.1, which ignores it, so every installation kept the hardcoded text the block exists to replace. 1.3.0 listens on 8080 as non-root, which the landing page Deployment needs. 1.3.1 adds the remaining dependency security fixes. |
+| versions.poolScaler | string | `"0.1.0"` | EduIDE-pool-scaler. Only used when `poolScaler.enabled` is true. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

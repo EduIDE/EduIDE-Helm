@@ -1,5 +1,23 @@
 # Changelog
 
+## [eduide 2.9.0] - unreleased
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+- [eduide-cluster] Add the optional `spec.targetIdle` (integer, minimum 0) to the AppDefinition CRD (`v1beta11`, additive): the number of free prewarmed pods the operator keeps. Absent means the old behaviour
+- [eduide] AppDefinitions keep a live `targetIdle` on upgrade, like `minInstances` and `maxInstances`. `appDefinitions.defaults.targetIdle` and `apps.<name>.targetIdle` set a bootstrap value; unset renders no field
+- [eduide-cluster] The "Warm pool waiting" and "Warm pool available, by environment" panels count free pool pods from the operator's `eduide_pool_instances` (on `operator.metricsPort`) instead of every `instance-*` pod, which included claimed ones
+- [eduide] Add the optional pool scaler (`poolScaler.enabled`): one replica with `Recreate`, RBAC to patch AppDefinitions and read Deployments, quotas, nodes and pods, its configuration (`poolScaler.config`, `poolScaler.calendar`), the Artemis and decision model token Secret and `poolScaler.mode` (`shadow` by default). `versions.poolScaler` pins its image
+- [eduide] `poolScaler.monitoring.enabled` adds the scaler's Grafana board, PodMonitor and PrometheusRule (PoolScalerDown, DecisionStale, ProviderFailing, PatchFailing, BudgetClamped, TargetNotReached, StrategyFallback, OverrideLong), each named per namespace
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+- Upgrade `eduide-cluster` first: an `eduide` release that renders `targetIdle` needs the CRD field, and the scaler cannot patch without it
+- The warm pool panels show 0 until the operator publishes `eduide_pool_instances` (EduIDE/EduIDE-Cloud#168) with `operator.metricsPort` set
+- `targetIdle` needs an operator that supports it (EduIDE/EduIDE-Cloud#168). Before that, the scaler in `mode: active` patches a field nothing reads, and PoolScalerTargetNotReached fires. Keep `mode: shadow` until then
+- `versions.poolScaler` 0.1.0 must be published before `poolScaler.enabled` is set
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
