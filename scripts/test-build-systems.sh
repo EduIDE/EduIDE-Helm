@@ -13,14 +13,18 @@ dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
 # One list per catalog image, built from the catalog itself.
-while read -r image ids; do
+for image in $(yq -r '.appDefinitions.catalog[] | select(.landingPage.buildSystems) | .image' "$ROOT/charts/eduide/values.yaml" | sort -u); do
   name="${image#eduide/}"
   mkdir -p "$dir/templates-$name"
-  jq -n --arg ids "$ids" '$ids | split(",") | map({id: ., label: ., order: 1})' > "$dir/templates-$name/templates-$name.json"
-done < <(yq -r '.appDefinitions.catalog | to_entries | .[] | select(.value.landingPage.buildSystems)
-                | .value.image + " " + (.value.landingPage.buildSystems | map(.id) | join(","))' "$ROOT/charts/eduide/values.yaml")
+  yq -o=json -I=0 "[.appDefinitions.catalog[] | select(.image == \"$image\") | .landingPage.buildSystems[]]" \
+    "$ROOT/charts/eduide/values.yaml" > "$dir/templates-$name/templates-$name.json"
+done
 
 if "$CHECK" "$dir" >/dev/null; then ok "lists matching the catalog pass"; else bad "matching lists must pass"; fi
+
+echo '[{"id":"maven","label":"Apache Maven"},{"id":"gradle","label":"Gradle"}]' > "$dir/templates-java-17-standalone/templates-java-17-standalone.json"
+out=$("$CHECK" "$dir")
+if [[ $? -eq 0 ]] && grep -q "::warning::catalog label 'Maven'" <<<"$out"; then ok "a differing label warns but passes"; else bad "a differing label must warn, not fail"; fi
 
 echo '[{"id":"other","label":"Other","order":1}]' > "$dir/templates-java-17-standalone/templates-java-17-standalone.json"
 if "$CHECK" "$dir" >/dev/null; then bad "an id missing from the image must fail"; else ok "an id missing from the image fails"; fi

@@ -98,8 +98,9 @@ offers fewer templates by overriding `buildSystems` in its `apps`.
 
 `landingPage.ephemeral` (true or false) decides per app whether its sessions
 are temporary. Unset, the app follows `landingPage.ephemeralStorage`. The
-privacy page states the workspace as persistent when any offered app (listed
-and not `visible: false`) is persistent.
+privacy page states the workspace as persistent when any rendered app is
+persistent, hidden Artemis apps included: an Artemis start launches them with
+their own persistence.
 
 An installation's own image needs a full path and tag, because the chart
 prefixes `imageRegistry` to anything that is not one:
@@ -109,22 +110,38 @@ prefixes `imageRegistry` to anything that is not one:
 
 Old image names are frozen at their last tag, so 3.0.0 only works with EduIDE
 2.0.0. The `*-templates` apps are renamed; list the new names in
-`appDefinitions.enabled` (the old ones are skipped with a warning that names the
-replacement):
+`appDefinitions.enabled`. The render fails while `enabled` still names an old
+one, because deleting an AppDefinition garbage-collects its live sessions:
 
 | Before | Now |
 |---|---|
 | `java-17-templates` | `java-17-standalone` |
 | `java-25-templates` | `java-25-standalone` |
 | `c-templates` | `c-standalone` |
-| `java-17`, `java-25`, `python`, `javascript`, `c` | same names, image `<lang>-artemis`, no longer offered on the landing page (`python` and `javascript` were) |
+| `java-17`, `java-25`, `python`, `javascript`, `c` | same names, image `<lang>-artemis`, no longer offered on the landing page |
 | - | new: `rust`, `go` and every `<lang>-standalone` |
 
-`landingPage.appDefinition` defaults to `java-17-standalone`. Template sessions
-were persistent before and follow `ephemeral` now, so a workspace saved under
-the old template app is no longer reachable and is reaped by the garbage
-collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep
-them persistent, and bump `versions.landingPage` to a release that reads it.
+Before you deploy:
+
+- **Maintenance window.** Removing or renaming an app terminates its live
+  sessions (the operator owns the session Deployments and warm pool volumes
+  through the AppDefinition). The new images also replace every running session.
+- **Warm pools.** `minInstances` of a renamed app does not move. Set it on the
+  new app and patch the live AppDefinition, which the chart does not reset.
+- **`python` and `javascript` are hidden now.** An installation that offered
+  them on the landing page switches to `python-standalone` and
+  `javascript-standalone`.
+- **`landingPage.appDefinition`** defaults to `java-17`: the app for links
+  without `?appDef=`, which is the Artemis start. The render fails when it is
+  not an app the installation renders, so update an override that still names a
+  `*-templates` app.
+- **Explicit `enabled`.** An empty `enabled` now offers and preloads 14 images
+  (two editions of seven languages) on every node. List what your courses use.
+- **Persistence.** Template sessions were persistent before and follow
+  `landingPage.ephemeral` now, so a workspace saved under the old template app
+  is no longer reachable and is reaped by the garbage collector. Set
+  `landingPage.ephemeral: false` on the `-standalone` apps to keep them
+  persistent, and bump `versions.landingPage` to a release that reads it.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.

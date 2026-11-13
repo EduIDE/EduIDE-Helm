@@ -155,12 +155,13 @@ landingPage:
   # only starts a session on its own when the host in both `gitUri` and `artemisUrl`
   # is on this list. Otherwise the student has to click Launch.
   trustedArtemisHosts: []
-  # -- the app id to launch
-  appDefinition: "java-17-standalone"
+  # -- The app the landing page launches for a link without `?appDef=`, which is
+  # the Artemis start. Must be an app this installation renders.
+  appDefinition: "java-17"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
   # Set to false if you want to use persisted storage. An app overrides this with
   # its own `landingPage.ephemeral` (true or false); the privacy page states the
-  # workspace as persistent when any offered app ends up persistent.
+  # workspace as persistent when any rendered app ends up persistent.
   ephemeralStorage: true
   # -- What the privacy page states about this installation.
   # Only the research clause lives here. The retention and session figures the
@@ -701,8 +702,7 @@ appDefinitions:
   # (`java-17-standalone`, ...): it is what the landing page offers, and its
   # `landingPage.buildSystems` lists the project templates the image carries.
   # Both editions keep Scorpio and the data bridge.
-  # An image only one installation uses (TH Mannheim's thm-java-25) belongs in
-  # that installation's `apps`, not here. Owned by the chart: change an entry
+  # An image only one installation uses belongs in that installation's `apps`, not here. Owned by the chart: change an entry
   # for one installation through `apps`. An installation that lists `enabled`
   # gets a new catalog entry only once it names it there.
   # `landingPage.buildSystems` ids are template folders of the image, checked
@@ -792,12 +792,14 @@ appDefinitions:
           - { id: bazel, label: Bazel }
     rust:
       image: eduide/rust-artemis
+      limitsMemory: 3000M
       landingPage:
         label: Rust
         # Artemis editions only start from Artemis, by name.
         visible: false
     rust-standalone:
       image: eduide/rust-standalone
+      limitsMemory: 3000M
       landingPage:
         label: Rust
         buildSystems:

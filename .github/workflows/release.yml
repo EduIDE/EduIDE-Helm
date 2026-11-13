@@ -114,23 +114,30 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit $fail
 
+      # Only a chart version that is not published yet needs the check; every
+      # other push to main is a no-op for the release and must not depend on
+      # the images still being around.
+      - name: Is this chart version new
+        id: fresh
+        run: |
+          set -euo pipefail
+          version="$(awk '/^version:/ {print $2; exit}' charts/eduide/Chart.yaml)"
+          if helm show chart "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts/eduide" --version "$version" >/dev/null 2>&1; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # buildSystems in the catalog is a hand-kept list of template ids; the
-      # image is the source of truth. EduIDE's build uploads each image's list
-      # as the artifact templates-<image>.json. Take them from the build run of
-      # the commit the pinned appVersion tag points to.
+      # image is the source of truth. Read each template.json from the
+      # published image itself, so nothing depends on build artifacts, which
+      # expire.
       - name: Every buildSystems id exists in its image
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: steps.fresh.outputs.new == 'true'
         run: |
           set -euo pipefail
           ide=$(yq -r '.appVersion' charts/eduide/Chart.yaml)
-          sha=$(gh api "repos/EduIDE/EduIDE/commits/v${ide}" --jq .sha)
-          run_id=$(gh api "repos/EduIDE/EduIDE/actions/workflows/build.yml/runs?head_sha=${sha}&status=success" --jq '.workflow_runs[0].id // empty')
-          if [[ -z "$run_id" ]]; then
-            echo "::error::no successful EduIDE build run for v${ide} (${sha}); cannot check buildSystems"
-            exit 1
-          fi
-          gh run download "$run_id" --repo EduIDE/EduIDE --pattern 'templates-*' --dir /tmp/templates
+          ./scripts/fetch-image-templates.sh "$ide" /tmp/templates
           ./scripts/check-build-systems.sh /tmp/templates
 
       - name: Package and publish charts

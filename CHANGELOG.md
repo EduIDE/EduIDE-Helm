@@ -5,15 +5,15 @@
 Breaking. Needs EduIDE 2.0.0; do not release before it.
 
 - [eduide] Every language comes in two editions. The Artemis apps (`java-17`, `java-25`, `python`, `javascript`, `c`, new `rust`, `go`) keep their names and now use `eduide/<lang>-artemis`; all are `visible: false`. New `<lang>-standalone` apps use `eduide/<lang>-standalone`, are offered on the landing page and list their templates in `landingPage.buildSystems`
-- [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The unknown-app warning for `appDefinitions.enabled` names the new name. `landingPage.appDefinition` defaults to `java-17-standalone`
+- [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The render fails while `appDefinitions.enabled` names one of them, with the new name in the message. It also fails when `landingPage.appDefinition` (default `java-17`, the app for links without `?appDef=`) is not a rendered app, and when `landingPage.ephemeral` is not a boolean
 - [eduide] Add `landingPage.ephemeral` per app (optional boolean), passed to the landing page config as a boolean. Unset follows `landingPage.ephemeralStorage`
-- [eduide] The privacy page's `workspacePersistent` is true when any offered app (listed, not `visible: false`) is persistent, instead of following `landingPage.ephemeralStorage` alone
-- [eduide] `release.yml` checks every `buildSystems` id against the image's `templates-<image>.json` from the EduIDE build run (`scripts/check-build-systems.sh`)
+- [eduide] The privacy page's `workspacePersistent` is true when any rendered app, hidden ones included, is persistent, instead of following `landingPage.ephemeralStorage` alone
+- [eduide] `release.yml` checks, for a chart version that is not published yet, every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
 - [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
 
 Upgrade notes:
 
-- Rename the three `*-templates` names in `appDefinitions.enabled`. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
+- Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
 - Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
 - Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
 

@@ -192,7 +192,7 @@ appDefinitions:
       landingPage:
         label: Python 3
 EOF
-out=$(render -f "$custom")
+out=$(render -f "$custom" --set landingPage.appDefinition=python)
 rm -f "$custom"
 hs=$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="haskell") | .spec.image + " " + .spec.limitsMemory' <<<"$out" | grep -v '^---$')
 if [[ "$hs" == "registry.example.edu/ide/haskell:2.1.0 4000M" \
@@ -235,7 +235,7 @@ else
   bad "an empty enabled did not render every definition" "defs=[$(app_names <<<"$out")]"
 fi
 # Once enabled lists names, an apps entry it does not name stays out, even an override.
-out=$(render --set-json 'appDefinitions.enabled=["python"]' --set appDefinitions.apps.c.minInstances=2)
+out=$(render --set-json 'appDefinitions.enabled=["python"]' --set landingPage.appDefinition=python --set appDefinitions.apps.c.minInstances=2)
 if [[ "$(app_names <<<"$out")" == "python " ]]; then
   ok "an apps entry that enabled does not name is not rendered"
 else
@@ -252,24 +252,17 @@ notes() {
   helm template t "$notes_chart/eduide" --show-only templates/notes-render.txt --set skipPreflight=true \
     --set keycloak.allowUnauthenticated=true --set keycloak.cookieSecret=test-render-secret "$@" 2>&1
 }
-out=$(render --set-json 'appDefinitions.enabled=["python","no-such-app"]')
+out=$(render --set-json 'appDefinitions.enabled=["python","no-such-app"]' --set landingPage.appDefinition=python)
 if [[ "$(app_names <<<"$out")" == "python " ]] \
-   && notes --set-json 'appDefinitions.enabled=["python","no-such-app"]' | grep -qx '  - no-such-app'; then
+   && notes --set landingPage.appDefinition=python --set-json 'appDefinitions.enabled=["python","no-such-app"]' | grep -qx '  - no-such-app'; then
   ok "an unknown name in enabled is skipped and named in a warning"
 else
-  bad "an unknown name in enabled was not skipped with a warning" "defs=[$(app_names <<<"$out")] notes=[$(notes --set-json 'appDefinitions.enabled=["python","no-such-app"]' | tr '\n' ' ')]"
+  bad "an unknown name in enabled was not skipped with a warning" "defs=[$(app_names <<<"$out")] notes=[$(notes --set landingPage.appDefinition=python --set-json 'appDefinitions.enabled=["python","no-such-app"]' | tr '\n' ' ')]"
 fi
 if notes | grep -q WARNING; then
   bad "the defaults print an unknown-app warning"
 else
   ok "the defaults print no warning"
-fi
-# The three template apps were renamed; the warning says to what.
-if notes --set-json 'appDefinitions.enabled=["c-templates","java-17-templates"]' | grep -qx '  - c-templates (renamed, use c-standalone)' \
-   && notes --set-json 'appDefinitions.enabled=["java-17-templates"]' | grep -qx '  - java-17-templates (renamed, use java-17-standalone)'; then
-  ok "a renamed app in enabled is warned about with its new name"
-else
-  bad "the unknown-app warning must name the new name of a renamed app"
 fi
 rm -rf "$notes_chart"
 
@@ -277,13 +270,42 @@ rm -rf "$notes_chart"
 # time anyone finds out it is broken.
 broken=""
 for name in $(yq -r '.appDefinitions.catalog | keys | .[]' "$CHART/values.yaml"); do
-  out=$(render --set-json "appDefinitions.enabled=[\"$name\"]")
+  out=$(render --set-json "appDefinitions.enabled=[\"$name\"]" --set "landingPage.appDefinition=$name")
   [[ "$(app_names <<<"$out")" == "$name " && "$(offered_names <<<"$out")" == "$name " ]] || broken+="$name "
 done
 if [[ -z "$broken" ]]; then
   ok "every catalog entry renders and is offered alone"
 else
   bad "catalog entries that do not render alone" "$broken"
+fi
+
+# Removing an AppDefinition terminates its live sessions, so a renamed app in
+# enabled and a landing page default that is not rendered stop the deploy.
+err=$(helm template t "$CHART" --set skipPreflight=true --set keycloak.allowUnauthenticated=true --set keycloak.cookieSecret=x --set-json 'appDefinitions.enabled=["c-templates","python"]' --set landingPage.appDefinition=python 2>&1 >/dev/null)
+if grep -q 'renamed to "c-standalone"' <<<"$err"; then
+  ok "a renamed app in enabled fails the render and names its replacement"
+else
+  bad "a renamed app in enabled must fail the render" "$err"
+fi
+if render --set-json 'appDefinitions.apps={"java-17-templates":{"image":"registry.example.edu/ide/x:1"}}' --set-json 'appDefinitions.enabled=["java-17-templates"]' --set landingPage.appDefinition=java-17-templates >/dev/null; then
+  ok "an installation may define an app under an old name itself"
+else
+  bad "a self-defined app under an old name must still render"
+fi
+if render --set-json 'appDefinitions.enabled=["python"]' >/dev/null; then
+  bad "a landingPage.appDefinition that is not rendered must fail the render"
+else
+  ok "a landingPage.appDefinition that is not rendered fails the render"
+fi
+if render --set-json 'appDefinitions.enabled=["python"]' --set-json 'landingPage.additionalApps={"java-17":{"label":"Java"}}' >/dev/null; then
+  ok "landingPage.additionalApps covers the default app"
+else
+  bad "landingPage.additionalApps must count as rendering the default app"
+fi
+if render --set-string appDefinitions.apps.python-standalone.landingPage.ephemeral=false >/dev/null; then
+  bad "a non-boolean landingPage.ephemeral must fail the render"
+else
+  ok "a non-boolean landingPage.ephemeral fails the render"
 fi
 
 echo
@@ -313,16 +335,16 @@ if [[ "$(render --set appDefinitions.apps.python-standalone.landingPage.ephemera
 else
   bad "an offered persistent app must make workspacePersistent true"
 fi
-# Artemis editions are not offered, so they cannot make the statement true.
-if [[ "$(render --set appDefinitions.apps.python.landingPage.ephemeral=false | persistent)" == false ]]; then
-  ok "a hidden persistent app does not count"
+# An Artemis start launches a hidden app with its own persistence, so it counts.
+if [[ "$(render --set appDefinitions.apps.python.landingPage.ephemeral=false | persistent)" == true ]]; then
+  ok "a hidden persistent app counts"
 else
-  bad "a hidden app must not make workspacePersistent true"
+  bad "a hidden persistent app must make workspacePersistent true"
 fi
 # Unset follows the installation-wide flag.
 if [[ "$(render --set landingPage.ephemeralStorage=false | persistent)" == true \
       && "$(render --set landingPage.ephemeralStorage=false --set appDefinitions.apps.python-standalone.landingPage.ephemeral=true \
-            --set-json 'appDefinitions.enabled=["python-standalone"]' | persistent)" == false ]]; then
+            --set landingPage.appDefinition=python-standalone --set-json 'appDefinitions.enabled=["python-standalone"]' | persistent)" == false ]]; then
   ok "unset follows landingPage.ephemeralStorage, a set value wins"
 else
   bad "per-app ephemeral must win over landingPage.ephemeralStorage"

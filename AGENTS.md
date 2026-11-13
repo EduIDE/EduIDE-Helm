@@ -122,8 +122,7 @@ when it is empty. A name in `enabled` with no definition is skipped and
 
 **The catalog holds only official releases.** Every image in EduIDE's build
 matrix that is meant for any installation, and nothing else: a custom build for
-one installation (TH Mannheim's `thm-java-25`, for example) is defined in that
-installation's own `apps`. Every installation on chart defaults offers the
+one installation is defined in that installation's own `apps`. Every installation on chart defaults offers the
 whole catalog, production included, so adding an entry is a decision for all of
 them. `scripts/test-app-consistency.sh` writes the set out and fails when it
 changes.
@@ -131,7 +130,9 @@ changes.
 App names: no suffix is the Artemis edition (`java-17`, image `java-17-artemis`),
 `-standalone` the standalone one (`java-17-standalone`). Artemis stores the name
 per exercise, so the Artemis names never change. `buildSystems` ids must exist
-in the image (`scripts/check-build-systems.sh`, run by `release.yml`).
+in the image (`scripts/fetch-image-templates.sh` reads the published image,
+`scripts/check-build-systems.sh` compares; `release.yml` runs both for a new
+chart version).
 
 Three things derive from that map, each through the helper: the AppDefinition
 custom resources, the app list the landing page offers, and the images the
