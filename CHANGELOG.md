@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))
