@@ -1,5 +1,22 @@
 # Changelog
 
+## [eduide 3.0.0] - unreleased
+
+Breaking. Needs EduIDE 2.0.0; do not release before it.
+
+- [eduide] Every language comes in two editions. The Artemis apps (`java-17`, `java-25`, `python`, `javascript`, `c`, new `rust`, `go`) keep their names and now use `eduide/<lang>-artemis`; all are `visible: false`. New `<lang>-standalone` apps use `eduide/<lang>-standalone`, are offered on the landing page and list their templates in `landingPage.buildSystems`
+- [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The unknown-app warning for `appDefinitions.enabled` names the new name. `landingPage.appDefinition` defaults to `java-17-standalone`
+- [eduide] Add `landingPage.ephemeral` per app (optional boolean), passed to the landing page config as a boolean. Unset follows `landingPage.ephemeralStorage`
+- [eduide] The privacy page's `workspacePersistent` is true when any offered app (listed, not `visible: false`) is persistent, instead of following `landingPage.ephemeralStorage` alone
+- [eduide] `release.yml` checks every `buildSystems` id against the image's `templates-<image>.json` from the EduIDE build run (`scripts/check-build-systems.sh`)
+- [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
+
+Upgrade notes:
+
+- Rename the three `*-templates` names in `appDefinitions.enabled`. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
+- Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
+- Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))

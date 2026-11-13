@@ -44,7 +44,7 @@ declared=$(yq -r '.appDefinitions.catalog | keys | .[]' "$CHART/values.yaml" | s
 # Written out on purpose: the catalog is what EduIDE officially releases, and
 # every installation on chart defaults offers all of it. A custom build for one
 # installation does not belong here.
-official=$(printf '%s\n' c c-templates java-17 java-17-templates java-25 java-25-templates javascript python)
+official=$(printf '%s\n' c c-standalone go go-standalone java-17 java-17-standalone java-25 java-25-standalone javascript javascript-standalone python python-standalone rust rust-standalone)
 if [[ "$declared" == "$official" ]]; then
   ok "the catalog holds exactly the official images"
 else
@@ -205,7 +205,7 @@ else
 fi
 # An override changes one field and keeps the rest of the catalog entry.
 if grep -q 'appName: "Python 3"' <<<"$out" \
-   && [[ "$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="python") | .spec.image' <<<"$out" | grep -v '^---$')" == ghcr.io/eduide/eduide/python:* ]]; then
+   && [[ "$(yq -r 'select(.kind=="AppDefinition" and .metadata.name=="python") | .spec.image' <<<"$out" | grep -v '^---$')" == ghcr.io/eduide/eduide/python-artemis:* ]]; then
   ok "an apps entry merges over its catalog entry"
 else
   bad "an apps entry must merge over its catalog entry, not replace it"
@@ -264,6 +264,13 @@ if notes | grep -q WARNING; then
 else
   ok "the defaults print no warning"
 fi
+# The three template apps were renamed; the warning says to what.
+if notes --set-json 'appDefinitions.enabled=["c-templates","java-17-templates"]' | grep -qx '  - c-templates (renamed, use c-standalone)' \
+   && notes --set-json 'appDefinitions.enabled=["java-17-templates"]' | grep -qx '  - java-17-templates (renamed, use java-17-standalone)'; then
+  ok "a renamed app in enabled is warned about with its new name"
+else
+  bad "the unknown-app warning must name the new name of a renamed app"
+fi
 rm -rf "$notes_chart"
 
 # Every catalog entry has to render on its own, or enabling it is the first
@@ -277,6 +284,48 @@ if [[ -z "$broken" ]]; then
   ok "every catalog entry renders and is offered alone"
 else
   bad "catalog entries that do not render alone" "$broken"
+fi
+
+echo
+echo "=== per-app persistence ==="
+
+# Both are read from the rendered config.js, where ephemeral has to be a JSON
+# boolean and an unset one has to stay absent.
+cfg() { yq -r 'select(.kind=="ConfigMap" and .metadata.name=="landing-page-config") | .data."config.js"' | grep -v '^---$'; }
+if [[ "$(cfg <<<"$OUT" | grep -c 'ephemeral:')" == 0 ]]; then
+  ok "no per-app ephemeral by default"
+else
+  bad "ephemeral must not be rendered unless an app sets it"
+fi
+out=$(render --set appDefinitions.apps.python-standalone.landingPage.ephemeral=false \
+             --set appDefinitions.apps.c-standalone.landingPage.ephemeral=true)
+if cfg <<<"$out" | grep -A3 'serviceAuthToken: "python-standalone"' | grep -qE '^ *ephemeral: false,$' \
+   && cfg <<<"$out" | grep -A3 'serviceAuthToken: "c-standalone"' | grep -qE '^ *ephemeral: true,$'; then
+  ok "landingPage.ephemeral reaches the landing page as a boolean"
+else
+  bad "landingPage.ephemeral did not render as a boolean"
+fi
+persistent() { cfg | grep -o 'workspacePersistent: [a-z]*' | cut -d' ' -f2; }
+# Defaults: ephemeralStorage true and no per-app override, so nothing is persistent.
+if [[ "$(persistent <<<"$OUT")" == false ]]; then ok "workspacePersistent is false when every offered app is ephemeral"; else bad "workspacePersistent must be false by default"; fi
+if [[ "$(render --set appDefinitions.apps.python-standalone.landingPage.ephemeral=false | persistent)" == true ]]; then
+  ok "one offered persistent app makes workspacePersistent true"
+else
+  bad "an offered persistent app must make workspacePersistent true"
+fi
+# Artemis editions are not offered, so they cannot make the statement true.
+if [[ "$(render --set appDefinitions.apps.python.landingPage.ephemeral=false | persistent)" == false ]]; then
+  ok "a hidden persistent app does not count"
+else
+  bad "a hidden app must not make workspacePersistent true"
+fi
+# Unset follows the installation-wide flag.
+if [[ "$(render --set landingPage.ephemeralStorage=false | persistent)" == true \
+      && "$(render --set landingPage.ephemeralStorage=false --set appDefinitions.apps.python-standalone.landingPage.ephemeral=true \
+            --set-json 'appDefinitions.enabled=["python-standalone"]' | persistent)" == false ]]; then
+  ok "unset follows landingPage.ephemeralStorage, a set value wins"
+else
+  bad "per-app ephemeral must win over landingPage.ephemeralStorage"
 fi
 
 echo

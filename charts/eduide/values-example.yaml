@@ -112,13 +112,14 @@ service:
 # Applications
 # ---------------------------------------------------------------------------
 # The chart offers everything in appDefinitions.catalog by default: Java 17,
-# Java 25, C, JavaScript, Python and the Java and C template variants. Each
+# Java 25, Python, JavaScript, C, Rust and Go, each as a -standalone app (offered
+# on the landing page) and as an Artemis app (no suffix, started from Artemis). Each
 # offered app is preloaded onto every node, so trimming the list to what your
 # courses use saves a lot of disk and pull time.
 #
 # appDefinitions:
 #   enabled:                  # from the catalog or from apps below
-#     - java-25-templates
+#     - java-25-standalone
 #     - python
 #     - haskell
 #   apps:

@@ -47,7 +47,7 @@ alike:
 ```yaml
 appDefinitions:
   enabled:                  # names from the catalog or from apps
-    - java-25-templates
+    - java-25-standalone
     - python
     - haskell
   apps:
@@ -70,9 +70,61 @@ naming it.
 That one merged list drives the AppDefinition custom resource, the landing
 page's app list, and the set of images preloaded onto every node. It used to be
 three hand-maintained lists across two repositories, the preload one addressed
-by array index - which is how production came to offer `c-templates` while
-preloading everything except `c-templates`.
+by array index - which is how production came to offer one app while
+preloading everything except it.
 `scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
+
+### Editions
+
+Every language comes in two editions, both with Scorpio and the data bridge:
+
+| AppDefinition | Image | Offered on the landing page | Started from |
+|---|---|---|---|
+| `<lang>` (no suffix) | `eduide/<lang>-artemis` | no (`visible: false`) | Artemis, by name (`?appDef=`) |
+| `<lang>-standalone` | `eduide/<lang>-standalone` | yes | the landing page, or an external start |
+
+`<lang>` is one of `java-17`, `java-25`, `python`, `javascript`, `c`, `rust`,
+`go`. The Artemis edition has the Artemis extension; standalone does not.
+Artemis stores the AppDefinition name per exercise, which is why the Artemis
+names stay without a suffix.
+
+`landingPage.buildSystems` of a `-standalone` app lists the ids of the project
+templates its image carries (`maven`, `gradle`, `make`, `bazel`, `python`,
+`node`, `web`, `cargo`, `go`). One entry starts it directly, several show the
+build system step, none starts an empty workspace. The id is the template
+folder in the image; the release train checks every id against the image's
+`templates-<image>.json` (`scripts/check-build-systems.sh`). An installation
+offers fewer templates by overriding `buildSystems` in its `apps`.
+
+`landingPage.ephemeral` (true or false) decides per app whether its sessions
+are temporary. Unset, the app follows `landingPage.ephemeralStorage`. The
+privacy page states the workspace as persistent when any offered app (listed
+and not `visible: false`) is persistent.
+
+An installation's own image needs a full path and tag, because the chart
+prefixes `imageRegistry` to anything that is not one:
+`registry.example.edu/ide/java-25:1.0.0`. Derive it `FROM` a `-standalone` image.
+
+### Upgrading to 3.0.0
+
+Old image names are frozen at their last tag, so 3.0.0 only works with EduIDE
+2.0.0. The `*-templates` apps are renamed; list the new names in
+`appDefinitions.enabled` (the old ones are skipped with a warning that names the
+replacement):
+
+| Before | Now |
+|---|---|
+| `java-17-templates` | `java-17-standalone` |
+| `java-25-templates` | `java-25-standalone` |
+| `c-templates` | `c-standalone` |
+| `java-17`, `java-25`, `python`, `javascript`, `c` | same names, image `<lang>-artemis`, no longer offered on the landing page (`python` and `javascript` were) |
+| - | new: `rust`, `go` and every `<lang>-standalone` |
+
+`landingPage.appDefinition` defaults to `java-17-standalone`. Template sessions
+were persistent before and follow `ephemeral` now, so a workspace saved under
+the old template app is no longer reachable and is reaped by the garbage
+collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep
+them persistent, and bump `versions.landingPage` to a release that reads it.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.

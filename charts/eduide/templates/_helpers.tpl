@@ -138,9 +138,10 @@ one per line. Usually a typo, or an app the chart no longer ships.
 */}}
 {{- define "eduide.unknownEnabledApps" -}}
 {{- $all := include "eduide.appDefinitions" . | fromJson -}}
+{{- $renamed := dict "java-17-templates" "java-17-standalone" "java-25-templates" "java-25-standalone" "c-templates" "c-standalone" -}}
 {{- range $name := (.Values.appDefinitions.enabled | default list) -}}
 {{- if not (hasKey $all $name) }}
-{{ $name }}
+{{ $name }}{{ if hasKey $renamed $name }} (renamed, use {{ get $renamed $name }}){{ end }}
 {{- end -}}
 {{- end -}}
 {{- end -}}

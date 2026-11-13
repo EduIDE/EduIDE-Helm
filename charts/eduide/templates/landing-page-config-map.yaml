@@ -44,6 +44,10 @@ data:
           {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
           visible: {{ get $val "visible" }},
           {{- end }}
+          {{- /* toJson keeps it a JSON boolean; unset stays absent so the page falls back to useEphemeralStorage. */}}
+          {{- if kindIs "bool" $val.ephemeral }}
+          ephemeral: {{ $val.ephemeral | toJson }},
+          {{- end }}
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
           {{- end }}
@@ -85,7 +89,9 @@ data:
       alternative - restating the figures in a second place - is how a privacy
       statement quietly becomes false.
 
-        workspacePersistent    landingPage.ephemeralStorage, inverted
+        workspacePersistent    true when any offered app is persistent: not
+                               ephemeral, where an app's landingPage.ephemeral
+                               wins over landingPage.ephemeralStorage
         workspaceRetentionSeconds theia-workspace-garbage-collector.env.WORKSPACE_TTL
         sessionMaxMinutes      appDefinitions.defaults.timeout
         sessionIdleMinutes     appDefinitions.defaults.monitor.activityTracker.timeoutAfter
@@ -118,8 +124,21 @@ data:
       {{- if gt $i $maxIdle }}{{ $maxIdle = $i }}{{ end }}
       {{- end }}
       {{- end }}
+      {{- /*
+      Offered means in $apps and not hidden, the same rule the page applies. An
+      Artemis edition (visible: false) is only started from Artemis and does
+      not count, but a single persistent standalone app is enough for the page
+      to state that workspaces are kept.
+      */}}
+      {{- $globalEphemeral := eq (tpl (.Values.landingPage.ephemeralStorage | toString) .) "true" }}
+      {{- $persistent := false }}
+      {{- range $key, $val := $apps }}
+      {{- $offered := not (and (hasKey $val "visible") (ne (toString (get $val "visible")) "true")) }}
+      {{- $ephemeral := ternary $val.ephemeral $globalEphemeral (kindIs "bool" $val.ephemeral) }}
+      {{- if and $offered (not $ephemeral) }}{{ $persistent = true }}{{ end }}
+      {{- end }}
       privacy: {
-        workspacePersistent: {{ not .Values.landingPage.ephemeralStorage }},
+        workspacePersistent: {{ $persistent }},
         workspaceGarbageCollected: {{ $gcEnabled }},
         {{- if $gcEnabled }}
         {{- /*
