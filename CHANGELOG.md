@@ -28,6 +28,11 @@ Breaking. Needs EduIDE 2.0.0; do not release before it.
 - [eduide] Security (internal audit 2026-11-16, CL-01): anchor the oauth2-proxy `skip_auth_routes` entry to `^/health$`. The unanchored `/health.*` matched any path containing `/health`. `scripts/test-session-isolation.sh` fails on an unanchored route
 - [eduide] Security (CL-12): remove the `session-allow-sidecars` NetworkPolicy, which let every session pod reach every sidecar pod. Sidecar pods now carry the session labels, so the default-deny covers them, and the operator creates one NetworkPolicy per session that connects an IDE pod to its own sidecars only. Needs the EduIDE-Cloud release that creates it (the next one after 2.0.1); with an older operator the language servers of sidecar-enabled apps are unreachable
 - [eduide-cluster] Security (CL-12): the operator ClusterRole may `create`, `get` and `delete` `networkpolicies`, for the per-session sidecar policy
+- [eduide-cluster] Add the optional `spec.targetIdle` (integer, minimum 0) to the AppDefinition CRD (`v1beta11`, additive): the number of free prewarmed pods the operator keeps. Absent means the old behaviour
+- [eduide] AppDefinitions keep a live `targetIdle` on upgrade, like `minInstances` and `maxInstances`. `appDefinitions.defaults.targetIdle` and `apps.<name>.targetIdle` set a bootstrap value; unset renders no field
+- [eduide-cluster] The "Warm pool waiting" and "Warm pool available, by environment" panels count free pool pods from the operator's `eduide_pool_instances` (on `operator.metricsPort`) instead of every `instance-*` pod, which included claimed ones
+- [eduide] Add the optional pool scaler (`poolScaler.enabled`): one replica with `Recreate`, RBAC to patch AppDefinitions and read Deployments, quotas, nodes and pods, its configuration (`poolScaler.config`, `poolScaler.calendar`), the Artemis and decision model token Secret and `poolScaler.mode` (`shadow` by default). `versions.poolScaler` pins its image
+- [eduide] `poolScaler.monitoring.enabled` adds the scaler's Grafana board, PodMonitor and PrometheusRule (PoolScalerDown, DecisionStale, ProviderFailing, PatchFailing, BudgetClamped, TargetNotReached, StrategyFallback, OverrideLong), each named per namespace
 
 Upgrade notes:
 
@@ -36,6 +41,10 @@ Upgrade notes:
 - Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
 - Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
 - Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+- Upgrade `eduide-cluster` first: an `eduide` release that renders `targetIdle` needs the CRD field, and the scaler cannot patch without it
+- The warm pool panels show 0 until the operator publishes `eduide_pool_instances` (EduIDE/EduIDE-Cloud#170) with `operator.metricsPort` set
+- `targetIdle` needs an operator that supports it (EduIDE/EduIDE-Cloud#170). Before that, the scaler in `mode: active` patches a field nothing reads, and PoolScalerTargetNotReached fires. Keep `mode: shadow` until then
+- `versions.poolScaler` 0.1.0 must be published before `poolScaler.enabled` is set
 
 ## [eduide 2.10.0] - 2026-11-14
 

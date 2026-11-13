@@ -43,6 +43,8 @@ versions:
   # same release. 1.4.0 is that release; 1.4.1 fixes the contrast of the
   # persistence hint.
   landingPage: "1.4.1" # renovate: datasource=github-releases depName=EduIDE/EduIDE-Landing-Page
+  # -- EduIDE-pool-scaler. Only used when `poolScaler.enabled` is true.
+  poolScaler: "0.1.0"
 
 # -- The container registry every EduIDE image is pulled from.
 imageRegistry: ghcr.io/eduide
@@ -965,6 +967,71 @@ preloading:
 # operator's own session activity tracker).
 monitoring:
   enabled: true
+
+# -- The pool scaler: decides how many free prewarmed pods each AppDefinition
+# keeps, by patching `spec.targetIdle`. See the EduIDE-pool-scaler README.
+# @default -- (see details below)
+poolScaler:
+  # -- Deploy the pool scaler. One replica, `Recreate`, no leader election.
+  enabled: false
+  # -- `shadow` computes and exports every decision but patches nothing;
+  # `active` patches `spec.targetIdle`. Start in shadow.
+  mode: shadow
+  # -- The pool scaler image. Templated, so the tag follows
+  # versions.poolScaler unless the whole string is overridden.
+  image: '{{ .Values.imageRegistry }}/eduide-pool-scaler:{{ .Values.versions.poolScaler }}'
+  # -- Optional: override the root imagePullPolicy.
+  imagePullPolicy:
+  # -- The scaler configuration file, as in EduIDE-pool-scaler's
+  # examples/config.yaml. `namespace`, `mode` and `metricsAddr` are set by the
+  # chart. `budget.nodeSelector` defaults to `global.nodeSelector`, the nodes
+  # session pods run on.
+  #
+  #   config:
+  #     timezone: Europe/Berlin
+  #     strategies: [reactive, predictive]
+  #     prometheus:
+  #       url: http://prometheus-operated.cattle-monitoring-system:9090
+  #     appLimits:
+  #       java-17: {floor: 2, ceiling: 80}
+  config: {}
+  # -- Events for the static calendar provider, rendered into a ConfigMap and
+  # re-read by the scaler every round. Each needs `appDefinition`, `kind`
+  # (`exam`, `release`, `due`), `time` (RFC3339) and `participants`.
+  calendar: []
+  # The Secret with `ARTEMIS_TOKEN` (for `config.artemis.url`) and
+  # `DECISION_MODEL_TOKEN` (for `config.decisionModel.url`). Both keys are
+  # optional.
+  secret:
+    # -- Have the chart create the Secret from the two tokens below. Off means
+    # it already exists, or no token is needed.
+    create: false
+    # -- Name of the Secret.
+    name: pool-scaler-tokens
+    # -- Artemis pre-shared token. Only read when `create` is true. Comes from
+    # a deployment secret, never from a file in git.
+    artemisToken: ""
+    # -- Decision model bearer token. Only read when `create` is true.
+    decisionModelToken: ""
+  # -- Resources of the scaler container.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+  # Grafana board, PodMonitor and alerts for the scaler.
+  monitoring:
+    # -- Create them. Needs the Prometheus Operator CRDs.
+    enabled: false
+    # -- Namespace of the PodMonitor and the PrometheusRule. Must be one your
+    # Prometheus discovers; also the `namespace` label the alerts carry for
+    # routing, as in eduide-cluster's `monitoring.alerting.namespace`.
+    namespace: cattle-monitoring-system
+    # -- Namespace of the dashboard ConfigMap, watched by Grafana's sidecar.
+    dashboardNamespace: cattle-dashboards
+    # -- Decision round older than this, in seconds, fires PoolScalerDecisionStale.
+    decisionStaleSeconds: 600
 
 # -- The Gradle build cache and Maven proxy. Optional: nothing reaches it
 # unless operator.enableBuildCaching or operator.enableDependencyCaching is also

@@ -56,6 +56,9 @@ jobs:
       - name: Session isolation (anchored skip-auth routes, sidecar policy)
         run: ./scripts/test-session-isolation.sh
 
+      - name: Pool scaler, targetIdle and operator metrics
+        run: ./scripts/test-pool-scaler.sh
+
       # AGENTS.md says the two charts are released together at the same version
       # and nothing checked it, so they drifted to 2.2.1 and 2.2.2 across a pair
       # of unrelated fixes. One repository tag and one GitHub release name one
