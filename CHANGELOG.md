@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [eduide 2.9.0] - unreleased
 
 - [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
 - [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
