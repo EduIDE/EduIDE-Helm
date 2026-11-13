@@ -1,0 +1,147 @@
+{{- if .Values.poolScaler.enabled }}
+{{- $ps := .Values.poolScaler }}
+{{- if not (has $ps.mode (list "shadow" "active")) }}
+{{- fail (printf "poolScaler.mode must be shadow or active, got %q" (toString $ps.mode)) }}
+{{- end }}
+{{- /*
+The chart owns namespace, mode and the metrics address; everything else is the
+scaler's own configuration file, passed through. The budget looks at the nodes
+session pods run on, which is global.nodeSelector unless set explicitly.
+*/}}
+{{- $cfg := deepCopy ($ps.config | default dict) }}
+{{- $_ := set $cfg "namespace" .Release.Namespace }}
+{{- $_ := set $cfg "mode" $ps.mode }}
+{{- $_ := set $cfg "metricsAddr" ":9090" }}
+{{- $budget := $cfg.budget | default dict }}
+{{- if and .Values.global.nodeSelector (not $budget.nodeSelector) }}
+{{- $_ := set $budget "nodeSelector" .Values.global.nodeSelector }}
+{{- $_ := set $cfg "budget" $budget }}
+{{- end }}
+{{- if $ps.calendar }}
+{{- $_ := set $cfg "calendar" (dict "file" "/etc/pool-scaler/calendar.yaml") }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pool-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pool-scaler-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+data:
+  config.yaml: |
+    {{- toYaml $cfg | nindent 4 }}
+  {{- with $ps.calendar }}
+  calendar.yaml: |
+    {{- toYaml (dict "events" .) | nindent 4 }}
+  {{- end }}
+{{- if $ps.secret.create }}
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ $ps.secret.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+stringData:
+  {{- with $ps.secret.artemisToken }}
+  ARTEMIS_TOKEN: {{ . | quote }}
+  {{- end }}
+  {{- with $ps.secret.decisionModelToken }}
+  DECISION_MODEL_TOKEN: {{ . | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pool-scaler
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: pool-scaler
+    app.kubernetes.io/part-of: eduide
+    app.kubernetes.io/component: pool-scaler
+spec:
+  # Exactly one: two scalers would fight over targetIdle, and there is no
+  # leader election. Recreate makes sure the old pod is gone before the new one
+  # starts deciding.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pool-scaler
+  template:
+    metadata:
+      labels:
+        app: pool-scaler
+        app.kubernetes.io/part-of: eduide
+        app.kubernetes.io/component: pool-scaler
+      annotations:
+        checksum/config: {{ toYaml $cfg | sha256sum }}
+        checksum/calendar: {{ toYaml $ps.calendar | sha256sum }}
+    spec:
+      serviceAccountName: pool-scaler
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.global.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: pool-scaler
+          image: {{ tpl ($ps.image | toString) . }}
+          imagePullPolicy: {{ if $ps.imagePullPolicy }}{{ tpl ($ps.imagePullPolicy | toString) . }}{{ else }}{{ tpl (.Values.imagePullPolicy | toString) . }}{{ end }}
+          args: ["run", "--config", "/etc/pool-scaler/config.yaml"]
+          env:
+            - name: ARTEMIS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ps.secret.name }}
+                  key: ARTEMIS_TOKEN
+                  optional: true
+            - name: DECISION_MODEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $ps.secret.name }}
+                  key: DECISION_MODEL_TOKEN
+                  optional: true
+          ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 30
+          resources:
+            {{- toYaml $ps.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pool-scaler
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: pool-scaler-config
+{{- end }}

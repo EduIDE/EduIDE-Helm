@@ -125,7 +125,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Pods named instance-*: started ahead of demand so a student does not wait for a cold start. If this reaches 0 the next student waits.",
+          "description": "Free prewarmed pods (ready or still starting), from the operator's eduide_pool_instances. Claimed pool pods are not counted. If this reaches 0 the next student waits for a cold start.",
           "gridPos": {
             "h": 5,
             "w": 6,
@@ -140,7 +140,7 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "count(kube_pod_info{namespace=~\"$namespace\", pod=~\"instance-.*\"}) or vector(0)",
+              "expr": "sum(eduide_pool_instances{namespace=~\"$namespace\", state=~\"idle_ready|idle_starting\"}) or vector(0)",
               "format": "time_series",
               "instant": false,
               "legendFormat": "",
@@ -436,7 +436,7 @@ data:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Unclaimed instance-* pods. Flat lines at 0 mean every start is a cold start; see the startup latency panel below for what that costs.",
+          "description": "Free prewarmed pods (ready or still starting), from the operator's eduide_pool_instances. Flat lines at 0 mean every start is a cold start; see the startup latency panel below for what that costs.",
           "gridPos": {
             "h": 8,
             "w": 12,
@@ -451,7 +451,7 @@ data:
                 "uid": "prometheus"
               },
               "editorMode": "code",
-              "expr": "count by (namespace) (kube_pod_info{namespace=~\"$namespace\", pod=~\"instance-.*\"})",
+              "expr": "sum by (namespace) (eduide_pool_instances{namespace=~\"$namespace\", state=~\"idle_ready|idle_starting\"})",
               "format": "time_series",
               "instant": false,
               "legendFormat": "{{ "{{" }}namespace{{ "}}" }}",
