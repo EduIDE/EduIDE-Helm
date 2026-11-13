@@ -3,6 +3,7 @@
 ## [eduide 2.8.1] - 2026-11-13
 
 - [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
+- [eduide-cluster] No changes; bumped with eduide, since both charts release at one version
 
 ## [eduide 2.8.0] - 2026-11-11
 
