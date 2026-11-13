@@ -684,6 +684,13 @@ appDefinitions:
       # The monitor extension's own server. Not the app port: there the operator
       # would hit oauth2-proxy, which can never answer the activity poll.
       port: 8081
+      activityTracker:
+        # Minutes without user input before the session is deleted. Long enough
+        # for a student who only listens to a lecture block between edits.
+        timeoutAfter: 60
+        # Minutes without user input before the "Are you still here?" dialog.
+        # Ten minutes of warning, because the operator only polls every few minutes.
+        notifyAfter: 50
   # -- The apps this installation offers, by name from `catalog` or `apps`.
   # Empty offers every definition. A name with neither is skipped, and
   # `helm install`/`helm upgrade` print a warning naming it.
