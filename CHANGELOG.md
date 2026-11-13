@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+
 ## [eduide 2.9.0] - 2026-11-14
 
 - [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
