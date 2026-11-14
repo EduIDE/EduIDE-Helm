@@ -200,6 +200,7 @@ The chart version is the platform version and is what an environment pins.
 | `missing ghcr.io/...` | a component build failed | check that repository's Actions, re-run |
 | `is not multi-arch` | one architecture failed | re-run the whole build, not just the merge job |
 | `tag v2.3.0 already exists` | version already used | pick the next one, tags are immutable |
+| `changed but version is still X` (PR) or `already published` (release on main) | a chart changed without a version bump | bump both charts in a pull request; a published version is never overwritten |
 
 ---
 

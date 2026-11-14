@@ -76,6 +76,9 @@ jobs:
           git fetch --quiet origin "${{ github.base_ref }}"
           failed=0
           for chart in charts/*/; do
+            # The glob ends in a slash, and `git show main:charts/eduide//Chart.yaml`
+            # fails. That made every changed chart look new, so this never failed.
+            chart="${chart%/}"
             name="$(basename "$chart")"
             if git diff --quiet "$base"...HEAD -- "$chart"; then
               continue
