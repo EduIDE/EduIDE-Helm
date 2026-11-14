@@ -32,6 +32,10 @@ versions:
   # to replace.
   # 1.3.0 listens on 8080 as non-root, which the landing page Deployment needs.
   # 1.3.1 adds the remaining dependency security fixes.
+  # Chart 3.0.0 needs the first landing page release that reads the per-app
+  # `ephemeral` flag (EduIDE-Landing-Page#66). Older releases ignore it and fall
+  # back to `landingPage.ephemeralStorage` for every app, so bump this pin in the
+  # same release.
   landingPage: "1.3.1"
 
 # -- The container registry every EduIDE image is pulled from.
@@ -151,16 +155,19 @@ landingPage:
   # only starts a session on its own when the host in both `gitUri` and `artemisUrl`
   # is on this list. Otherwise the student has to click Launch.
   trustedArtemisHosts: []
-  # -- the app id to launch
-  appDefinition: "java-17-templates"
+  # -- The app the landing page launches for a link without `?appDef=`, which is
+  # the Artemis start. Must be an app this installation renders.
+  appDefinition: "java-17"
   # -- If set to true no persisted storage is used when creating sessions on the landing page.
-  # Set to false if you want to use persisted storage.
+  # Set to false if you want to use persisted storage. An app overrides this with
+  # its own `landingPage.ephemeral` (true or false); the privacy page states the
+  # workspace as persistent when any rendered app ends up persistent.
   ephemeralStorage: true
   # -- What the privacy page states about this installation.
   # Only the research clause lives here. The retention and session figures the
   # page shows are DERIVED in the landing page config map from the settings that
   # actually produce them - `theia-workspace-garbage-collector.env.WORKSPACE_TTL`,
-  # `landingPage.ephemeralStorage` and `appDefinitions.defaults.timeout` - so
+  # `landingPage.ephemeralStorage` (and each offered app's `landingPage.ephemeral`) and `appDefinitions.defaults.timeout` - so
   # changing a retention period cannot leave the privacy statement claiming
   # something untrue. Do not restate those numbers here.
   # @default -- (see details below)
@@ -725,48 +732,55 @@ appDefinitions:
   # Empty offers every definition. A name with neither is skipped, and
   # `helm install`/`helm upgrade` print a warning naming it.
   enabled: []
-  # -- The IDE images EduIDE officially releases. An image only one
-  # installation uses (TH Mannheim's thm-java-25) belongs in that
-  # installation's `apps`, not here. Owned by the chart: change an entry for
-  # one installation through `apps`. An installation that lists `enabled` gets
-  # a new catalog entry only once it names it there.
+  # -- The IDE images EduIDE officially releases, in two editions per language.
+  # No suffix is the Artemis edition (`java-17`, `python`, ...): it carries the
+  # Artemis extension, is started from Artemis by name and is never offered on
+  # the landing page. `-standalone` is the edition without the Artemis extension
+  # (`java-17-standalone`, ...): it is what the landing page offers, and its
+  # `landingPage.buildSystems` lists the project templates the image carries.
+  # Both editions keep Scorpio and the data bridge.
+  # An image only one installation uses belongs in that installation's `apps`, not here. Owned by the chart: change an entry
+  # for one installation through `apps`. An installation that lists `enabled`
+  # gets a new catalog entry only once it names it there.
+  # `landingPage.buildSystems` ids are template folders of the image, checked
+  # against the image's templates-<image>.json by the release train.
+  # `landingPage.ephemeral` (true or false) decides per app whether its sessions
+  # are temporary; unset follows `landingPage.ephemeralStorage`.
   # @default -- (see values.yaml)
   catalog:
     java-17:
-      image: eduide/java-17
+      image: eduide/java-17-artemis
       requestsCpu: 500m
       limitsMemory: 3000M
       # Java is the common case, so some instances are kept warm.
       minInstances: 3
       landingPage:
         label: Java 17
-        # Deployable and startable by name, but not offered in the drop-down -
-        # the -templates variant is what students pick.
+        # Artemis editions only start from Artemis, by name.
         visible: false
-    java-17-templates:
-      image: eduide/java-17-templates
+    java-17-standalone:
+      image: eduide/java-17-standalone
       requestsCpu: 500m
       limitsMemory: 3000M
       landingPage:
         label: Java 17
-        # A -templates image exists to offer a build-system choice. Dropping
-        # this list is what makes the picker disappear from the landing page.
         buildSystems:
           - { id: maven, label: Maven }
           - { id: gradle, label: Gradle }
     java-25:
-      image: eduide/java-25
+      image: eduide/java-25-artemis
       requestsCpu: 500m
       limitsMemory: 3000M
       landingPage:
         label: Java 25
+        # Artemis editions only start from Artemis, by name.
         visible: false
         # The landing page derives the icon from the label when this is unset:
         # "Java 25" becomes java-25-logo.png, which it does not ship, so the
         # tile would show a broken image. The general Java logo it does ship.
         image: java-logo.png
-    java-25-templates:
-      image: eduide/java-25-templates
+    java-25-standalone:
+      image: eduide/java-25-standalone
       requestsCpu: 500m
       limitsMemory: 3000M
       landingPage:
@@ -775,26 +789,70 @@ appDefinitions:
         buildSystems:
           - { id: maven, label: Maven }
           - { id: gradle, label: Gradle }
+    python:
+      image: eduide/python-artemis
+      landingPage:
+        label: Python
+        # Artemis editions only start from Artemis, by name.
+        visible: false
+    python-standalone:
+      image: eduide/python-standalone
+      landingPage:
+        label: Python
+        buildSystems:
+          - { id: python, label: Python }
+    javascript:
+      image: eduide/javascript-artemis
+      landingPage:
+        label: Javascript
+        # Artemis editions only start from Artemis, by name.
+        visible: false
+    javascript-standalone:
+      image: eduide/javascript-standalone
+      landingPage:
+        label: Javascript
+        buildSystems:
+          - { id: node, label: "Node (TypeScript)" }
+          - { id: web, label: "Web (TypeScript)" }
     c:
-      image: eduide/c
+      image: eduide/c-artemis
       landingPage:
         label: C
+        # Artemis editions only start from Artemis, by name.
         visible: false
-    c-templates:
-      image: eduide/c-templates
+    c-standalone:
+      image: eduide/c-standalone
       landingPage:
         label: C
         buildSystems:
-          - { id: bazel, label: Bazel }
           - { id: make, label: Make }
-    javascript:
-      image: eduide/javascript
+          - { id: bazel, label: Bazel }
+    rust:
+      image: eduide/rust-artemis
+      limitsMemory: 3000M
       landingPage:
-        label: Javascript
-    python:
-      image: eduide/python
+        label: Rust
+        # Artemis editions only start from Artemis, by name.
+        visible: false
+    rust-standalone:
+      image: eduide/rust-standalone
+      limitsMemory: 3000M
       landingPage:
-        label: Python
+        label: Rust
+        buildSystems:
+          - { id: cargo, label: Cargo }
+    go:
+      image: eduide/go-artemis
+      landingPage:
+        label: Go
+        # Artemis editions only start from Artemis, by name.
+        visible: false
+    go-standalone:
+      image: eduide/go-standalone
+      landingPage:
+        label: Go
+        buildSystems:
+          - { id: go, label: Go }
   # -- This installation's own apps, and overrides of catalog entries. A key
   # matching a catalog entry is merged over it, so
   # `java-17: {minInstances: 10}` changes one field. `<name>: null`

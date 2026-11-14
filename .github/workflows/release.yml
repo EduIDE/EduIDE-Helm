@@ -114,6 +114,32 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit $fail
 
+      # Only a chart version that is not published yet needs the check; every
+      # other push to main is a no-op for the release and must not depend on
+      # the images still being around.
+      - name: Is this chart version new
+        id: fresh
+        run: |
+          set -euo pipefail
+          version="$(awk '/^version:/ {print $2; exit}' charts/eduide/Chart.yaml)"
+          if helm show chart "oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts/eduide" --version "$version" >/dev/null 2>&1; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # buildSystems in the catalog is a hand-kept list of template ids; the
+      # image is the source of truth. Read each template.json from the
+      # published image itself, so nothing depends on build artifacts, which
+      # expire.
+      - name: Every buildSystems id exists in its image
+        if: steps.fresh.outputs.new == 'true'
+        run: |
+          set -euo pipefail
+          ide=$(yq -r '.appVersion' charts/eduide/Chart.yaml)
+          ./scripts/fetch-image-templates.sh "$ide" /tmp/templates
+          ./scripts/check-build-systems.sh /tmp/templates
+
       - name: Package and publish charts
         id: publish
         run: |
