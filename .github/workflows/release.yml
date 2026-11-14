@@ -269,7 +269,6 @@ jobs:
           for chart in eduide eduide-cluster; do
             helm show chart "oci://ghcr.io/eduide/charts/${chart}" --version "$VERSION" | grep -x "version: ${VERSION}"
           done
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url --jq .url
           {
             echo "## Released ${TAG}"
             echo
