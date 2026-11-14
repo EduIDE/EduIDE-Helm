@@ -1,5 +1,14 @@
 # Changelog
 
+## [eduide 2.9.0] - 2026-11-14
+
+- [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Pair this with a landing page image that serves `/session-ended`. An older image falls back to its start page, which is still better than the 5xx it replaces
+
 ## [eduide 2.8.1] - 2026-11-13
 
 - [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
