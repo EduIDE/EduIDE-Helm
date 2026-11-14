@@ -378,7 +378,7 @@ operator:
   # - K8SANNOTATIONANDWONDERSHAPER    Set Kubernetes annotations and use wondershaper init container
   bandwidthLimiter: "K8SANNOTATION"
   # -- If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container
-  wondershaperImage: theiacloud/theia-cloud-wondershaper:1.2.0-next
+  wondershaperImage: theiacloud/theia-cloud-wondershaper:1.3.0-next
   # -- Port on which the operator serves Prometheus metrics at /metrics, such as
   # theiacloud_sessions_ended_total by reason (inactivity, lifetime). The
   # eduide-cluster chart's PodMonitor scrapes it. 0 serves nothing. Needs an
