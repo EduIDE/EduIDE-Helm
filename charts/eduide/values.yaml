@@ -386,6 +386,11 @@ operator:
   bandwidthLimiter: "K8SANNOTATION"
   # -- If bandwidthLimiter is set to WONDERSHAPER or K8SANNOTATIONANDWONDERSHAPER this image will be used for the wondershaper init container
   wondershaperImage: theiacloud/theia-cloud-wondershaper:1.2.0-next
+  # -- Port on which the operator serves Prometheus metrics at /metrics, such as
+  # theiacloud_sessions_ended_total by reason (inactivity, lifetime). The
+  # eduide-cluster chart's PodMonitor scrapes it. 0 serves nothing. Needs an
+  # operator image that knows --metricsPort; older ones fail to start with it.
+  metricsPort: 0
   # -- Set the number of active sessions a single user can launch
   sessionsPerUser: "1"
   # -- The name of the storage class for persistent volume claims for workspaces.

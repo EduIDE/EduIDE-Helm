@@ -16,6 +16,15 @@ Upgrade notes:
 - Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
 - Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
 - Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+## [eduide 2.10.0] - 2026-11-14
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+
 ## [eduide 2.9.0] - 2026-11-14
 
 - [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
