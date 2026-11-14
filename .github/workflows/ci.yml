@@ -15,10 +15,8 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Syntax, and the bump every chart change needs. `helm push` in release.yml
-  # silently skips a version that already exists, so a forgotten bump is a no-op
-  # rather than an error - which is exactly how the chart READMEs drifted five
-  # PRs behind. Catch it here instead.
+  # Syntax. A chart change needs no version bump: the release pull request
+  # moves the version.
   # ---------------------------------------------------------------------------
   lint:
     runs-on: ubuntu-latest
@@ -67,31 +65,6 @@ jobs:
             exit 1
           fi
           echo "both charts are at $a"
-
-      - name: Chart version must be bumped when a chart changes
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          base="origin/${{ github.base_ref }}"
-          git fetch --quiet origin "${{ github.base_ref }}"
-          failed=0
-          for chart in charts/*/; do
-            name="$(basename "$chart")"
-            if git diff --quiet "$base"...HEAD -- "$chart"; then
-              continue
-            fi
-            old="$(git show "$base:$chart/Chart.yaml" 2>/dev/null | awk '/^version:/{print $2; exit}')" || old=""
-            new="$(awk '/^version:/{print $2; exit}' "$chart/Chart.yaml")"
-            if [[ -z "$old" ]]; then
-              echo "  $name: new chart at $new"
-            elif [[ "$old" == "$new" ]]; then
-              echo "::error file=$chart/Chart.yaml::$name changed but version is still $old. Bump it - release.yml skips versions that already exist, so this would publish nothing."
-              failed=1
-            else
-              echo "  $name: $old -> $new"
-            fi
-          done
-          exit $failed
 
   # ---------------------------------------------------------------------------
   # Validate rendered output against real Kubernetes and CRD schemas.
