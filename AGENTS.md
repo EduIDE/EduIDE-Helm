@@ -69,9 +69,9 @@ render-diff fills with false changes and stops being read.
 
 Releases are manual. A release pull request moves the CHANGELOG entries under
 the new version and bumps both charts; after it merges, `release.yml`
-(`workflow_dispatch`, input `version`) verifies every pinned image, tags,
-creates the GitHub Release from the CHANGELOG section and publishes both charts
-to OCI. Nothing releases on push to `main`, and automation never pushes to
+(`workflow_dispatch`, input `version`) verifies every pinned image, drafts
+the GitHub Release from the CHANGELOG section, publishes both charts to OCI
+and finally publishes the release, which creates the tag. Nothing releases on push to `main`, and automation never pushes to
 `main`. Procedure in the README, and as a skill in
 `.claude/skills/release/SKILL.md`.
 

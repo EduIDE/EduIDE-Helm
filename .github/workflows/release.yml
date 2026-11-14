@@ -135,8 +135,13 @@ jobs:
         run: |
           set -euo pipefail
           for chart in eduide eduide-cluster; do
-            if helm show chart "oci://ghcr.io/eduide/charts/${chart}" --version "$VERSION" >/dev/null 2>&1; then
+            if out=$(helm show chart "oci://ghcr.io/eduide/charts/${chart}" --version "$VERSION" 2>&1); then
               echo "::error::${chart} ${VERSION} is already published. Pick the next version."
+              exit 1
+            fi
+            # Only "not found" proves the version is free; any other error could hide a published chart.
+            if ! grep -qi 'not found' <<<"$out"; then
+              echo "::error::could not check ${chart} ${VERSION}: ${out}"
               exit 1
             fi
           done
@@ -186,12 +191,19 @@ jobs:
 
       # --version stamps a release candidate; for a stable release it equals
       # the version in Chart.yaml, which the release job already checked.
+      # The pins job refused versions published before this run, so a chart
+      # that exists now was pushed by an earlier attempt of this run (a
+      # "Re-run failed jobs") and is kept as it is.
       - name: Package and push charts
         run: |
           set -euo pipefail
           OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           mkdir -p dist
           for chart in eduide-cluster eduide; do
+            if helm show chart "oci://ghcr.io/${OWNER}/charts/${chart}" --version "$VERSION" >/dev/null 2>&1; then
+              echo "${chart} ${VERSION} was pushed by an earlier attempt, keeping it"
+              continue
+            fi
             ./scripts/resolve-deps.sh "charts/${chart}"
             helm package "charts/${chart}" --version "$VERSION" --destination dist
             helm push "dist/${chart}-${VERSION}.tgz" "oci://ghcr.io/${OWNER}/charts"
@@ -206,7 +218,8 @@ jobs:
         run: |
           set -euo pipefail
           {
-            gh release view "$TAG" --json body --jq .body
+            # Drop a table an earlier attempt already appended.
+            gh release view "$TAG" --json body --jq .body | sed '/^## What this chart version pins/,$d'
             echo
             echo "## What this chart version pins"
             echo
@@ -262,3 +275,13 @@ jobs:
             echo
             echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Last: publishing the draft creates the tag. Until here a failed job leaves
+  # a draft and no tag.
+  publish-release:
+    needs: [release, verify]
+    permissions:
+      contents: write
+    uses: EduIDE/.github/.github/workflows/release-publish.yml@main
+    with:
+      tag: ${{ needs.release.outputs.tag }}

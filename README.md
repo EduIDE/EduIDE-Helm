@@ -117,17 +117,19 @@ gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=2.3.0
 
 It then, in this order:
 
-1. **checks** every image the charts pin exists and is multi-arch, and that the
+1. **checks** that the IDE, Cloud (operator, service, conversion webhook) and
+   landing page images the charts pin exist and are multi-arch, and that the
    chart versions are not published yet
 2. **validates** the version (semver, newer than the last release, matches both
-   `Chart.yaml` files, CHANGELOG section exists), tags the commit and creates
-   the GitHub Release from the CHANGELOG section
+   `Chart.yaml` files, CHANGELOG section exists) and creates a draft GitHub
+   Release from the CHANGELOG section
 3. **publishes** both charts to `oci://ghcr.io/eduide/charts` and adds what the
    version pins to the release notes
 4. **verifies** both charts can be pulled
+5. **publishes the release**, which creates the `vX.Y.Z` tag
 
-Checking before tagging is deliberate: a missing image costs a fix, not a tag
-for charts that were never published.
+The tag appears last on purpose: a missing image or a failed push leaves a
+draft, not a tag for charts that were never published.
 
 ## Rolling it out
 
@@ -192,6 +194,13 @@ The chart version is the platform version and is what an environment pins.
 | `No '## [eduide X.Y.Z]' section` | CHANGELOG not moved in the release PR | fix it in a new PR |
 
 ---
+
+## Cluster prerequisites
+
+- **cert-manager** - certificate management, including Let's Encrypt.
+  [Install](https://cert-manager.io/docs/installation/helm/).
+- **Envoy Gateway** with the Gateway API CRDs. The GatewayClass name must match
+  `gateway.className` (default `envoy`).
 
 ## Working on the charts
 

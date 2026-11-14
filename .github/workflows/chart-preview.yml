@@ -57,6 +57,8 @@ jobs:
           #
           # The sha keeps successive pushes on one PR distinguishable.
           SHA7="$(git rev-parse --short=7 HEAD)"
+          # An all-digit sha with a leading zero is not a valid semver identifier.
+          if [[ "$SHA7" =~ ^[0-9]+$ ]]; then SHA7="g${SHA7}"; fi
           to_preview_version() {
             local base="$1"
             case "$base" in

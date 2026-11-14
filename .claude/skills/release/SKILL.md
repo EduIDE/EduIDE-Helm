@@ -39,11 +39,11 @@ EduIDE dependencies this repository pins:
 
 | Repository | Pinned in | Current pin | How to bump |
 |---|---|---|---|
-| EduIDE | `charts/eduide/Chart.yaml` and `charts/eduide-cluster/Chart.yaml`, key `appVersion` (both equal; renders every IDE image tag) | `yq -r .appVersion charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`) |
-| EduIDE-Cloud | `charts/eduide/values.yaml`, key `versions.cloud` (operator, service) | `yq -r .versions.cloud charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Cloud --exclude-pre-releases --limit 1` |
-| EduIDE-Landing-Page | `charts/eduide/values.yaml`, key `versions.landingPage` | `yq -r .versions.landingPage charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Landing-Page --exclude-pre-releases --limit 1` |
-| EduIDE-shared-cache | `charts/eduide/Chart.yaml`, `dependencies[name=eduide-shared-cache].version` (OCI) | `yq '.dependencies[] \| select(.name=="eduide-shared-cache").version' charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE-shared-cache --exclude-pre-releases --limit 1` (tag `eduide-shared-cache-X.Y.Z`, pin is `X.Y.Z`); then refresh `Chart.lock` with `helm dependency update charts/eduide` |
-| workspace-garbage-collector | `charts/eduide/Chart.yaml`, `dependencies[name=theia-workspace-garbage-collector].version` (OCI), and `charts/eduide/values.yaml` `theia-workspace-garbage-collector.image.tag` | same pattern, with `yq -r '.["theia-workspace-garbage-collector"].image.tag' charts/eduide/values.yaml` for the image | latest: `gh release list -R EduIDE/workspace-garbage-collector --exclude-pre-releases --limit 1` (tag `theia-workspace-garbage-collector-X.Y.Z`); `Chart.lock` refresh as above. Once the GC chart pins its own image by version, empty `image.tag` here |
+| EduIDE | `charts/eduide/Chart.yaml` and `charts/eduide-cluster/Chart.yaml`, key `appVersion` (both equal; renders every IDE image tag) | `yq -r .appVersion charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE --exclude-drafts --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`) |
+| EduIDE-Cloud | `charts/eduide/values.yaml`, key `versions.cloud` (operator, service) | `yq -r .versions.cloud charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Cloud --exclude-drafts --exclude-pre-releases --limit 1` |
+| EduIDE-Landing-Page | `charts/eduide/values.yaml`, key `versions.landingPage` | `yq -r .versions.landingPage charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Landing-Page --exclude-drafts --exclude-pre-releases --limit 1` |
+| EduIDE-shared-cache | `charts/eduide/Chart.yaml`, `dependencies[name=eduide-shared-cache].version` (OCI) | `yq '.dependencies[] \| select(.name=="eduide-shared-cache").version' charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE-shared-cache --exclude-drafts --exclude-pre-releases --limit 1` (tag `eduide-shared-cache-X.Y.Z`, pin is `X.Y.Z`); then refresh `Chart.lock` with `helm dependency update charts/eduide` |
+| workspace-garbage-collector | `charts/eduide/Chart.yaml`, `dependencies[name=theia-workspace-garbage-collector].version` (OCI), and `charts/eduide/values.yaml` `theia-workspace-garbage-collector.image.tag` | same pattern, with `yq -r '.["theia-workspace-garbage-collector"].image.tag' charts/eduide/values.yaml` for the image | latest: `gh release list -R EduIDE/workspace-garbage-collector --exclude-drafts --exclude-pre-releases --limit 1` (tag `theia-workspace-garbage-collector-X.Y.Z`); `Chart.lock` refresh as above. Once the GC chart pins its own image by version, empty `image.tag` here |
 | EduIDE-pool-scaler | `charts/eduide/values.yaml`, key `versions.poolScaler`, only when present on main | `yq -r .versions.poolScaler charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-pool-scaler`; never pin an unreleased version |
 
 `charts/eduide-cluster/values.yaml` `conversion.image` points at the upstream `theiacloud/theia-cloud-conversion-webhook`, not at an EduIDE-Cloud release, so it is not a pin to bump here. Upstream images (`wondershaperImage`, demo image) are Renovate's job.
@@ -58,7 +58,7 @@ Who pins this repository (tell the user after the release):
 
 ```bash
 gh release list -R EduIDE/EduIDE-Helm --limit 10
-LAST=$(gh release list -R EduIDE/EduIDE-Helm --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName')
+LAST=$(gh release list -R EduIDE/EduIDE-Helm --exclude-drafts --exclude-pre-releases --limit 1 --json tagName --jq '.[0].tagName')
 git fetch origin --tags
 git log --first-parent --format='%h %s' "$LAST"..origin/main
 ```
@@ -102,7 +102,7 @@ For each row of "EduIDE dependencies":
 
 1. Read the current pin from the file.
 2. Find the latest release of that repository:
-   `gh release list -R EduIDE/<repo> --exclude-pre-releases --limit 1`
+   `gh release list -R EduIDE/<repo> --exclude-drafts --exclude-pre-releases --limit 1`
    (for a prerelease of this repository, also look at its prereleases).
 3. Check whether it has unreleased changes on main:
    `gh api repos/EduIDE/<repo>/compare/<its last tag>...main --jq '.ahead_by, (.commits[].commit.message | split("\n")[0])'`
@@ -164,6 +164,9 @@ Rules:
   `[eduide]` entry naming old and new version.
 - Add `### Upgrade notes` when an operator has to do something beyond
   installing the new version.
+- If an earlier `-rc.N` of this version got a section of its own, copy its
+  entries into the stable section: the stable notes cover everything since the
+  last stable release.
 - Use hyphens, never em or en dashes.
 
 ## 5. Open the release pull request
@@ -190,33 +193,41 @@ unless the user asks.
 **Release candidate shortcut:** a `-rc.N` needs no release pull request.
 release.yml does not check version files for a prerelease and falls back to the
 Unreleased section for the notes. Dispatch it from the branch to test
-(step 6 with `--ref <branch>`).
+(step 6 with `--ref <branch>`). A prerelease never becomes "latest". Its
+entries stay under Unreleased, so the later stable section still lists every
+change since the last stable release.
 
 ## 6. Run release.yml after the merge
 
 ```bash
+START=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 gh workflow run release.yml -R EduIDE/EduIDE-Helm --ref main -f version=X.Y.Z
-sleep 5
-RUN=$(gh run list -R EduIDE/EduIDE-Helm --workflow release.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')
+# The run of this dispatch: yours, created after START. The release
+# concurrency group runs one release per repository at a time.
+ME=$(gh api user --jq .login)
+until RUN=$(gh run list -R EduIDE/EduIDE-Helm --workflow release.yml --event workflow_dispatch \
+    --user "$ME" --created ">=$START" --limit 1 --json databaseId --jq '.[0].databaseId // empty') \
+    && [[ -n "$RUN" ]]; do sleep 3; done
 gh run watch "$RUN" -R EduIDE/EduIDE-Helm --exit-status
 ```
 
 If a job waits for an environment approval (`prod`), tell the user to approve
-it in the run page. If `validate` fails, the message says what to fix; fix it
-in a new pull request, never by editing tags. If a later job fails, fix the
-cause and use "Re-run failed jobs": the tag stays, nothing is published twice.
-Never delete a tag or a release once something was published under it; ship
-the next patch version instead.
+it in the run page. If the `release` job fails, its message says what to fix;
+fix it in a new pull request. Until the last job (`publish-release`) succeeds,
+the GitHub Release is a draft and the tag does not exist. If a later job
+fails, fix the cause and use "Re-run failed jobs": the draft is reused and
+jobs that succeeded do not run again. A new dispatch of the same version
+replaces the leftover draft, but fails where a version cannot be pushed twice
+(a chart, Open VSX), so prefer the rerun. Once the release is published, never
+delete its tag or release; ship the next patch version instead.
 
 ## 7. Verify what was published
 
-Check every row of "What a release publishes", for example:
+Check every row of "What a release publishes" with the command in its Check
+column (the `verify` job already ran them), and that the release is public:
 
 ```bash
-gh release view vX.Y.Z -R EduIDE/EduIDE-Helm --json url,isPrerelease,assets --jq '{url, isPrerelease, assets: [.assets[].name]}'
-crane manifest ghcr.io/eduide/<image>:X.Y.Z | jq -r '[.manifests[].platform.architecture] | join(",")'   # amd64 and arm64
-helm show chart oci://ghcr.io/eduide/charts/<chart> --version X.Y.Z
-curl -fsS https://open-vsx.org/api/<namespace>/<name>/X.Y.Z | jq -r .version
+gh release view vX.Y.Z -R EduIDE/EduIDE-Helm --json url,isDraft,isPrerelease,assets --jq '{url, isDraft, isPrerelease, assets: [.assets[].name]}'
 ```
 
 Report to the user: the release link, the artifacts with their check result,
