@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 2.9.0](https://img.shields.io/badge/Version-2.9.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
+![Version: 2.10.0](https://img.shields.io/badge/Version-2.10.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.5.0](https://img.shields.io/badge/AppVersion-1.5.0-informational?style=flat-square)
 
 EduIDE tenant release: operator, REST service, landing page and routes for one
 environment. Requires eduide-cluster to be installed on the cluster first.
@@ -150,6 +150,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | operator.leaderElection | object | (see details below) | Options to influence the operator's leader election |
 | operator.logging | object | (see details below) | Allows to override the operator's log4j configuration |
 | operator.maxWatchIdleTime | string | `"3600000"` | Configures the timeout in milliseconds when a watcher for either AppDefinitions, Workspaces, or Sessions is assumed to be not working. When this is detected the operator instance will stop and a new operator will set up fresh watchers. |
+| operator.metricsPort | int | `0` | Port on which the operator serves Prometheus metrics at /metrics, such as theiacloud_sessions_ended_total by reason (inactivity, lifetime). The eduide-cluster chart's PodMonitor scrapes it. 0 serves nothing. Needs an operator image that knows --metricsPort; older ones fail to start with it. |
 | operator.oAuth2ProxyVersion | string | `"v7.12.0"` | The version to use of the quay.io/oauth2-proxy/oauth2-proxy image |
 | operator.replicas | int | `1` | Number of operator instances to create |
 | operator.requestedStorage | string | `"250Mi"` | The amount of requested storage for each persistent volume claim (PVC) for workspaces. This is directly passed to created PVCs and must be a valid Kubernetes quantity. See https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/quantity/ |
