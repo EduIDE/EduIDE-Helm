@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased]
+
 ## [eduide 2.10.0] - 2026-11-14
 
 - [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
