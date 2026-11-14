@@ -1,5 +1,10 @@
 # Changelog
 
+## [eduide 2.8.1] - 2026-11-13
+
+- [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
+- [eduide-cluster] No changes; bumped with eduide, since both charts release at one version
+
 ## [eduide 2.8.0] - 2026-11-11
 
 - [eduide] [eduide-cluster] Add `global.nodeSelector`, which pins every EduIDE workload to the nodes carrying those labels: the operator, the REST service, the landing page, image preloading and the conversion webhook. The operator gets it as `--sessionNodeSelector key=value,...` for the session pods it creates. Default empty, which renders exactly as before ([#73](https://github.com/EduIDE/EduIDE-Helm/issues/73))

@@ -68,7 +68,7 @@ spec:
     port: {{ (($app.monitor).port) | default (($d.monitor).port) | default 8081 }}
     activityTracker:
       timeoutAfter: {{ ((($app.monitor).activityTracker).timeoutAfter) | default ((($d.monitor).activityTracker).timeoutAfter) | default 60 }}
-      notifyAfter: {{ ((($app.monitor).activityTracker).notifyAfter) | default ((($d.monitor).activityTracker).notifyAfter) | default 55 }}
+      notifyAfter: {{ ((($app.monitor).activityTracker).notifyAfter) | default ((($d.monitor).activityTracker).notifyAfter) | default 50 }}
   {{- with ($app.options | default $d.options) }}
   options:
     {{- toYaml . | nindent 4 }}
