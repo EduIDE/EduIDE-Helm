@@ -16,6 +16,19 @@ Upgrade notes:
 - Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
 - Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
 - Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+## [eduide 2.9.0] - 2026-11-14
+
+- [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Pair this with a landing page image that serves `/session-ended`. An older image falls back to its start page, which is still better than the 5xx it replaces
+
+## [eduide 2.8.1] - 2026-11-13
+
+- [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
+- [eduide-cluster] No changes; bumped with eduide, since both charts release at one version
 
 ## [eduide 2.8.0] - 2026-11-11
 
