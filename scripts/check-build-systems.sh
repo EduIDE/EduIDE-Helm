@@ -43,9 +43,13 @@ while IFS=$'\t' read -r image ids labels; do
       fail=1
     fi
   done
-done < <(yq -r '.appDefinitions.catalog | to_entries | .[]
-                | select(.value.landingPage.buildSystems)
-                | .value.image + "\t" + (.value.landingPage.buildSystems | map(.id) | join(",")) + "\t" + (.value.landingPage.buildSystems | map(.label // "") | join(","))' \
-           "$ROOT/charts/eduide/values.yaml")
+# yq builds JSON and jq the lines: older yq releases (the 4.44 in release.yml)
+# print "\t" literally instead of a tab.
+done < <(yq -o=json '.appDefinitions.catalog' "$ROOT/charts/eduide/values.yaml" \
+           | jq -r 'to_entries[] | .value | select(.landingPage.buildSystems)
+                    | [.image,
+                       (.landingPage.buildSystems | map(.id) | join(",")),
+                       (.landingPage.buildSystems | map(.label // "") | join(","))]
+                    | @tsv')
 
 exit $fail
