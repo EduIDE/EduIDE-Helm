@@ -1,6 +1,6 @@
 # Changelog
 
-## [eduide 3.0.0] - unreleased
+## [Unreleased]
 
 Breaking. Needs EduIDE 2.0.0; do not release before it.
 
@@ -8,7 +8,7 @@ Breaking. Needs EduIDE 2.0.0; do not release before it.
 - [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The render fails while `appDefinitions.enabled` names one of them, with the new name in the message. It also fails when `landingPage.appDefinition` (default `java-17`, the app for links without `?appDef=`) is not a rendered app, and when `landingPage.ephemeral` is not a boolean
 - [eduide] Add `landingPage.ephemeral` per app (optional boolean), passed to the landing page config as a boolean. Unset follows `landingPage.ephemeralStorage`
 - [eduide] The privacy page's `workspacePersistent` is true when any rendered app, hidden ones included, is persistent, instead of following `landingPage.ephemeralStorage` alone
-- [eduide] `release.yml` checks, for a chart version that is not published yet, every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
+- [eduide] `release.yml` checks every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
 - [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
 
 Upgrade notes:
