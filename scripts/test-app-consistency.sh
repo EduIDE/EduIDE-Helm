@@ -494,6 +494,23 @@ else
   bad "session egress must exclude private ranges and the metadata endpoint" "except=[$excluded]"
 fi
 
+# Anonymous mode needs the explicit opt-in, with or without preflight.
+err=$(helm template t "$CHART" --set skipPreflight=true --set keycloak.cookieSecret=x 2>&1 >/dev/null)
+if grep -q 'without authentication' <<<"$err"; then
+  ok "keycloak.enable=false without allowUnauthenticated fails the render"
+else
+  bad "anonymous mode must need allowUnauthenticated" "$err"
+fi
+if render --set keycloak.enable=true --set keycloak.authUrl=https://keycloak.example.edu/auth/ >/dev/null; then
+  ok "keycloak enabled with real values renders without the opt-in"
+else
+  bad "enabled keycloak must render without allowUnauthenticated"
+fi
+
+# The service only sees the origins it is meant to allow and a management port Prometheus can scrape.
+cors=$(render | grep -m1 'CORS_ORIGINS')
+if [[ "$cors" == *"://"* && "$cors" != *'*'* ]]; then ok "CORS origins come from the landing page host"; else bad "CORS_ORIGINS must name the landing origin" "$cors"; fi
+
 # The footer version used to be a hand-set string that drifted from the deploy.
 footer_version() { render "$@" | grep -m1 -o 'version: "[^"]*"'; }
 expect_version() {

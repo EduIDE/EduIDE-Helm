@@ -300,15 +300,25 @@ landingPage:
 # -- Values related to Keycloak
 # @default -- (see details below)
 keycloak:
-  # -- Whether keycloak authentication shall be used
+  # -- Whether keycloak authentication shall be used. `false` is anonymous mode and
+  # needs `allowUnauthenticated: true`, see below.
   enable: false
-  # -- Install even though the Keycloak values below are still the chart's
+  # -- Explicit opt-in for a throwaway environment without authentication. The
+  # chart refuses `enable: false` without it: in anonymous mode the `user` of a
+  # request is the identity, so anyone can act as any user and open any session.
+  # It also allows installing even though the Keycloak values below are still the chart's
   # placeholders. The oauth2-proxy ConfigMaps render regardless of `enable`
   # (the operator mounts them into every session by literal name), so leaving
   # the placeholders means a proxy pointed at a host that does not exist and
   # sessions that fail rather than run unauthenticated. Only set this for an
   # installation that is deliberately not exposed yet.
   allowUnauthenticated: false
+  # -- Audience the REST service requires in access tokens (`aud` claim). Empty
+  # means no check, which keeps working with Keycloak's default tokens. To turn
+  # it on, add an "Audience" mapper to the client (or a client scope) that puts
+  # this value into the access token, then set it here, usually to `clientId`.
+  # Without the mapper every request is answered 401.
+  audience: ""
   # -- The name of the Keycloak group identifying admin users who are allowed to access the service's admin endpoints.
   adminGroup: "theia-cloud/admin"
   # -- Key cloak auth URL. Only has to be specified when enable: true
@@ -504,6 +514,25 @@ service:
     external: false
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
+  # -- Maximum active sessions per user, enforced by the REST service on every
+  # launch path. Empty means the value of `operator.sessionsPerUser`, so the
+  # limit the operator applies to lazy sessions holds for the other paths too.
+  # Set a number to override; 0 or less means no limit.
+  sessionsPerUser: ""
+  # -- Additional origins (besides the landing page) allowed to call the REST
+  # service from a browser. The landing page origin is always allowed; with no
+  # origin configured CORS is off.
+  corsOrigins: []
+  # -- Trust store for the TLS certificate of Keycloak, needed only when it is
+  # signed by a private CA. The REST service always verifies the certificate.
+  # Reference a Secret holding a PKCS12 or JKS file.
+  oidcTrustStore:
+    # -- Name of the Secret. Empty means the JVM's default trust store.
+    secretName: ""
+    # -- Key of the trust store file in the Secret
+    key: truststore.p12
+    # -- Key of the trust store password in the Secret. Leave empty if it has none.
+    passwordKey: ""
   # -- Base64-encoded admin API token. Only read when adminApiTokenSecret.create
   # is true. Comes from a deployment secret, never from a file in git.
   adminApiToken: ""
