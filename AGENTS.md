@@ -44,7 +44,7 @@ Session, Workspace and AppDefinition on the cluster.
 **The conversion webhook belongs to the cluster chart.** A CRD names exactly
 one conversion service, so it cannot be a per-environment resource.
 
-**Preloading must not be under `--wait`.** It pulls ~10 multi-GB images on every
+**Preloading must not be under `--wait`.** It pulls 14 multi-GB images on every
 node. Inside the main release it would time out and `--atomic` would roll back a
 healthy deploy.
 
@@ -67,28 +67,26 @@ render-diff fills with false changes and stops being read.
 
 ## Releasing
 
-`Release train` cuts a version across all four repositories. It builds, then
-verifies every image exists and is multi-arch, and only then tags — because a
-failure after tagging strands immutable tags on repositories whose images were
-never published.
-
-**It does not bump the chart version.** That is a reviewed pull request; the
-workflow checks the charts are already at the requested version and fails
-otherwise. Do not make automation push to `main`: it triggers the workflows
-watching `main`. Full procedure in the README, and as a skill in
-`.claude/skills/cut-a-release.md`.
+Releases are manual. A release pull request moves the CHANGELOG entries under
+the new version and bumps both charts; after it merges, `release.yml`
+(`workflow_dispatch`, input `version`) verifies every pinned image, drafts
+the GitHub Release from the CHANGELOG section, publishes both charts to OCI
+and finally publishes the release, which creates the tag. Nothing releases on push to `main`, and automation never pushes to
+`main`. Procedure in the README, and as a skill in
+`.claude/skills/release/SKILL.md`.
 
 ## Conventions
 
-- A changed chart must have a bumped version. CI enforces this: `release.yml`
-  skips a version that already exists, so a forgotten bump publishes nothing
-  and fails silently. It has happened three times.
+- Do not bump the chart version in a feature or fix PR. Add the entry under
+  `## [Unreleased]` in `CHANGELOG.md`; the release pull request bumps the
+  version. CI still checks that both charts carry the same version.
 - Chart READMEs are generated. Run helm-docs and commit the result; CI fails on
   drift.
 - `kubeconform` skips `HTTPRoute`: the CRDs-catalog schema declares
   `minItems: 1` on `spec.rules`, but the upstream Gateway API CRD does not, and
-  `httproute-instances.yaml` ships `rules: []` deliberately for the operator to
-  patch.
+  `httproute-instances.yaml` deliberately omits the field. The operator does not
+  patch that route - it reads its `parentRefs` and `hostnames` and copies them
+  onto a new, Session-owned route per session.
 
 ## Renovate
 
@@ -96,16 +94,20 @@ watching `main`. Full procedure in the README, and as a skill in
 the org-wide preset. Policy changes belong there, not here. Nothing is
 automerged.
 
-Two managers see this repo. `helmv3` reads the `dependencies:` block in
+Three managers see this repo. `helmv3` reads the `dependencies:` block in
 `charts/eduide/Chart.yaml` and refreshes `charts/eduide/Chart.lock` with it.
 `helm-values` reads the image pins in `charts/eduide/values.yaml` and
-`charts/eduide-cluster/values.yaml`.
+`charts/eduide-cluster/values.yaml`. A regex manager from the preset reads
+`versions.cloud` and `versions.landingPage` through their trailing
+`# renovate: datasource=github-releases depName=...` comment and proposes the
+latest release of that repository. Keep that comment on the same line, a comment
+above the key ends up in the helm-docs README. `versions.ide` stays empty and
+follows `appVersion`, which the release sets.
 
 Expect a Renovate pull request touching a chart to arrive **red**, and to need
 two things done by hand before it merges:
 
-- the chart `version:` bump, which the CI job enforces and Renovate does not know
-  to make;
+- an entry under `## [Unreleased]` in `CHANGELOG.md`;
 - regenerated chart READMEs, because helm-docs renders both the dependency table
   and the values defaults, so a bump of either drifts them.
 
@@ -122,14 +124,17 @@ when it is empty. A name in `enabled` with no definition is skipped and
 
 **The catalog holds only official releases.** Every image in EduIDE's build
 matrix that is meant for any installation, and nothing else: a custom build for
-one installation (TH Mannheim's `thm-java-25`, for example) is defined in that
-installation's own `apps`. Every installation on chart defaults offers the
+one installation is defined in that installation's own `apps`. Every installation on chart defaults offers the
 whole catalog, production included, so adding an entry is a decision for all of
 them. `scripts/test-app-consistency.sh` writes the set out and fails when it
 changes.
 
-App names are the plain image name (`java-17`, `c-templates`), without the old
-`-latest` suffix.
+App names: no suffix is the Artemis edition (`java-17`, image `java-17-artemis`),
+`-standalone` the standalone one (`java-17-standalone`). Artemis stores the name
+per exercise, so the Artemis names never change. `buildSystems` ids must exist
+in the image (`scripts/fetch-image-templates.sh` reads the published image,
+`scripts/check-build-systems.sh` compares; `release.yml` runs both for a new
+chart version).
 
 Three things derive from that map, each through the helper: the AppDefinition
 custom resources, the app list the landing page offers, and the images the
@@ -137,8 +142,7 @@ preloading DaemonSet pulls onto every node. **Never write a preload list, and ne
 
 They used to be three hand-maintained lists across two repositories, the
 preload one addressed by array index, with production's list one shorter than
-test's. Production offered `c-templates` while preloading everything except
-`c-templates`. `scripts/test-app-consistency.sh` asserts they agree and CI runs
+test's. Production offered one app while preloading everything except it. `scripts/test-app-consistency.sh` asserts they agree and CI runs
 it; it also fails on any floating tag in a default render.
 
 ## One version knob per source repository
@@ -156,13 +160,11 @@ interpolate `.Values.versions.*` without any template change. Keep it that way:
 turning them into `{registry, repository, tag}` maps would break every values
 file for no gain.
 
-## The garbage collector is pinned to a commit, not a version
+## The garbage collector image follows its chart version
 
-Its repository has never published a versioned image - GHCR holds only `latest`, `main` and
-per-commit SHAs - and its own chart defaults to `latest`. A released chart must
-not install whatever was built most recently, and `helm upgrade` would see no
-diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
-Replace it with a semver tag when that repo starts publishing versioned images.
+The garbage collector chart dependency (1.0.0 and later) pins its own versioned
+image through its appVersion, so this chart sets no `image.tag` for it. Bumping
+the dependency version in `charts/eduide/Chart.yaml` is the whole upgrade.
 
 ## Dependency aliases must be lowercase
 

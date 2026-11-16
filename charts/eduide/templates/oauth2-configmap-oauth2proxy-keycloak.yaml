@@ -30,7 +30,7 @@ data:
     upstreams="http://127.0.0.1:placeholder-port/"
     # Proxy Config
     #user_id_claim="preferred_username"
-    skip_auth_routes=["/health.*"]
+    skip_auth_routes=["^/health$"]
     skip_provider_button="true"
     reverse_proxy="true"
     # email_domains=["*"]

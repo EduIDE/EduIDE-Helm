@@ -15,10 +15,8 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Syntax, and the bump every chart change needs. `helm push` in release.yml
-  # silently skips a version that already exists, so a forgotten bump is a no-op
-  # rather than an error - which is exactly how the chart READMEs drifted five
-  # PRs behind. Catch it here instead.
+  # Syntax. A chart change needs no version bump: the release pull request
+  # moves the version.
   # ---------------------------------------------------------------------------
   lint:
     runs-on: ubuntu-latest
@@ -46,11 +44,17 @@ jobs:
       - name: App definitions, landing page and preloading agree
         run: ./scripts/test-app-consistency.sh
 
+      - name: The buildSystems check catches drift
+        run: ./scripts/test-build-systems.sh
+
       - name: Maintenance page and rolling updates
         run: ./scripts/test-maintenance-page.sh
 
       - name: global.nodeSelector reaches every workload
         run: ./scripts/test-node-selector.sh
+
+      - name: Session isolation (anchored skip-auth routes, sidecar policy)
+        run: ./scripts/test-session-isolation.sh
 
       # AGENTS.md says the two charts are released together at the same version
       # and nothing checked it, so they drifted to 2.2.1 and 2.2.2 across a pair
@@ -67,31 +71,6 @@ jobs:
             exit 1
           fi
           echo "both charts are at $a"
-
-      - name: Chart version must be bumped when a chart changes
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          base="origin/${{ github.base_ref }}"
-          git fetch --quiet origin "${{ github.base_ref }}"
-          failed=0
-          for chart in charts/*/; do
-            name="$(basename "$chart")"
-            if git diff --quiet "$base"...HEAD -- "$chart"; then
-              continue
-            fi
-            old="$(git show "$base:$chart/Chart.yaml" 2>/dev/null | awk '/^version:/{print $2; exit}')" || old=""
-            new="$(awk '/^version:/{print $2; exit}' "$chart/Chart.yaml")"
-            if [[ -z "$old" ]]; then
-              echo "  $name: new chart at $new"
-            elif [[ "$old" == "$new" ]]; then
-              echo "::error file=$chart/Chart.yaml::$name changed but version is still $old. Bump it - release.yml skips versions that already exist, so this would publish nothing."
-              failed=1
-            else
-              echo "  $name: $old -> $new"
-            fi
-          done
-          exit $failed
 
   # ---------------------------------------------------------------------------
   # Validate rendered output against real Kubernetes and CRD schemas.
@@ -116,12 +95,13 @@ jobs:
           # Gateway API and theia.cloud are not in the default schema set.
           #
           # HTTPRoute is skipped deliberately. templates/httproute-instances.yaml
-          # ships `rules: []` on purpose - the operator patches rules in at
-          # runtime to publish each new session. The CRDs-catalog schema declares
-          # minItems: 1 on spec.rules and so rejects it, but the upstream Gateway
-          # API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on that
-          # field. The catalog is stricter than what the cluster enforces, so this
-          # is a false positive rather than a defect in the chart.
+          # OMITS spec.rules entirely: it exists to carry the gateway attachment
+          # and hostnames that the operator copies onto the per-session route it
+          # creates for each session. The CRDs-catalog schema declares minItems: 1
+          # on spec.rules and so rejects a route without it, but the upstream
+          # Gateway API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on
+          # that field. The catalog is stricter than what the cluster enforces, so
+          # this is a false positive rather than a defect in the chart.
           # Revisit when the gateway templates are restructured; validating against
           # schemas converted from the real CRDs would let us drop the skip.
           SCHEMAS=(

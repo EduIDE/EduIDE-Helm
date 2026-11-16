@@ -1,9 +1,65 @@
 # Changelog
 
-## [eduide 2.9.0] - unreleased
+## [Unreleased]
 
-- [eduide] `landingPage.allowedGitHosts` (default `github.com`): hosts a git link without an Artemis token may clone from, as checked by EduIDE-Landing-Page
-- [eduide] `landingPage.sessionEnv`: public environment variables added to every session, e.g. Scorpio's `SCORPIO_GITHUB_CLIENT_ID`
+Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10, I-01). The service changes need an EduIDE-Cloud release that contains the matching service fixes.
+
+- [eduide] Refuse `keycloak.enable: false` unless `keycloak.allowUnauthenticated: true` is set. Anonymous mode lets anyone act as any user, so it needs an explicit opt-in for a throwaway environment. Installations with Keycloak enabled are not affected (I-01)
+- [eduide] New `service.corsOrigins`. The service allows browser calls from the landing page origin plus these, and from no other origin (CL-07)
+- [eduide] New `keycloak.audience`. When set, the service requires it in the `aud` claim of access tokens. Empty (the default) keeps the old behavior. Add an audience mapper to the Keycloak client before setting it (CL-08)
+- [eduide] New `service.oidcTrustStore` for a Keycloak certificate signed by a private CA. The service verifies the certificate of Keycloak now; it skipped the check before. Installations whose Keycloak uses a private CA must set it (CL-08)
+- [eduide] New `service.adminApiEnabled` (default `false`), a feature toggle for the admin API token protected scaling endpoints (`/service/admin/appdefinition`). Off, the service answers them with 404 even when a token is configured. Set `true` where something calls them. Needs the matching EduIDE-Cloud service
+- [eduide] New `landingPage.allowedGitHosts` (default `github.com`, `gitlab.com`): hosts a launch link may clone from when it is not a trusted Artemis link, for example a GitHub, GitLab or Gitea repository. Add the host of your own Gitea or GitLab. Links from other hosts are refused by EduIDE-Landing-Page; it needs the landing page release with this check
+- [eduide] New `service.sessionsPerUser`. Empty (the default) means `operator.sessionsPerUser`, so the limit of the operator also applies to the other launch paths; a number overrides it, 0 means no limit (CL-10)
+- [eduide] The service pod exposes the management port 9000 (metrics, OpenAPI) and carries the label `eduide.io/metrics-port: management`. [eduide-cluster] The service PodMonitor scrapes the `management` port of pods with that label; a second PodMonitor (`theia-cloud-service-legacy`) keeps scraping the `http` port of pods without it, so environments can be upgraded one by one. Remove the legacy monitor once all run this chart. The chart must be released with a service image that serves the management port (CL-07)
+
+Breaking. Needs EduIDE 2.0.0; do not release before it.
+
+- [eduide] Every language comes in two editions. The Artemis apps (`java-17`, `java-25`, `python`, `javascript`, `c`, new `rust`, `go`) keep their names and now use `eduide/<lang>-artemis`; all are `visible: false`. New `<lang>-standalone` apps use `eduide/<lang>-standalone`, are offered on the landing page and list their templates in `landingPage.buildSystems`
+- [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The render fails while `appDefinitions.enabled` names one of them, with the new name in the message. It also fails when `landingPage.appDefinition` (default `java-17`, the app for links without `?appDef=`) is not a rendered app, and when `landingPage.ephemeral` is not a boolean
+- [eduide] Add `landingPage.ephemeral` per app (optional boolean), passed to the landing page config as a boolean. Unset follows `landingPage.ephemeralStorage`
+- [eduide] The privacy page's `workspacePersistent` is true when any rendered app, hidden ones included, is persistent, instead of following `landingPage.ephemeralStorage` alone
+- [eduide] `release.yml` checks every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
+- [eduide] Renovate now proposes new EduIDE-Cloud and EduIDE-Landing-Page releases for `versions.cloud` and `versions.landingPage` (trailing `# renovate:` comments, no rendering change)
+- [eduide] Pin EduIDE-Cloud 3.0.0 (`versions.cloud`; security fixes of the 2026-11-16 audit, and no operator restart on Workspace deletion since 2.0.1) and EduIDE-Landing-Page 1.4.1 (`versions.landingPage`, reads the per-app `ephemeral` flag)
+- [eduide] The catalog labels the JavaScript apps "JavaScript" instead of "Javascript"
+- [eduide] Let the operator get, create, update and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections. No list or watch: the operator reads each Secret by name. Needs the matching EduIDE-Cloud operator ([#57](https://github.com/EduIDE/EduIDE-Helm/pull/57))
+- [eduide] Depend on workspace-garbage-collector 1.0.0, whose chart pins its own versioned image; the commit SHA image pin is gone. 1.0.0 also starts with its documented defaults when `CHECK_INTERVAL` or `WORKSPACE_TTL` are unset
+- [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
+- [eduide] Security (internal audit 2026-11-16, CL-01): anchor the oauth2-proxy `skip_auth_routes` entry to `^/health$`. The unanchored `/health.*` matched any path containing `/health`. `scripts/test-session-isolation.sh` fails on an unanchored route
+- [eduide] Security (CL-12): remove the `session-allow-sidecars` NetworkPolicy, which let every session pod reach every sidecar pod. Sidecar pods now carry the session labels, so the default-deny covers them, and the operator creates one NetworkPolicy per session that connects an IDE pod to its own sidecars only. Needs the EduIDE-Cloud release that creates it (the next one after 2.0.1); with an older operator the language servers of sidecar-enabled apps are unreachable
+- [eduide-cluster] Security (CL-12): the operator ClusterRole may `create`, `get` and `delete` `networkpolicies`, for the per-session sidecar policy
+
+Upgrade notes:
+
+- Upgrade `eduide-cluster` before or together with `eduide`: the operator needs the new `networkpolicies` permission before it starts a session with sidecars. Sessions that run during the upgrade keep their pods; sidecar pods are recreated with the new spec when their session or pool instance is recreated
+- Roll out the chart and the EduIDE-Cloud operator that creates the data bridge token Secrets before an EduIDE release whose IDE image contains the data bridge that requires the token. A bridge that requires the token rejects every injection from an operator that does not send it, and sessions then open without Artemis credentials. Installations with their own RBAC instead of this chart's grant the operator the same Secret verbs. Keep `networkPolicies.enabled: true`
+- Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
+- Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
+- Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+
+## [eduide 2.10.0] - 2026-11-14
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+
+## [eduide 2.9.0] - 2026-11-14
+
+- [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Pair this with a landing page image that serves `/session-ended`. An older image falls back to its start page, which is still better than the 5xx it replaces
+
+## [eduide 2.8.1] - 2026-11-13
+
+- [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
+- [eduide-cluster] No changes; bumped with eduide, since both charts release at one version
 
 ## [eduide 2.8.0] - 2026-11-11
 

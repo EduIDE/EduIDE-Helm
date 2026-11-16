@@ -32,8 +32,7 @@ nothing else. Ten lines across five environments is one line per environment.
 
 ```bash
 helm lint charts/eduide charts/eduide-cluster
-# bump the chart version - CI enforces it, and release.yml silently
-# publishes nothing if you forget
+# no version bump: add the change under "## [Unreleased]" in CHANGELOG.md
 docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2
 ```
 
