@@ -451,6 +451,16 @@ else
   bad "PersistentVolume writes must be granted only for Minikube" "default=[$(pv_verbs <<<"$rendered" | tr '\n' ' ')]"
 fi
 
+# The operator keeps one data bridge token Secret per pool instance, read by name.
+# Compare the whole rule, so a widened resource or API group fails too.
+secret_rules=$(yq -o=json -I=0 'select(.kind == "Role" and .metadata.name == "operator-bridge-token-secrets") | .rules | map(.verbs |= sort)' <<<"$rendered" | grep -vE '^---$')
+secret_sa=$(yq -r 'select(.kind == "RoleBinding" and .metadata.name == "operator-bridge-token-secrets") | .roleRef.kind + "/" + .roleRef.name + " " + .subjects[0].name' <<<"$rendered" | grep -vE '^---$')
+if [[ "$secret_rules" == '[{"apiGroups":[""],"resources":["secrets"],"verbs":["create","delete","get","update"]}]' && "$secret_sa" == "Role/operator-bridge-token-secrets operator-api-service-account" ]]; then
+  ok "the operator may manage Secrets in its namespace, without list or watch"
+else
+  bad "the operator needs get, create, update and delete on Secrets, and nothing else" "rules=[$secret_rules] binding=[$secret_sa]"
+fi
+
 # The operator polls this port for activity. A mismatch makes every poll fail.
 policy_monitor=$(yq -r 'select(.kind == "NetworkPolicy" and .metadata.name == "session-allow-operator") | .spec.ingress[0].ports[1].port' <<<"$rendered" | grep -vE '^(---|null)$')
 app_monitor=$(yq -r 'select(.kind == "AppDefinition") | .spec.monitor.port' <<<"$rendered" | grep -vE '^(---|null)$' | sort -u)
@@ -493,6 +503,23 @@ if grep -qx '10.0.0.0/8' <<<"$excluded" && grep -qx '169.254.169.254/32' <<<"$ex
 else
   bad "session egress must exclude private ranges and the metadata endpoint" "except=[$excluded]"
 fi
+
+# Anonymous mode needs the explicit opt-in, with or without preflight.
+err=$(helm template t "$CHART" --set skipPreflight=true --set keycloak.cookieSecret=x 2>&1 >/dev/null)
+if grep -q 'without authentication' <<<"$err"; then
+  ok "keycloak.enable=false without allowUnauthenticated fails the render"
+else
+  bad "anonymous mode must need allowUnauthenticated" "$err"
+fi
+if render --set keycloak.enable=true --set keycloak.authUrl=https://keycloak.example.edu/auth/ >/dev/null; then
+  ok "keycloak enabled with real values renders without the opt-in"
+else
+  bad "enabled keycloak must render without allowUnauthenticated"
+fi
+
+# The service only sees the origins it is meant to allow and a management port Prometheus can scrape.
+cors=$(render | grep -m1 'CORS_ORIGINS')
+if [[ "$cors" == *"://"* && "$cors" != *'*'* ]]; then ok "CORS origins come from the landing page host"; else bad "CORS_ORIGINS must name the landing origin" "$cors"; fi
 
 # The footer version used to be a hand-set string that drifted from the deploy.
 footer_version() { render "$@" | grep -m1 -o 'version: "[^"]*"'; }

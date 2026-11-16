@@ -20,6 +20,8 @@ spec:
     metadata:
       labels:
         app: service
+        {{- /* Tells the PodMonitor in eduide-cluster to scrape the management port; pods without it are scraped on `http`. */}}
+        eduide.io/metrics-port: management
       annotations:
         helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}
@@ -41,6 +43,10 @@ spec:
         - name: http
           containerPort: {{ tpl (.Values.service.port | toString) . }}
           protocol: TCP
+        {{- /* Metrics and the OpenAPI document. Not routed through the gateway; Prometheus scrapes it. */}}
+        - name: management
+          containerPort: 9000
+          protocol: TCP
         {{- /*
         The service has no health endpoint. An open port means Quarkus is up,
         which is what matters: without this the pod counted as ready the moment
@@ -61,6 +67,19 @@ spec:
         env:
         - name: SENTRY_ENABLE
           value: {{ tpl (.Values.service.sentry.enable | toString) . | quote }}
+      {{- with .Values.service.oidcTrustStore }}
+      {{- if .secretName }}
+        - name: KEYCLOAK_TRUSTSTORE_FILE
+          value: /etc/oidc-trust/{{ .key }}
+      {{- if .passwordKey }}
+        - name: KEYCLOAK_TRUSTSTORE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .secretName }}
+              key: {{ .passwordKey }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
       {{- /*
       Only mount the token when something actually supplies it. This used to be
       gated on the name and key alone, both of which have defaults, so a default
@@ -74,6 +93,16 @@ spec:
             secretKeyRef:
               name: {{ tpl (.Values.service.adminApiTokenSecret.name | toString) . }}
               key: {{ tpl (.Values.service.adminApiTokenSecret.key | toString) . }}
+      {{- end }}
+      {{- if .Values.service.oidcTrustStore.secretName }}
+        volumeMounts:
+        - name: oidc-trust
+          mountPath: /etc/oidc-trust
+          readOnly: true
+      volumes:
+      - name: oidc-trust
+        secret:
+          secretName: {{ .Values.service.oidcTrustStore.secretName }}
       {{- end }}
       {{- if .Values.service.imagePullSecret }}
       imagePullSecrets:
