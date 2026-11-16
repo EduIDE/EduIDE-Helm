@@ -10,7 +10,8 @@ Breaking. Needs EduIDE 2.0.0; do not release before it.
 - [eduide] The privacy page's `workspacePersistent` is true when any rendered app, hidden ones included, is persistent, instead of following `landingPage.ephemeralStorage` alone
 - [eduide] `release.yml` checks every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
 - [eduide] Renovate now proposes new EduIDE-Cloud and EduIDE-Landing-Page releases for `versions.cloud` and `versions.landingPage` (trailing `# renovate:` comments, no rendering change)
-- [eduide] Pin EduIDE-Cloud 2.0.0 (`versions.cloud`) and EduIDE-Landing-Page 1.4.0 (`versions.landingPage`, reads the per-app `ephemeral` flag)
+- [eduide] Pin EduIDE-Cloud 2.0.1 (`versions.cloud`; 2.0.1 fixes an operator restart on every Workspace deletion) and EduIDE-Landing-Page 1.4.0 (`versions.landingPage`, reads the per-app `ephemeral` flag)
+- [eduide] The catalog labels the JavaScript apps "JavaScript" instead of "Javascript"
 - [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
 
 Upgrade notes:
