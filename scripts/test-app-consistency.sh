@@ -455,10 +455,10 @@ fi
 # Compare the whole rule, so a widened resource or API group fails too.
 secret_rules=$(yq -o=json -I=0 'select(.kind == "Role" and .metadata.name == "operator-bridge-token-secrets") | .rules | map(.verbs |= sort)' <<<"$rendered" | grep -vE '^---$')
 secret_sa=$(yq -r 'select(.kind == "RoleBinding" and .metadata.name == "operator-bridge-token-secrets") | .roleRef.kind + "/" + .roleRef.name + " " + .subjects[0].name' <<<"$rendered" | grep -vE '^---$')
-if [[ "$secret_rules" == '[{"apiGroups":[""],"resources":["secrets"],"verbs":["create","delete","get","patch","update"]}]' && "$secret_sa" == "Role/operator-bridge-token-secrets operator-api-service-account" ]]; then
+if [[ "$secret_rules" == '[{"apiGroups":[""],"resources":["secrets"],"verbs":["create","delete","get","update"]}]' && "$secret_sa" == "Role/operator-bridge-token-secrets operator-api-service-account" ]]; then
   ok "the operator may manage Secrets in its namespace, without list or watch"
 else
-  bad "the operator needs get, create, update, patch and delete on Secrets, and nothing else" "rules=[$secret_rules] binding=[$secret_sa]"
+  bad "the operator needs get, create, update and delete on Secrets, and nothing else" "rules=[$secret_rules] binding=[$secret_sa]"
 fi
 
 # The operator polls this port for activity. A mismatch makes every poll fail.

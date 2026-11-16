@@ -12,7 +12,7 @@ Breaking. Needs EduIDE 2.0.0; do not release before it.
 - [eduide] Renovate now proposes new EduIDE-Cloud and EduIDE-Landing-Page releases for `versions.cloud` and `versions.landingPage` (trailing `# renovate:` comments, no rendering change)
 - [eduide] Pin EduIDE-Cloud 2.0.1 (`versions.cloud`; 2.0.1 fixes an operator restart on every Workspace deletion) and EduIDE-Landing-Page 1.4.0 (`versions.landingPage`, reads the per-app `ephemeral` flag)
 - [eduide] The catalog labels the JavaScript apps "JavaScript" instead of "Javascript"
-- [eduide] Let the operator get, create, update, patch and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections. No list or watch: the operator reads each Secret by name. Needs the matching EduIDE-Cloud operator ([#57](https://github.com/EduIDE/EduIDE-Helm/pull/57))
+- [eduide] Let the operator get, create, update and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections. No list or watch: the operator reads each Secret by name. Needs the matching EduIDE-Cloud operator ([#57](https://github.com/EduIDE/EduIDE-Helm/pull/57))
 - [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
 
 Upgrade notes:
