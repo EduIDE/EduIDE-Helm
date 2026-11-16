@@ -28,8 +28,8 @@ A bare `--version 2.0.0` with no overrides pins every image. Nothing floats.
 | Value | Source repository | Default |
 |---|---|---|
 | `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
-| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.2.0` |
-| `versions.landingPage` | EduIDE-Landing-Page | `1.2.0` |
+| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.3.0` |
+| `versions.landingPage` | EduIDE-Landing-Page | `1.3.1` |
 
 The three release on their own cadence, so each has its own knob and an
 override names exactly one. A blanket tag would be wrong: a pull request only
@@ -47,7 +47,7 @@ alike:
 ```yaml
 appDefinitions:
   enabled:                  # names from the catalog or from apps
-    - java-25-templates
+    - java-25-standalone
     - python
     - haskell
   apps:
@@ -70,9 +70,78 @@ naming it.
 That one merged list drives the AppDefinition custom resource, the landing
 page's app list, and the set of images preloaded onto every node. It used to be
 three hand-maintained lists across two repositories, the preload one addressed
-by array index - which is how production came to offer `c-templates` while
-preloading everything except `c-templates`.
+by array index - which is how production came to offer one app while
+preloading everything except it.
 `scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
+
+### Editions
+
+Every language comes in two editions, both with Scorpio and the data bridge:
+
+| AppDefinition | Image | Offered on the landing page | Started from |
+|---|---|---|---|
+| `<lang>` (no suffix) | `eduide/<lang>-artemis` | no (`visible: false`) | Artemis, by name (`?appDef=`) |
+| `<lang>-standalone` | `eduide/<lang>-standalone` | yes | the landing page, or an external start |
+
+`<lang>` is one of `java-17`, `java-25`, `python`, `javascript`, `c`, `rust`,
+`go`. The Artemis edition has the Artemis extension; standalone does not.
+Artemis stores the AppDefinition name per exercise, which is why the Artemis
+names stay without a suffix.
+
+`landingPage.buildSystems` of a `-standalone` app lists the ids of the project
+templates its image carries (`maven`, `gradle`, `make`, `bazel`, `python`,
+`node`, `web`, `cargo`, `go`). One entry starts it directly, several show the
+build system step, none starts an empty workspace. The id is the template
+folder in the image; the release train checks every id against the image's
+`templates-<image>.json` (`scripts/check-build-systems.sh`). An installation
+offers fewer templates by overriding `buildSystems` in its `apps`.
+
+`landingPage.ephemeral` (true or false) decides per app whether its sessions
+are temporary. Unset, the app follows `landingPage.ephemeralStorage`. The
+privacy page states the workspace as persistent when any rendered app is
+persistent, hidden Artemis apps included: an Artemis start launches them with
+their own persistence.
+
+An installation's own image needs a full path and tag, because the chart
+prefixes `imageRegistry` to anything that is not one:
+`registry.example.edu/ide/java-25:1.0.0`. Derive it `FROM` a `-standalone` image.
+
+### Upgrading to 3.0.0
+
+Old image names are frozen at their last tag, so 3.0.0 only works with EduIDE
+2.0.0. The `*-templates` apps are renamed; list the new names in
+`appDefinitions.enabled`. The render fails while `enabled` still names an old
+one, because deleting an AppDefinition garbage-collects its live sessions:
+
+| Before | Now |
+|---|---|
+| `java-17-templates` | `java-17-standalone` |
+| `java-25-templates` | `java-25-standalone` |
+| `c-templates` | `c-standalone` |
+| `java-17`, `java-25`, `python`, `javascript`, `c` | same names, image `<lang>-artemis`, no longer offered on the landing page |
+| - | new: `rust`, `go` and every `<lang>-standalone` |
+
+Before you deploy:
+
+- **Maintenance window.** Removing or renaming an app terminates its live
+  sessions (the operator owns the session Deployments and warm pool volumes
+  through the AppDefinition). The new images also replace every running session.
+- **Warm pools.** `minInstances` of a renamed app does not move. Set it on the
+  new app and patch the live AppDefinition, which the chart does not reset.
+- **`python` and `javascript` are hidden now.** An installation that offered
+  them on the landing page switches to `python-standalone` and
+  `javascript-standalone`.
+- **`landingPage.appDefinition`** defaults to `java-17`: the app for links
+  without `?appDef=`, which is the Artemis start. The render fails when it is
+  not an app the installation renders, so update an override that still names a
+  `*-templates` app.
+- **Explicit `enabled`.** An empty `enabled` now offers and preloads 14 images
+  (two editions of seven languages) on every node. List what your courses use.
+- **Persistence.** Template sessions were persistent before and follow
+  `landingPage.ephemeral` now, so a workspace saved under the old template app
+  is no longer reachable and is reaped by the garbage collector. Set
+  `landingPage.ephemeral: false` on the `-standalone` apps to keep them
+  persistent, and bump `versions.landingPage` to a release that reads it.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.
@@ -81,70 +150,59 @@ Environment configuration for the TUM installations lives in
 
 # Cutting a release
 
-A release is one version across four repositories: EduIDE-Cloud, EduIDE,
-EduIDE-Landing-Page and this one.
+Nothing releases on push to `main`. A release is a reviewed pull request
+followed by a manual run of `release.yml`. The `release` skill
+(`.claude/skills/release/SKILL.md`) walks through it: it proposes the version,
+checks the EduIDE components this repository pins against their latest
+releases, writes the CHANGELOG section and opens the pull request.
 
-**The release train does not bump the chart version.** You do, in a reviewed
-pull request. The workflow checks the charts are already at the version you
-asked for and refuses to continue otherwise. Automation that pushes to `main`
-triggers the workflows watching `main`, and release automation that can trigger
-itself is a bad thing to own.
+Chart changes need no version bump. They go under `## [Unreleased]` in
+`CHANGELOG.md`; the version moves in the release pull request only.
 
-## The three steps
+## The two steps
 
-### 1. Dry run
+### 1. Release pull request
 
-```
-Actions -> Release train -> Run workflow
-  version:  2.3.0        (no leading v)
-  dry_run:  true
-```
-
-Nothing is built, tagged or published. It reports which images the version
-would need. Read the summary before continuing.
-
-### 2. Bump the charts in a pull request
-
-Both charts, both fields, all four values identical:
+Both charts, one version; `appVersion` and the `versions.*` pins at the
+component releases you want to ship:
 
 ```yaml
 # charts/eduide/Chart.yaml  AND  charts/eduide-cluster/Chart.yaml
 version: 2.3.0
-appVersion: "2.3.0"
 ```
 
 ```bash
 docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2
 ```
 
-Open the PR, let CI run, get it reviewed, merge. CI checks the version moved,
-the READMEs match, and shows what the change does to every live environment.
+Move the `## [Unreleased]` entries under `## [eduide 2.3.0] - YYYY-MM-DD`,
+open the PR, let CI run, get it reviewed, merge.
 
-### 3. Run the release train for real
+### 2. Run the release
 
-```
-Actions -> Release train -> Run workflow
-  version:  2.3.0
-  dry_run:  false
+```bash
+gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=2.3.0
 ```
 
 It then, in this order:
 
-1. **validates** the version is semver and `v2.3.0` is free
-2. **builds** all 14 images at that tag, by dispatching each repository's own
-   build workflow — **nothing is tagged yet**
-3. **verifies** every image exists in GHCR and is multi-arch
-4. **tags** the three component repositories and creates their releases
-5. **checks** the charts are at `2.3.0`, tags this repository, publishes both
+1. **checks** that the IDE, Cloud (operator, service, conversion webhook) and
+   landing page images the charts pin exist and are multi-arch, and that the
+   chart versions are not published yet
+2. **validates** the version (semver, newer than the last release, matches both
+   `Chart.yaml` files, CHANGELOG section exists) and creates a draft GitHub
+   Release from the CHANGELOG section
+3. **publishes** both charts to `oci://ghcr.io/eduide/charts` and adds what the
+   version pins to the release notes
+4. **verifies** both charts can be pulled
+5. **publishes the release**, which creates the `vX.Y.Z` tag
 
-Building before tagging is deliberate. Building 15 multi-GB IDE images is the
-flakiest step in the pipeline; a failure after tagging strands immutable
-`v2.3.0` tags on repositories whose images were never published. This way a
-flake costs a re-run.
+The tag appears last on purpose: a missing image or a failed push leaves a
+draft, not a tag for charts that were never published.
 
 ## Rolling it out
 
-The train deploys nothing. In EduIDE-deployment:
+A release deploys nothing. In EduIDE-deployment:
 
 ```yaml
 # environments/prod-tum/env.yaml
@@ -158,8 +216,10 @@ automatically.
 
 ## Release candidates
 
-`2.3.0-rc.1` everywhere — same pipeline, same registry, marked as a prerelease
-on GitHub. Consume with an explicit `--version`; never `--devel`.
+Run `release.yml` with `-f version=2.3.0-rc.1`, from any branch: same pipeline,
+same registry, marked as a prerelease on GitHub. The version files are not
+checked for a release candidate; the charts are stamped with it. Consume with
+an explicit `--version`; never `--devel`.
 
 ## Versioning rules
 
@@ -181,14 +241,14 @@ The chart version is the platform version and is what an environment pins.
 ## Checklist
 
 ```
-[ ] dry run is clean
 [ ] both Chart.yaml files at the same `version`
 [ ] `appVersion` set to the EduIDE release the IDE images were published under
 [ ] `versions.cloud` and `versions.landingPage` set to their releases
 [ ] scripts/test-app-consistency.sh passes (no floating tags, three consumers agree)
 [ ] helm-docs run, READMEs committed
-[ ] bump PR reviewed and merged
-[ ] release train run with dry_run: false
+[ ] CHANGELOG section `## [eduide X.Y.Z]` written
+[ ] release PR reviewed and merged
+[ ] release.yml run
 [ ] chartVersion bumped in EduIDE-deployment for the environments to move
 ```
 
@@ -196,16 +256,17 @@ The chart version is the platform version and is what an environment pins.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `version is 'X', expected 'Y'` | step 2 skipped or half-done | bump both charts, both fields |
-| `missing ghcr.io/...` | a component build failed | check that repository's Actions, re-run |
-| `is not multi-arch` | one architecture failed | re-run the whole build, not just the merge job |
-| `tag v2.3.0 already exists` | version already used | pick the next one, tags are immutable |
+| `version is 'X', expected 'Y'` | release PR missed a Chart.yaml | bump both charts |
+| `missing ghcr.io/...` | a component build failed or is not released | check that repository's Actions, release it first |
+| `is not multi-arch` | one architecture failed | re-run that repository's build |
+| `Tag vX.Y.Z already exists` / `already published` | version already used | pick the next one, tags are immutable |
+| `No '## [eduide X.Y.Z]' section` | CHANGELOG not moved in the release PR | fix it in a new PR |
 
 ---
 
 ## Cluster prerequisites
 
-- **cert-manager** — certificate management, including Let's Encrypt.
+- **cert-manager** - certificate management, including Let's Encrypt.
   [Install](https://cert-manager.io/docs/installation/helm/).
 - **Envoy Gateway** with the Gateway API CRDs. The GatewayClass name must match
   `gateway.className` (default `envoy`).

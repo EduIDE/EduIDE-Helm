@@ -1,8 +1,49 @@
 # Changelog
 
-## [eduide 2.9.0] - 2026-11-12
+## [Unreleased]
 
-- [eduide] Let the operator get, create, update, patch and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections ([EduIDE-Cloud#157](https://github.com/EduIDE/EduIDE-Cloud/issues/157)). No list or watch: the operator reads each Secret by name
+Breaking. Needs EduIDE 2.0.0; do not release before it.
+
+- [eduide] Every language comes in two editions. The Artemis apps (`java-17`, `java-25`, `python`, `javascript`, `c`, new `rust`, `go`) keep their names and now use `eduide/<lang>-artemis`; all are `visible: false`. New `<lang>-standalone` apps use `eduide/<lang>-standalone`, are offered on the landing page and list their templates in `landingPage.buildSystems`
+- [eduide] Remove `java-17-templates`, `java-25-templates` and `c-templates`; they are `java-17-standalone`, `java-25-standalone` and `c-standalone`. The render fails while `appDefinitions.enabled` names one of them, with the new name in the message. It also fails when `landingPage.appDefinition` (default `java-17`, the app for links without `?appDef=`) is not a rendered app, and when `landingPage.ephemeral` is not a boolean
+- [eduide] Add `landingPage.ephemeral` per app (optional boolean), passed to the landing page config as a boolean. Unset follows `landingPage.ephemeralStorage`
+- [eduide] The privacy page's `workspacePersistent` is true when any rendered app, hidden ones included, is persistent, instead of following `landingPage.ephemeralStorage` alone
+- [eduide] `release.yml` checks every `buildSystems` id against the `template.json` files in the published image (`scripts/fetch-image-templates.sh`, `scripts/check-build-systems.sh`) and warns on differing labels
+- [eduide] Renovate now proposes new EduIDE-Cloud and EduIDE-Landing-Page releases for `versions.cloud` and `versions.landingPage` (trailing `# renovate:` comments, no rendering change)
+- [eduide] Pin EduIDE-Cloud 2.0.1 (`versions.cloud`; 2.0.1 fixes an operator restart on every Workspace deletion) and EduIDE-Landing-Page 1.4.0 (`versions.landingPage`, reads the per-app `ephemeral` flag)
+- [eduide] The catalog labels the JavaScript apps "JavaScript" instead of "Javascript"
+- [eduide] Let the operator get, create, update, patch and delete Secrets in its own namespace (Role and RoleBinding `operator-bridge-token-secrets`). The operator keeps one data bridge token Secret per prewarmed pool instance (`instance-<n>-<appdef>-bridge-token`) and rotates it on every release, so the data bridge can reject unauthenticated injections. No list or watch: the operator reads each Secret by name. Needs the matching EduIDE-Cloud operator ([#57](https://github.com/EduIDE/EduIDE-Helm/pull/57))
+- [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
+
+Upgrade notes:
+
+- Roll out the chart and the EduIDE-Cloud operator that creates the data bridge token Secrets before an EduIDE release whose IDE image contains the data bridge that requires the token. A bridge that requires the token rejects every injection from an operator that does not send it, and sessions then open without Artemis credentials. Installations with their own RBAC instead of this chart's grant the operator the same Secret verbs. Keep `networkPolicies.enabled: true`
+- Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
+- Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
+- Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
+
+## [eduide 2.10.0] - 2026-11-14
+
+- [eduide] Add `operator.metricsPort`. When set, the operator serves Prometheus metrics on a `metrics` port, starting with `theiacloud_sessions_ended_total{reason, app_definition}`: the sessions it stopped for inactivity or for reaching the lifetime limit. Default 0, which renders exactly as before
+- [eduide-cluster] Add a PodMonitor for the operator's `metrics` port and a "Sessions ended per hour, by reason" panel to the sessions dashboard. Without `operator.metricsPort` the PodMonitor finds no target and the panel stays empty
+
+Upgrade notes:
+
+- Set `operator.metricsPort` only with an EduIDE-Cloud release that has `--metricsPort` (the first EduIDE-Cloud release that contains EduIDE/EduIDE-Cloud#167). An older operator rejects the option and does not start
+
+## [eduide 2.9.0] - 2026-11-14
+
+- [eduide] Redirect a request for an ended session to the landing page's `/session-ended` page instead of answering 5xx ([#39](https://github.com/EduIDE/EduIDE-Helm/pull/39)). The redirect is the instances route's catch-all rule, so a live session's longer path still wins. Only 302 is accepted, because eager sessions reuse instance paths. Turn it off with `gateway.routes.sessionEndedRedirect.enabled: false`
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Pair this with a landing page image that serves `/session-ended`. An older image falls back to its start page, which is still better than the 5xx it replaces
+
+## [eduide 2.8.1] - 2026-11-13
+
+- [eduide] Show the "Are you still here?" dialog after 50 minutes without input instead of 55, so students get ten minutes of warning before the 60-minute inactivity timeout. Both values are now explicit in `appDefinitions.defaults.monitor.activityTracker` (`timeoutAfter: 60`, `notifyAfter: 50`)
+- [eduide-cluster] No changes; bumped with eduide, since both charts release at one version
 
 ## [eduide 2.8.0] - 2026-11-11
 

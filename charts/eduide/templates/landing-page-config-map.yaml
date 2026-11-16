@@ -35,6 +35,15 @@ data:
       {{- if $a.landingPage }}{{ $apps = set $apps $n $a.landingPage }}{{ end }}
       {{- end }}
       {{- end }}
+      {{- /*
+      The page launches this app for links without ?appDef=, so it has to exist.
+      An additionalApps entry counts too: that escape hatch replaces the derived
+      list.
+      */}}
+      {{- $default := tpl (.Values.landingPage.appDefinition | toString) . }}
+      {{- if not (or (hasKey $apps $default) (hasKey (include "eduide.apps" . | fromJson) $default)) }}
+      {{- fail (printf "landingPage.appDefinition %q is not an app this installation renders. Offer it in appDefinitions.enabled or point landingPage.appDefinition at an app that is." $default) }}
+      {{- end }}
       additionalApps: [
         {{- range $key, $val := $apps }}
         {{- $image := (get $val "image" | default (get $val "Image")) }}
@@ -43,6 +52,11 @@ data:
           appName: {{ $val.label | quote }},
           {{- if and (hasKey $val "visible") (ne (toString (get $val "visible")) "true") }}
           visible: {{ get $val "visible" }},
+          {{- end }}
+          {{- /* toJson keeps it a JSON boolean; unset stays absent so the page falls back to useEphemeralStorage. */}}
+          {{- if hasKey $val "ephemeral" }}
+          {{- if not (kindIs "bool" $val.ephemeral) }}{{ fail (printf "landingPage.ephemeral of app %q must be true or false, got %v" $key $val.ephemeral) }}{{ end }}
+          ephemeral: {{ $val.ephemeral | toJson }},
           {{- end }}
           {{- if $image }}
           image: {{ tpl ($image | toString) $root | quote }},
@@ -85,7 +99,9 @@ data:
       alternative - restating the figures in a second place - is how a privacy
       statement quietly becomes false.
 
-        workspacePersistent    landingPage.ephemeralStorage, inverted
+        workspacePersistent    true when any rendered app is persistent, hidden
+                               ones included; an app's landingPage.ephemeral wins
+                               over landingPage.ephemeralStorage
         workspaceRetentionSeconds theia-workspace-garbage-collector.env.WORKSPACE_TTL
         sessionMaxMinutes      appDefinitions.defaults.timeout
         sessionIdleMinutes     appDefinitions.defaults.monitor.activityTracker.timeoutAfter
@@ -118,8 +134,19 @@ data:
       {{- if gt $i $maxIdle }}{{ $maxIdle = $i }}{{ end }}
       {{- end }}
       {{- end }}
+      {{- /*
+      Every rendered app counts, hidden ones included: an Artemis start launches
+      a hidden app with whatever persistence its caller picks, so the page
+      cannot promise ephemeral workspaces while one of them may be persistent.
+      */}}
+      {{- $globalEphemeral := eq (tpl (.Values.landingPage.ephemeralStorage | toString) .) "true" }}
+      {{- $persistent := false }}
+      {{- range $key, $app := (include "eduide.apps" . | fromJson) }}
+      {{- $own := (($app.landingPage | default dict).ephemeral) }}
+      {{- if not (ternary $own $globalEphemeral (kindIs "bool" $own)) }}{{ $persistent = true }}{{ end }}
+      {{- end }}
       privacy: {
-        workspacePersistent: {{ not .Values.landingPage.ephemeralStorage }},
+        workspacePersistent: {{ $persistent }},
         workspaceGarbageCollected: {{ $gcEnabled }},
         {{- if $gcEnabled }}
         {{- /*
