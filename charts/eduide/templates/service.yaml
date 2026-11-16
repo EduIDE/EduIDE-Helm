@@ -67,6 +67,8 @@ spec:
         env:
         - name: SENTRY_ENABLE
           value: {{ tpl (.Values.service.sentry.enable | toString) . | quote }}
+        - name: THEIA_CLOUD_ADMIN_API_ENABLED
+          value: {{ .Values.service.adminApiEnabled | toString | quote }}
       {{- with .Values.service.oidcTrustStore }}
       {{- if .secretName }}
         - name: KEYCLOAK_TRUSTSTORE_FILE
