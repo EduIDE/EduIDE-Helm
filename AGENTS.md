@@ -94,10 +94,15 @@ and finally publishes the release, which creates the tag. Nothing releases on pu
 the org-wide preset. Policy changes belong there, not here. Nothing is
 automerged.
 
-Two managers see this repo. `helmv3` reads the `dependencies:` block in
+Three managers see this repo. `helmv3` reads the `dependencies:` block in
 `charts/eduide/Chart.yaml` and refreshes `charts/eduide/Chart.lock` with it.
 `helm-values` reads the image pins in `charts/eduide/values.yaml` and
-`charts/eduide-cluster/values.yaml`.
+`charts/eduide-cluster/values.yaml`. A regex manager from the preset reads
+`versions.cloud` and `versions.landingPage` through their trailing
+`# renovate: datasource=github-releases depName=...` comment and proposes the
+latest release of that repository. Keep that comment on the same line, a comment
+above the key ends up in the helm-docs README. `versions.ide` stays empty and
+follows `appVersion`, which the release sets.
 
 Expect a Renovate pull request touching a chart to arrive **red**, and to need
 two things done by hand before it merges:
