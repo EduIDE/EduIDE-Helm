@@ -22,7 +22,8 @@ spec:
       - {{ . }}
       {{- end }}
   podMetricsEndpoints:
-    - port: http
+    # The service serves metrics on its management port, which is not routed through the gateway.
+    - port: management
       interval: 15s
       path: /q/metrics
 {{- end }}

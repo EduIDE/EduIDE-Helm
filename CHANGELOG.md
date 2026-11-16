@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10, I-01). The service changes need an EduIDE-Cloud release that contains the matching service fixes.
+
+- [eduide] Refuse `keycloak.enable: false` unless `keycloak.allowUnauthenticated: true` is set. Anonymous mode lets anyone act as any user, so it needs an explicit opt-in for a throwaway environment. Installations with Keycloak enabled are not affected (I-01)
+- [eduide] New `service.corsOrigins`. The service allows browser calls from the landing page origin plus these, and from no other origin (CL-07)
+- [eduide] New `keycloak.audience`. When set, the service requires it in the `aud` claim of access tokens. Empty (the default) keeps the old behavior. Add an audience mapper to the Keycloak client before setting it (CL-08)
+- [eduide] New `service.oidcTrustStore` for a Keycloak certificate signed by a private CA. The service verifies the certificate of Keycloak now; it skipped the check before. Installations whose Keycloak uses a private CA must set it (CL-08)
+- [eduide] New `service.sessionsPerUser` (default 0, no limit) (CL-10)
+- [eduide] The service pod exposes the management port 9000 (metrics, OpenAPI); [eduide-cluster] the service PodMonitor scrapes that port. Upgrade both charts together with the matching service image (CL-07)
+
 Breaking. Needs EduIDE 2.0.0; do not release before it.
 
 - [eduide] Every language comes in two editions. The Artemis apps (`java-17`, `java-25`, `python`, `javascript`, `c`, new `rust`, `go`) keep their names and now use `eduide/<lang>-artemis`; all are `visible: false`. New `<lang>-standalone` apps use `eduide/<lang>-standalone`, are offered on the landing page and list their templates in `landingPage.buildSystems`

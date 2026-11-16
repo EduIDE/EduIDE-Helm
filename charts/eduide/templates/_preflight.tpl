@@ -73,11 +73,19 @@ resolve anywhere. Requiring all three to match meant that setting the realm and
 client but forgetting the URL passed the check, and the proxy then pointed every
 session at a host that does not exist.
 
-Only checked when Keycloak is enabled: `keycloak.enable: false` is already an
-explicit statement that there is no identity provider.
+The placeholder is only checked when Keycloak is enabled.
+
+`keycloak.enable: false` is anonymous mode: the service takes the `user` field
+of a request as the identity, so anyone can act as any user, and sessions run
+without a proxy. That is only acceptable for a throwaway environment, so it
+needs the same explicit opt-in as the placeholder values.
 */}}
+{{- $enabled := eq (tpl ($kc.enable | toString) .) "true" -}}
+{{- if and (not $enabled) (not $kc.allowUnauthenticated) }}
+{{- fail "keycloak.enable is false, which runs the service and the sessions without authentication: anyone can act as any user. Enable Keycloak, or set keycloak.allowUnauthenticated=true for a throwaway environment." }}
+{{- end }}
 {{- $placeholder := eq ($kc.authUrl | toString) "https://keycloak.url/auth/" -}}
-{{- if and $kc.enable $placeholder (not $kc.allowUnauthenticated) }}
+{{- if and $enabled $placeholder (not $kc.allowUnauthenticated) }}
 {{- fail (printf "keycloak is left at the chart's placeholder values (authUrl=%s realm=%s clientId=%s). Configure them, or set keycloak.allowUnauthenticated=true to install without a working identity provider." $kc.authUrl $kc.realm $kc.clientId) }}
 {{- end }}
 {{- end -}}
