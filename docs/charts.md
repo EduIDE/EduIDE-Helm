@@ -10,11 +10,11 @@ Two charts, released together with the same version.
 ```bash
 # once per cluster
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version 2.0.0 -n eduide-system --create-namespace
+  --version <chart version> -n eduide-system --create-namespace
 
 # once per environment
 helm install eduide oci://ghcr.io/eduide/charts/eduide \
-  --version 2.0.0 -n eduide-test1 -f my-values.yaml
+  --version <chart version> -n eduide-test1 -f my-values.yaml
 ```
 
 ## Why two charts and not one
