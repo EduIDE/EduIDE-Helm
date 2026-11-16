@@ -9,6 +9,18 @@ changes rather than reordering.
 {{- $ctx := . -}}
 {{- $d := .Values.appDefinitions.defaults | default dict -}}
 {{- $apps := include "eduide.apps" . | fromJson -}}
+{{- /*
+Deleting an AppDefinition garbage-collects its live sessions (the operator owns
+the session Deployments and pool volumes through it), so a renamed app in
+`enabled` stops the deploy instead of only warning.
+*/ -}}
+{{- $renamed := include "eduide.renamedApps" . | fromJson -}}
+{{- $defined := include "eduide.appDefinitions" . | fromJson -}}
+{{- range $old := (.Values.appDefinitions.enabled | default list) }}
+{{- if and (hasKey $renamed $old) (not (hasKey $defined $old)) }}
+{{- fail (printf "appDefinitions.enabled lists %q, which chart 3.0.0 renamed to %q. Use the new name; removing an app terminates its live sessions, so deploy in a maintenance window (see the upgrade notes in the README)." $old (get $renamed $old)) }}
+{{- end }}
+{{- end }}
 {{- range $name := ($apps | keys | sortAlpha) }}
 {{- $app := index $apps $name }}
 {{- if not $app.image }}

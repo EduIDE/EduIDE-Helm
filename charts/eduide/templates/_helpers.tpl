@@ -133,6 +133,13 @@ not merged in here; each consumer falls back to them per field.
 {{- end -}}
 
 {{/*
+Template apps that were renamed in chart 3.0.0, old name to new, as JSON.
+*/}}
+{{- define "eduide.renamedApps" -}}
+{{- dict "java-17-templates" "java-17-standalone" "java-25-templates" "java-25-standalone" "c-templates" "c-standalone" | toJson -}}
+{{- end -}}
+
+{{/*
 Names in appDefinitions.enabled with no definition in the catalog or in apps,
 one per line. Usually a typo, or an app the chart no longer ships.
 */}}
