@@ -517,6 +517,10 @@ service:
     external: false
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
+  # -- Feature toggle for the admin API token protected endpoints
+  # (`/service/admin/appdefinition`). Off by default: the service then answers
+  # them with 404, even when a token is configured.
+  adminApiEnabled: false
   # -- Maximum active sessions per user, enforced by the REST service on every
   # launch path. Empty means the value of `operator.sessionsPerUser`, so the
   # limit the operator applies to lazy sessions holds for the other paths too.
