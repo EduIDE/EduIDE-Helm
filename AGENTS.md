@@ -67,22 +67,19 @@ render-diff fills with false changes and stops being read.
 
 ## Releasing
 
-`Release train` cuts a version across all four repositories. It builds, then
-verifies every image exists and is multi-arch, and only then tags — because a
-failure after tagging strands immutable tags on repositories whose images were
-never published.
-
-**It does not bump the chart version.** That is a reviewed pull request; the
-workflow checks the charts are already at the requested version and fails
-otherwise. Do not make automation push to `main`: it triggers the workflows
-watching `main`. Full procedure in the README, and as a skill in
-`.claude/skills/cut-a-release.md`.
+Releases are manual. A release pull request moves the CHANGELOG entries under
+the new version and bumps both charts; after it merges, `release.yml`
+(`workflow_dispatch`, input `version`) verifies every pinned image, drafts
+the GitHub Release from the CHANGELOG section, publishes both charts to OCI
+and finally publishes the release, which creates the tag. Nothing releases on push to `main`, and automation never pushes to
+`main`. Procedure in the README, and as a skill in
+`.claude/skills/release/SKILL.md`.
 
 ## Conventions
 
-- A changed chart must have a bumped version. CI enforces this: `release.yml`
-  skips a version that already exists, so a forgotten bump publishes nothing
-  and fails silently. It has happened three times.
+- Do not bump the chart version in a feature or fix PR. Add the entry under
+  `## [Unreleased]` in `CHANGELOG.md`; the release pull request bumps the
+  version. CI still checks that both charts carry the same version.
 - Chart READMEs are generated. Run helm-docs and commit the result; CI fails on
   drift.
 - `kubeconform` skips `HTTPRoute`: the CRDs-catalog schema declares
@@ -105,8 +102,7 @@ Two managers see this repo. `helmv3` reads the `dependencies:` block in
 Expect a Renovate pull request touching a chart to arrive **red**, and to need
 two things done by hand before it merges:
 
-- the chart `version:` bump, which the CI job enforces and Renovate does not know
-  to make;
+- an entry under `## [Unreleased]` in `CHANGELOG.md`;
 - regenerated chart READMEs, because helm-docs renders both the dependency table
   and the values defaults, so a bump of either drifts them.
 

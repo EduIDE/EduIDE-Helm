@@ -1,31 +1,45 @@
-name: Release Charts
+# Manual release. The only way this repository releases.
+#
+#   gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=2.11.0
+#
+# Both charts (eduide, eduide-cluster) ship under the same version. See
+# .claude/skills/release/SKILL.md for the whole flow.
+#
+# A Release created with GITHUB_TOKEN starts no other workflow, so everything
+# a release needs is a job in this file.
+
+name: Release
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Chart version without the leading v, e.g. 2.11.0, or 2.11.0-rc.1 for a prerelease"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
-    if: github.event_name != 'pull_request'
+  # Before the tag exists: every image the charts pin is there, and the chart
+  # versions are free.
+  pins:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-    env:
-      OCI_REGISTRY: ghcr.io
-      OCI_REPOSITORY: charts
+      contents: read
+      packages: read
+    outputs:
+      ide: ${{ steps.pins.outputs.ide }}
+      cloud: ${{ steps.pins.outputs.cloud }}
+      landing: ${{ steps.pins.outputs.landing }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -37,7 +51,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
+          echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "$OWNER" --password-stdin
 
       # A chart version is a promise about images: appVersion pins every IDE
       # image, versions.cloud the operator and service, versions.landingPage the
@@ -114,80 +128,98 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit $fail
 
-      - name: Package and publish charts
-        id: publish
+      # A published chart version is never replaced: helm push overwrites.
+      - name: Chart versions are not published yet
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-
-          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
-          mkdir -p dist
-
-          charts=(
-            eduide-cluster
-            eduide
-          )
-
-          published=""
-          for chart in "${charts[@]}"; do
-            version="$(awk '/^version:/ {print $2; exit}' "charts/${chart}/Chart.yaml")"
-            artifact="dist/${chart}-${version}.tgz"
-            ref="${OCI_PREFIX}/${chart}"
-
-            if helm show chart "${ref}" --version "${version}" >/dev/null 2>&1; then
-              echo "Chart ${chart}:${version} already published, skipping"
-              continue
+          for chart in eduide eduide-cluster; do
+            if out=$(helm show chart "oci://ghcr.io/eduide/charts/${chart}" --version "$VERSION" 2>&1); then
+              echo "::error::${chart} ${VERSION} is already published. Pick the next version."
+              exit 1
             fi
-
-            ./scripts/resolve-deps.sh "charts/${chart}"
-            helm package "charts/${chart}" --destination dist
-            helm push "${artifact}" "${OCI_PREFIX}"
-            helm show chart "${ref}" --version "${version}" >/dev/null
-            published="${published} ${chart}"
+            # Only "not found" proves the version is free; any other error could hide a published chart.
+            if ! grep -qi 'not found' <<<"$out"; then
+              echo "::error::could not check ${chart} ${VERSION}: ${out}"
+              exit 1
+            fi
           done
 
-          # What the release step tags. Empty when main carried no version bump,
-          # which is every ordinary merge.
-          echo "charts=${published# }" >> "$GITHUB_OUTPUT"
-          echo "version=$(awk '/^version:/ {print $2; exit}' charts/eduide/Chart.yaml)" >> "$GITHUB_OUTPUT"
+  release:
+    needs: pins
+    permissions:
+      contents: write
+    uses: EduIDE/.github/.github/workflows/release.yml@main
+    with:
+      version: ${{ inputs.version }}
+      tag_prefix: "v"
+      changelog_heading: "## [eduide {version}]"
+      version_check: |
+        for chart in eduide eduide-cluster; do
+          got=$(yq -r .version "charts/${chart}/Chart.yaml")
+          if [[ "$got" != "$VERSION" ]]; then
+            echo "::error file=charts/${chart}/Chart.yaml::version is '$got', expected '$VERSION'. Bump it in the release pull request first."
+            exit 1
+          fi
+        done
 
-      # Without this the only record of what is current is a tag list, or the
-      # registry. A release names the version, says what it pins, and gives
-      # anyone asking "what is deployed?" one page to read.
-      # Keyed on whether a release for the current chart version exists, not on
-      # whether this run pushed the charts. A run that pushed successfully and
-      # then failed before this step used to be unrecoverable: the rerun skipped
-      # the already-published charts, so the gate was empty and the release was
-      # never created. Chart 2.3.0 and 2.5.0 both shipped with no release page.
-      - name: Tag and publish a GitHub release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          V: ${{ steps.publish.outputs.version }}
-          CHARTS: ${{ steps.publish.outputs.charts }}
-          IDE: ${{ steps.pins.outputs.ide }}
-          CLOUD: ${{ steps.pins.outputs.cloud }}
-          LANDING: ${{ steps.pins.outputs.landing }}
+  publish:
+    needs: [pins, release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Login to GHCR
+        run: |
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$OWNER" --password-stdin
+
+      # --version stamps a release candidate; for a stable release it equals
+      # the version in Chart.yaml, which the release job already checked.
+      # The pins job refused versions published before this run, so a chart
+      # that exists now was pushed by an earlier attempt of this run (a
+      # "Re-run failed jobs") and is kept as it is.
+      - name: Package and push charts
         run: |
           set -euo pipefail
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          mkdir -p dist
+          for chart in eduide-cluster eduide; do
+            if helm show chart "oci://ghcr.io/${OWNER}/charts/${chart}" --version "$VERSION" >/dev/null 2>&1; then
+              echo "${chart} ${VERSION} was pushed by an earlier attempt, keeping it"
+              continue
+            fi
+            ./scripts/resolve-deps.sh "charts/${chart}"
+            helm package "charts/${chart}" --version "$VERSION" --destination dist
+            helm push "dist/${chart}-${VERSION}.tgz" "oci://ghcr.io/${OWNER}/charts"
+          done
 
-          if gh release view "v${V}" >/dev/null 2>&1; then
-            echo "::notice::release v${V} already exists, nothing to do"
-            exit 0
-          fi
-
-          pre=""
-          [[ "$V" == *-* ]] && pre="--prerelease"
-
-          # Empty on a rerun that found the charts already published. Both are
-          # at one version - CI enforces it - so name them both.
-          charts="${CHARTS:-eduide eduide-cluster}"
-
+      - name: Add the pinned versions to the release notes
+        env:
+          TAG: ${{ needs.release.outputs.tag }}
+          IDE: ${{ needs.pins.outputs.ide }}
+          CLOUD: ${{ needs.pins.outputs.cloud }}
+          LANDING: ${{ needs.pins.outputs.landing }}
+        run: |
+          set -euo pipefail
           {
-            echo "Charts published to \`oci://ghcr.io/eduide/charts\`:"
-            echo
-            for c in $charts; do
-              echo "- \`${c}\` $(awk '/^version:/ {print $2; exit}' "charts/${c}/Chart.yaml")"
-            done
+            # Drop a table an earlier attempt already appended.
+            gh release view "$TAG" --json body --jq .body | sed '/^## What this chart version pins/,$d'
             echo
             echo "## What this chart version pins"
             echo
@@ -197,109 +229,58 @@ jobs:
             echo "| Operator and service (EduIDE-Cloud) | ${CLOUD} |"
             echo "| Landing page | ${LANDING} |"
             echo
+            echo "Charts published to \`oci://ghcr.io/eduide/charts\`: \`eduide\` and \`eduide-cluster\` at ${VERSION}."
             echo "Every image above was verified to exist and be multi-arch before the charts were pushed."
             echo
             echo "## Deploying it"
             echo
-            echo "Bump \`spec.platform.chartVersion\` to \`${V}\` in the relevant"
+            echo "Bump \`spec.platform.chartVersion\` to \`${VERSION}\` in the relevant"
             echo "\`environments/*/env.yaml\` in EduIDE-deployment, in a pull request."
             echo "Merging records the version; only \`e2e\` deploys on merge. Every"
             echo "other environment, production included, needs Actions ->"
             echo "**Deploy environment** run against it. Nothing here rolls anything out."
-          } > /tmp/notes.md
+          } > "$RUNNER_TEMP/notes.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
 
-          # --target lets gh create the tag server side. `git tag -a` needs a
-          # committer identity, which actions/checkout does not configure, so it
-          # would fail here - after the charts are already published. An existing
-          # tag from an earlier failed run is reused, and --target ignored.
-          #
-          # --generate-notes adds the commit and contributor list; the body above
-          # is what a reader actually needs first, so it goes in --notes-file.
-          gh release create "v${V}" \
-            --target "${GITHUB_SHA}" \
-            --title "v${V}" \
-            --notes-file /tmp/notes.md \
-            --generate-notes $pre
-
-  release-pr-preview:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+  verify:
+    needs: [release, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      packages: read
     env:
-      OCI_REGISTRY: ghcr.io
-      OCI_REPOSITORY: charts
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ needs.release.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
       - name: Setup Helm
         uses: azure/setup-helm@v4
         with:
           version: v3.14.0
 
       - name: Login to GHCR
-        env:
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$OWNER" --password-stdin
 
-      - name: Package and publish PR preview charts
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+      - name: Charts and release exist
         run: |
           set -euo pipefail
-
-          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
-          mkdir -p dist
-
-          # A preview version has to be valid semver, and it has to sort below
-          # the release it previews so `helm upgrade` never picks one up by
-          # accident.
-          #
-          # Appending ".pr-24" only worked while every chart version was already
-          # a prerelease: 1.4.0-next.7.pr-24 parses, because the dot just adds
-          # another prerelease identifier. 2.0.0.pr-24 does not - a release
-          # version needs the hyphen that starts the prerelease part. Bumping to
-          # a clean 2.0.0 is what surfaced this.
-          #
-          # The sha keeps successive pushes on one PR distinguishable.
-          SHA7="$(git rev-parse --short=7 HEAD)"
-          to_preview_version() {
-            local base="$1"
-            case "$base" in
-              *-*) printf '%s.pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;  # already a prerelease
-              *)   printf '%s-pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;
-            esac
-          }
-
-          charts=(
-            eduide-cluster
-            eduide
-          )
-
-          for chart in "${charts[@]}"; do
-            src_dir="charts/${chart}"
-            work_dir="dist/${chart}"
-            rm -rf "$work_dir"
-            cp -R "$src_dir" "$work_dir"
-
-            base_version="$(awk '/^version:/ {print $2; exit}' "${src_dir}/Chart.yaml")"
-            preview_version="$(to_preview_version "$base_version")"
-            ref="${OCI_PREFIX}/${chart}"
-            artifact="dist/${chart}-${preview_version}.tgz"
-
-            sed -i "s/^version: .*/version: ${preview_version}/" "${work_dir}/Chart.yaml"
-
-            # The copy under dist/ needs its own dependencies: helm package
-            # reads charts/ from the directory it is given, not from the source.
-            ./scripts/resolve-deps.sh "$work_dir"
-            helm package "$work_dir" --destination dist
-            helm push "${artifact}" "${OCI_PREFIX}"
-            helm show chart "${ref}" --version "${preview_version}" >/dev/null
+          for chart in eduide eduide-cluster; do
+            helm show chart "oci://ghcr.io/eduide/charts/${chart}" --version "$VERSION" | grep -x "version: ${VERSION}"
           done
+          {
+            echo "## Released ${TAG}"
+            echo
+            echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Last: publishing the draft creates the tag. Until here a failed job leaves
+  # a draft and no tag.
+  publish-release:
+    needs: [release, verify]
+    permissions:
+      contents: write
+    uses: EduIDE/.github/.github/workflows/release-publish.yml@main
+    with:
+      tag: ${{ needs.release.outputs.tag }}

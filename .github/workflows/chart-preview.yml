@@ -1,0 +1,94 @@
+name: Chart PR preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      OCI_REGISTRY: ghcr.io
+      OCI_REPOSITORY: charts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.0
+
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "$GHCR_TOKEN" | helm registry login "$OCI_REGISTRY" -u "$OWNER" --password-stdin
+
+      - name: Package and publish PR preview charts
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          OWNER="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          OCI_PREFIX="oci://${OCI_REGISTRY}/${OWNER}/${OCI_REPOSITORY}"
+          mkdir -p dist
+
+          # A preview version has to be valid semver, and it has to sort below
+          # the release it previews so `helm upgrade` never picks one up by
+          # accident.
+          #
+          # Appending ".pr-24" only worked while every chart version was already
+          # a prerelease: 1.4.0-next.7.pr-24 parses, because the dot just adds
+          # another prerelease identifier. 2.0.0.pr-24 does not - a release
+          # version needs the hyphen that starts the prerelease part. Bumping to
+          # a clean 2.0.0 is what surfaced this.
+          #
+          # The sha keeps successive pushes on one PR distinguishable.
+          SHA7="$(git rev-parse --short=7 HEAD)"
+          # An all-digit sha with a leading zero is not a valid semver identifier.
+          if [[ "$SHA7" =~ ^[0-9]+$ ]]; then SHA7="g${SHA7}"; fi
+          to_preview_version() {
+            local base="$1"
+            case "$base" in
+              *-*) printf '%s.pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;  # already a prerelease
+              *)   printf '%s-pr.%s.%s' "$base" "$PR_NUMBER" "$SHA7" ;;
+            esac
+          }
+
+          charts=(
+            eduide-cluster
+            eduide
+          )
+
+          for chart in "${charts[@]}"; do
+            src_dir="charts/${chart}"
+            work_dir="dist/${chart}"
+            rm -rf "$work_dir"
+            cp -R "$src_dir" "$work_dir"
+
+            base_version="$(awk '/^version:/ {print $2; exit}' "${src_dir}/Chart.yaml")"
+            preview_version="$(to_preview_version "$base_version")"
+            ref="${OCI_PREFIX}/${chart}"
+            artifact="dist/${chart}-${preview_version}.tgz"
+
+            sed -i "s/^version: .*/version: ${preview_version}/" "${work_dir}/Chart.yaml"
+
+            # The copy under dist/ needs its own dependencies: helm package
+            # reads charts/ from the directory it is given, not from the source.
+            ./scripts/resolve-deps.sh "$work_dir"
+            helm package "$work_dir" --destination dist
+            helm push "${artifact}" "${OCI_PREFIX}"
+            helm show chart "${ref}" --version "${preview_version}" >/dev/null
+          done
