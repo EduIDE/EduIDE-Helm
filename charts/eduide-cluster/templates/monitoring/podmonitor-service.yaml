@@ -16,6 +16,7 @@ spec:
   selector:
     matchLabels:
       app: service
+      eduide.io/metrics-port: management
   namespaceSelector:
     matchNames:
       {{- range .Values.monitoring.targetNamespaces }}
@@ -24,6 +25,33 @@ spec:
   podMetricsEndpoints:
     # The service serves metrics on its management port, which is not routed through the gateway.
     - port: management
+      interval: 15s
+      path: /q/metrics
+---
+{{- /*
+Transition: service pods of environments that are not upgraded yet carry no
+eduide.io/metrics-port label and still serve metrics on the http port. Drop
+this monitor once every environment runs the chart that sets the label.
+*/}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: theia-cloud-service-legacy
+  namespace: {{ .Values.monitoring.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: service
+    matchExpressions:
+      - key: eduide.io/metrics-port
+        operator: DoesNotExist
+  namespaceSelector:
+    matchNames:
+      {{- range .Values.monitoring.targetNamespaces }}
+      - {{ . }}
+      {{- end }}
+  podMetricsEndpoints:
+    - port: http
       interval: 15s
       path: /q/metrics
 {{- end }}

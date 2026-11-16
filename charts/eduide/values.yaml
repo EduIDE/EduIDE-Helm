@@ -515,8 +515,10 @@ service:
     name: service-admin-api-token
     key: ADMIN_API_TOKEN
   # -- Maximum active sessions per user, enforced by the REST service on every
-  # launch path. 0 means no limit.
-  sessionsPerUser: 0
+  # launch path. Empty means the value of `operator.sessionsPerUser`, so the
+  # limit the operator applies to lazy sessions holds for the other paths too.
+  # Set a number to override; 0 or less means no limit.
+  sessionsPerUser: ""
   # -- Additional origins (besides the landing page) allowed to call the REST
   # service from a browser. The landing page origin is always allowed; with no
   # origin configured CORS is off.

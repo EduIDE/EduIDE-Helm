@@ -20,6 +20,8 @@ spec:
     metadata:
       labels:
         app: service
+        {{- /* Tells the PodMonitor in eduide-cluster to scrape the management port; pods without it are scraped on `http`. */}}
+        eduide.io/metrics-port: management
       annotations:
         helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}

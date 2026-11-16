@@ -11,7 +11,8 @@ data:
   KEYCLOAK_ENABLE: {{ tpl (.Values.keycloak.enable | toString) . | quote }}
   {{- $origins := prepend (.Values.service.corsOrigins | default list) (printf "%s://%s" (tpl (.Values.service.protocol | toString) .) (include "theia-cloud.host.landing" .)) }}
   CORS_ORIGINS: {{ join "," $origins | quote }}
-  SESSIONS_PER_USER: {{ .Values.service.sessionsPerUser | default 0 | quote }}
+  {{- $perUser := ternary .Values.operator.sessionsPerUser .Values.service.sessionsPerUser (eq (toString .Values.service.sessionsPerUser) "") }}
+  SESSIONS_PER_USER: {{ tpl ($perUser | toString) . | quote }}
   SENTRY_ENVIRONMENT: {{ .Release.Namespace }}
   OTEL_TRACES_EXPORTER: none
   OTEL_METRICS_EXPORTER: none

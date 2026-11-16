@@ -8,8 +8,8 @@ Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10,
 - [eduide] New `service.corsOrigins`. The service allows browser calls from the landing page origin plus these, and from no other origin (CL-07)
 - [eduide] New `keycloak.audience`. When set, the service requires it in the `aud` claim of access tokens. Empty (the default) keeps the old behavior. Add an audience mapper to the Keycloak client before setting it (CL-08)
 - [eduide] New `service.oidcTrustStore` for a Keycloak certificate signed by a private CA. The service verifies the certificate of Keycloak now; it skipped the check before. Installations whose Keycloak uses a private CA must set it (CL-08)
-- [eduide] New `service.sessionsPerUser` (default 0, no limit) (CL-10)
-- [eduide] The service pod exposes the management port 9000 (metrics, OpenAPI); [eduide-cluster] the service PodMonitor scrapes that port. Upgrade both charts together with the matching service image (CL-07)
+- [eduide] New `service.sessionsPerUser`. Empty (the default) means `operator.sessionsPerUser`, so the limit of the operator also applies to the other launch paths; a number overrides it, 0 means no limit (CL-10)
+- [eduide] The service pod exposes the management port 9000 (metrics, OpenAPI) and carries the label `eduide.io/metrics-port: management`. [eduide-cluster] The service PodMonitor scrapes the `management` port of pods with that label; a second PodMonitor (`theia-cloud-service-legacy`) keeps scraping the `http` port of pods without it, so environments can be upgraded one by one. Remove the legacy monitor once all run this chart. The chart must be released with a service image that serves the management port (CL-07)
 
 Breaking. Needs EduIDE 2.0.0; do not release before it.
 

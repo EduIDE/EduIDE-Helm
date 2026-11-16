@@ -189,7 +189,7 @@ environment. Requires eduide-cluster to be installed on the cluster first.
 | service.replicas | int | `1` | Number of REST service pods. The service keeps no state of its own, so more than one is safe; it also turns on its PodDisruptionBudget. |
 | service.sentry | object | (see details below) | Values related to Sentry on the service. |
 | service.sentry.enable | bool | `false` | Set SENTRY_ENABLE=true in the service deployment. Off by default: the DSN is compiled into the published images and points at TUM's Sentry, so enabling this outside TUM sends your hostnames and namespace names there. |
-| service.sessionsPerUser | int | `0` | Maximum active sessions per user, enforced by the REST service on every launch path. 0 means no limit. |
+| service.sessionsPerUser | string | `""` | Maximum active sessions per user, enforced by the REST service on every launch path. Empty means the value of `operator.sessionsPerUser`, so the limit the operator applies to lazy sessions holds for the other paths too. Set a number to override; 0 or less means no limit. |
 | servicerole.name | string | `"service-api-access"` |  |
 | skipPreflight | bool | `false` | Skip the check that eduide-cluster is installed on this cluster. Only useful for rendering against a cluster that intentionally lacks it. |
 | theia-workspace-garbage-collector | object | `{"enabled":true,"image":{"tag":"5896ca3b55324af4b195256dd5c198fb751f5cb8"}}` | Reaps workspaces whose sessions are long gone. |
