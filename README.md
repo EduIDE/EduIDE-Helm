@@ -28,8 +28,8 @@ A bare `--version 2.0.0` with no overrides pins every image. Nothing floats.
 | Value | Source repository | Default |
 |---|---|---|
 | `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
-| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.2.0` |
-| `versions.landingPage` | EduIDE-Landing-Page | `1.2.0` |
+| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.3.0` |
+| `versions.landingPage` | EduIDE-Landing-Page | `1.3.1` |
 
 The three release on their own cadence, so each has its own knob and an
 override names exactly one. A blanket tag would be wrong: a pull request only
