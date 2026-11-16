@@ -44,7 +44,7 @@ Session, Workspace and AppDefinition on the cluster.
 **The conversion webhook belongs to the cluster chart.** A CRD names exactly
 one conversion service, so it cannot be a per-environment resource.
 
-**Preloading must not be under `--wait`.** It pulls ~10 multi-GB images on every
+**Preloading must not be under `--wait`.** It pulls 14 multi-GB images on every
 node. Inside the main release it would time out and `--atomic` would roll back a
 healthy deploy.
 
@@ -160,13 +160,11 @@ interpolate `.Values.versions.*` without any template change. Keep it that way:
 turning them into `{registry, repository, tag}` maps would break every values
 file for no gain.
 
-## The garbage collector is pinned to a commit, not a version
+## The garbage collector image follows its chart version
 
-Its repository has never published a versioned image - GHCR holds only `latest`, `main` and
-per-commit SHAs - and its own chart defaults to `latest`. A released chart must
-not install whatever was built most recently, and `helm upgrade` would see no
-diff when it changed. `garbageCollector.image.tag` therefore pins a commit SHA.
-Replace it with a semver tag when that repo starts publishing versioned images.
+The garbage collector chart dependency (1.0.0 and later) pins its own versioned
+image through its appVersion, so this chart sets no `image.tag` for it. Bumping
+the dependency version in `charts/eduide/Chart.yaml` is the whole upgrade.
 
 ## Dependency aliases must be lowercase
 

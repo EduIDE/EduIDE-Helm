@@ -11,25 +11,28 @@ The installable EduIDE platform. Two charts, published as OCI artifacts to
 ```bash
 # once per cluster
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version 2.0.0 -n eduide-system --create-namespace
+  --version <chart version> -n eduide-system --create-namespace
 
 # once per environment
 helm install eduide oci://ghcr.io/eduide/charts/eduide \
-  --version 2.0.0 -n eduide-test1 -f my-values.yaml
+  --version <chart version> -n eduide-test1 -f my-values.yaml
 ```
 
-Both charts always carry the same version. `docs/charts.md` explains why the
+Both charts always carry the same version. Take `<chart version>` from the
+[releases page](https://github.com/EduIDE/EduIDE-Helm/releases); pass a
+prerelease such as `3.0.0-rc.3` explicitly, because `helm` skips prereleases
+otherwise. `docs/charts.md` explains why the
 split exists and what it is safe to change.
 
 ## What one install pins
 
-A bare `--version 2.0.0` with no overrides pins every image. Nothing floats.
+A bare `--version <chart version>` with no overrides pins every image. Nothing floats.
 
 | Value | Source repository | Default |
 |---|---|---|
 | `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
-| `versions.cloud` | EduIDE-Cloud (operator, REST service) | `1.3.0` |
-| `versions.landingPage` | EduIDE-Landing-Page | `1.3.1` |
+| `versions.cloud` | EduIDE-Cloud (operator, REST service) | see `charts/eduide/values.yaml` |
+| `versions.landingPage` | EduIDE-Landing-Page | see `charts/eduide/values.yaml` |
 
 The three release on their own cadence, so each has its own knob and an
 override names exactly one. A blanket tag would be wrong: a pull request only
@@ -233,7 +236,7 @@ an explicit `--version`; never `--devel`.
 `appVersion` is the tag of the IDE images, so a chart says exactly which IDEs it
 runs. The operator, REST service and landing page carry their own versions in
 `versions.cloud` and `versions.landingPage`, because they release on a different
-cadence and a one-line landing page fix should not rebuild fifteen
+cadence and a one-line landing page fix should not rebuild 14
 multi-gigabyte IDE images.
 
 The chart version is the platform version and is what an environment pins.
