@@ -27,3 +27,9 @@ rules:
       - leases
       - pods
     verbs: ["list", "create", "watch", "get", "edit", "patch", "delete", "update"]
+  # Sidecars of a session talk to their IDE pod through a policy the operator creates per session
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs: ["create", "get", "delete"]

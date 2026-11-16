@@ -11,6 +11,13 @@ top. The cloud metadata endpoint is excluded from the external-egress allow so
 a compromised session cannot read instance credentials, even when general
 outbound access is on.
 
+Sidecar pods (language servers) carry the session labels, so the policies above
+select them too. The operator creates one more policy per session, or per pool
+instance for eager sessions, that connects an IDE pod only to its own sidecars
+on the sidecar ports. It needs create, get and delete on networkpolicies, which
+the eduide-cluster operator ClusterRole grants. No chart policy opens traffic to
+sidecars in general.
+
 Operator, service and landing-page pods have no policies of their own. Sessions
 cannot reach them because the external-egress allow excludes private ranges.
 */ -}}
@@ -156,28 +163,5 @@ spec:
               {{- range $np.privateEgressCidrs }}
               - {{ . | quote }}
               {{- end }}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: session-allow-sidecars
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/part-of: eduide
-    app.kubernetes.io/component: session-network-policy
-spec:
-  podSelector:
-    matchLabels:
-      {{- toYaml $sessionSelector | nindent 6 }}
-  policyTypes:
-    - Egress
-  egress:
-    # Language servers run as sidecar pods in this namespace, and the private
-    # ranges above no longer cover them.
-    - to:
-        - podSelector:
-            matchExpressions:
-              - key: theia-cloud.io/sidecar
-                operator: Exists
 {{- end }}
 {{- end }}

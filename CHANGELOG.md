@@ -13,9 +13,13 @@ Breaking. Needs EduIDE 2.0.0; do not release before it.
 - [eduide] Pin EduIDE-Cloud 2.0.1 (`versions.cloud`; 2.0.1 fixes an operator restart on every Workspace deletion) and EduIDE-Landing-Page 1.4.0 (`versions.landingPage`, reads the per-app `ephemeral` flag)
 - [eduide] The catalog labels the JavaScript apps "JavaScript" instead of "Javascript"
 - [eduide] [eduide-cluster] Chart 3.0.0, appVersion 2.0.0
+- [eduide] Security (internal audit 2026-11-16, CL-01): anchor the oauth2-proxy `skip_auth_routes` entry to `^/health$`. The unanchored `/health.*` matched any path containing `/health`. `scripts/test-session-isolation.sh` fails on an unanchored route
+- [eduide] Security (CL-12): remove the `session-allow-sidecars` NetworkPolicy, which let every session pod reach every sidecar pod. Sidecar pods now carry the session labels, so the default-deny covers them, and the operator creates one NetworkPolicy per session that connects an IDE pod to its own sidecars only. Needs the EduIDE-Cloud release that creates it (the next one after 2.0.1); with an older operator the language servers of sidecar-enabled apps are unreachable
+- [eduide-cluster] Security (CL-12): the operator ClusterRole may `create`, `get` and `delete` `networkpolicies`, for the per-session sidecar policy
 
 Upgrade notes:
 
+- Upgrade `eduide-cluster` before or together with `eduide`: the operator needs the new `networkpolicies` permission before it starts a session with sidecars. Sessions that run during the upgrade keep their pods; sidecar pods are recreated with the new spec when their session or pool instance is recreated
 - Deploy in a maintenance window: removing or renaming an app terminates its live sessions. Rename the three `*-templates` names in `appDefinitions.enabled` (the render fails otherwise). Move warm pools (`minInstances`) to the new app and patch the live AppDefinition. `python` and `javascript` are hidden Artemis apps now: installations that offered them switch to `<lang>-standalone`. An empty `enabled` offers and preloads 14 images, so list what you use. Update a `landingPage.appDefinition` override that names a `*-templates` app. Template sessions were persistent before; they follow the app's `ephemeral` now. Standalone workspaces created under the old app names are not reachable and are reaped by the garbage collector. Set `landingPage.ephemeral: false` on the `-standalone` apps to keep sessions persistent
 - Pin `versions.landingPage` to a landing page release that reads the per-app `ephemeral` flag (EduIDE-Landing-Page#66) in the same release; older ones ignore it
 - Installation-specific images need a full path and tag (the chart prefixes `imageRegistry` to anything else)
