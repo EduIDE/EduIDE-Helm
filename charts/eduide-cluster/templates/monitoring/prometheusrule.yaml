@@ -28,6 +28,8 @@ garbage-collector, conversion-webhook.
 {{- $t := $a.thresholds }}
 {{- $ns := include "eduide.monitoredNamespaceRegex" . }}
 {{- $certNs := include "eduide.certificateNamespaceRegex" . }}
+{{- /* The CA certificate signs the conversion webhook's; matched by name, the rest of cert-manager's namespace is not ours. */}}
+{{- $caCert := printf `namespace="%s", name="theia-cloud-ca-certificate"` .Values.certmanager.namespace }}
 {{- $sessions := `pod=~"(session-|instance-).*"` }}
 {{- $ide := `container!="", container!~"oauth.*", container!="POD"` }}
 {{- $runbook := printf "%s/incident-response" (trimSuffix "/" $a.runbookUrl) }}
@@ -425,7 +427,7 @@ spec:
       rules:
         - alert: EduIDECertificateExpiringSoon
           expr: |-
-            (certmanager_certificate_expiration_timestamp_seconds{namespace=~"{{ $certNs }}"} - time()) / 86400 < {{ $t.certExpiryDays }}
+            ((certmanager_certificate_expiration_timestamp_seconds{namespace=~"{{ $certNs }}"} or certmanager_certificate_expiration_timestamp_seconds{{ "{" }}{{ $caCert }}{{ "}" }}) - time()) / 86400 < {{ $t.certExpiryDays }}
           for: 1h
           labels:
             severity: warning
@@ -446,6 +448,7 @@ spec:
         - alert: EduIDECertificateNotReady
           expr: |-
             certmanager_certificate_ready_status{condition="True", namespace=~"{{ $certNs }}"} == 0
+            or certmanager_certificate_ready_status{condition="True", {{ $caCert }}} == 0
           for: 1h
           labels:
             severity: warning

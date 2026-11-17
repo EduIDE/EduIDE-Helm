@@ -34,7 +34,6 @@ for w in operator-deployment service-deployment landing-page-deployment image-pr
   expect "$w: no helm.sh/revision annotation" "0" "$n"
 done
 
-
 echo "=== consumed config still rolls pods ==="
 ann() { yq -r "select(.metadata.name==\"$1\") | .spec.template.metadata.annotations[\"$2\"] // \"\""; }
 before=$(ann operator-deployment checksum/operator-config <<<"$OUT")
@@ -43,6 +42,27 @@ for pair in service-deployment:checksum/config service-deployment:checksum/secre
   [[ -n "$(ann "${pair%%:*}" "${pair#*:}" <<<"$OUT")" ]] && ok "${pair}" || bad "${pair} missing"
 done
 
+echo "=== secrets and config changes roll the pods ==="
+sig() { yq -r "select(.metadata.name==\"$1\") | .spec.template.metadata.annotations | to_entries | map(.value) | join(\",\")" <<<"$2"; }
+differs() {
+  local label=$1 w=$2; shift 2
+  if [[ "$(sig "$w" "$OUT")" != "$(sig "$w" "$(render "$@")")" ]]; then ok "$label rolls $w"; else bad "$label rolls $w"; fi
+}
+differs "service.authToken" operator-deployment --set service.authToken=other
+differs "service.authToken" service-deployment --set service.authToken=other
+differs "operator logging config" operator-deployment --set operator.logging.override=true
+ADMIN=(--set service.adminApiTokenSecret.create=true)
+OUT_ADMIN=$(render "${ADMIN[@]}")
+if [[ "$(sig service-deployment "$OUT_ADMIN")" != "$(sig service-deployment "$(render "${ADMIN[@]}" --set service.adminApiToken=Zm9v)")" ]]; then
+  ok "adminApiToken rolls service-deployment"
+else
+  bad "adminApiToken rolls service-deployment"
+fi
+differs "landingPage config" landing-page-deployment --set landingPage.appDefinition=python-standalone
+
+echo "=== no Release.Revision left in the templates ==="
+if grep -rn 'Release.Revision' "$CHART/templates" >/dev/null; then bad "Release.Revision still used"; else ok "Release.Revision unused"; fi
+
 echo "=== certificate alerts are namespace scoped ==="
 
 cluster() {
@@ -50,16 +70,24 @@ cluster() {
     --set monitoring.enabled=true --set monitoring.alerting.enabled=true \
     --set monitoring.certManager.enabled=true "$@" 2>/dev/null
 }
-expr() { yq -r "select(.kind==\"PrometheusRule\") | .spec.groups[].rules[] | select(.alert==\"$1\") | .expr"; }
+alert_expr() { yq -r "select(.kind==\"PrometheusRule\") | .spec.groups[].rules[] | select(.alert==\"$1\") | .expr"; }
 RULES=$(cluster --set 'monitoring.targetNamespaces={eduide-prod,eduide-test}')
 for a in EduIDECertificateExpiringSoon EduIDECertificateNotReady; do
-  e=$(expr "$a" <<<"$RULES")
+  e=$(alert_expr "$a" <<<"$RULES")
   if [[ "$e" == *'namespace=~"^(eduide-prod|eduide-test|'*'eduide-system'*')$"'* ]]; then
     ok "$a: filtered to environments and eduide-system"
   else
     bad "$a: filtered to environments and eduide-system" "$e"
   fi
+  if [[ "$e" == *'namespace="cert-manager", name="theia-cloud-ca-certificate"'* ]]; then
+    ok "$a: includes the CA certificate by name"
+  else
+    bad "$a: includes the CA certificate by name" "$e"
+  fi
 done
+
+e=$(alert_expr EduIDECertificateNotReady <<<"$(cluster --set 'monitoring.targetNamespaces=null' --set gateway.namespace=eduide-system --set monitoring.alerting.namespace=eduide-system --namespace eduide-system)")
+[[ "$e" == *'namespace=~"^(eduide-system)$"'* ]] && ok "empty targetNamespaces: only eduide-system" || bad "empty targetNamespaces: only eduide-system" "$e"
 
 echo
 [[ $FAILED -eq 0 ]] && echo "ALL PASS" || echo "SOME FAILED"

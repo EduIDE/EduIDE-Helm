@@ -25,6 +25,9 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/service-config-secret.yaml") . | sha256sum }}
+        {{- if .Values.service.adminApiTokenSecret.create }}
+        checksum/admin-api-token: {{ include (print $.Template.BasePath "/admin-api-token-secret.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       # we need to be able to create and read sessions
       automountServiceAccountToken: true
