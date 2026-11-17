@@ -92,6 +92,11 @@ landingPage:
   # both gitUri and artemisUrl is listed here. Otherwise the student clicks Launch.
   trustedArtemisHosts:
     - artemis.example.edu
+  # Alpha, off while empty: hosts a link may clone public repositories from. A
+  # non-default port belongs to the host, as in gitea.example.edu:3000.
+  # allowedGitHosts:
+  #   - github.com
+  #   - gitea.example.edu:3000
   infoTitle: Welcome to EduIDE
 
 # ---------------------------------------------------------------------------

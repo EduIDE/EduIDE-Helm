@@ -250,7 +250,8 @@ landingPage:
   # (`?gitUri=`), off while this list is empty (the default). Lists the hosts
   # such a link may clone from when it is not a trusted Artemis link (see
   # trustedArtemisHosts), for example `[github.com, gitlab.com]` plus your own
-  # Gitea or GitLab. Only public repositories over HTTPS open. Before turning it
+  # Gitea or GitLab. A host on a non-default port is listed as `host:port`, e.g.
+  # `gitea.example.org:3000`. Only public repositories over HTTPS open. Before turning it
   # on, list your Artemis host in trustedArtemisHosts: once on, other Artemis
   # links lose their Artemis token. Off, Artemis links work as before.
   allowedGitHosts: []

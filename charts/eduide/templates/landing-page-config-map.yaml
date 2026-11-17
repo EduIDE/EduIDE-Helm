@@ -88,7 +88,9 @@ data:
       extension) may only clone from these hosts. Rendered even when empty, so an
       empty list really means "none" rather than falling back to the page's default.
       */}}
-      allowedGitHosts: {{ .Values.landingPage.allowedGitHosts | default list | toJson }},
+      {{- $gitHosts := .Values.landingPage.allowedGitHosts | default list }}
+      {{- if not (kindIs "slice" $gitHosts) }}{{ fail (printf "landingPage.allowedGitHosts must be a list of hosts, got %v; use --set 'landingPage.allowedGitHosts={github.com}'" $gitHosts) }}{{ end }}
+      allowedGitHosts: {{ $gitHosts | toJson }},
       sentryEnable: {{ tpl (.Values.landingPage.sentry.enable | toString) . }},
       {{- if .Values.landingPage.sentry.dsn }}
       sentryDsn: {{ tpl (.Values.landingPage.sentry.dsn | toString) . | quote }},
