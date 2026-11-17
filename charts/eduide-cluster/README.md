@@ -16,7 +16,7 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | clusterIssuer | string | `"theia-cloud-selfsigned-issuer"` | The cluster issuer to use for the certificate |
 | conversion.certMountPath | string | `"/etc/webhook/certs"` | The location of where the certificates are mounted into the container (needs to match with application.properties) |
 | conversion.certReloadPeriod | int | `604800` | The certificate reload period in seconds |
-| conversion.image | string | `"theiacloud/theia-cloud-conversion-webhook:1.2.0-next"` | The image of the webhook container |
+| conversion.image | string | `"ghcr.io/eduide/eduide-cloud/conversion-webhook:3.0.3"` | The image of the webhook container. Our EduIDE-Cloud build: it knows every AppDefinition version this chart ships and runs on a JDK with the Java4Shell fix (CVE-2026-114938); the upstream 1.2.0-next ran on Temurin 21.0.10. |
 | envoyProxy.annotations | object | `{}` |  |
 | envoyProxy.create | bool | `false` |  |
 | envoyProxy.labels | object | `{}` |  |
