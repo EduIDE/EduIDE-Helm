@@ -50,8 +50,6 @@ metadata:
     app.kubernetes.io/managed-by: {{ $ctx.Release.Service }}
     app.kubernetes.io/part-of: eduide
     app.kubernetes.io/component: app-definition
-  annotations:
-    helm.sh/revision: {{ $ctx.Release.Revision | quote }}
 spec:
   name: {{ $name }}
   image: {{ include "eduide.appImage" (dict "app" $app "ctx" $ctx) }}

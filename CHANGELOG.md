@@ -4,6 +4,8 @@
 
 Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10, I-01). The service changes need an EduIDE-Cloud release that contains the matching service fixes.
 
+- [eduide] A deploy without changes no longer restarts the operator, service, landing page and preloading pods. The pod templates carried `helm.sh/revision`, which changes on every upgrade. It is removed there and from the AppDefinitions. The operator pod now rolls on a change of its `operator-config` ConfigMap (`checksum/operator-config`); service and landing page already rolled on their config. `scripts/test-no-revision-restarts.sh` guards both
+- [eduide-cluster] The alerts `EduIDECertificateExpiringSoon` and `EduIDECertificateNotReady` only look at certificates in the namespaces in `monitoring.targetNamespaces` plus the release, Gateway and alerting namespaces (normally `eduide-system`). On a shared cluster they matched the broken certificates of other tenants. No new value: the list the bootstrap already derives from the environments is reused
 - [eduide] Refuse `keycloak.enable: false` unless `keycloak.allowUnauthenticated: true` is set. Anonymous mode lets anyone act as any user, so it needs an explicit opt-in for a throwaway environment. Installations with Keycloak enabled are not affected (I-01)
 - [eduide] New `service.corsOrigins`. The service allows browser calls from the landing page origin plus these, and from no other origin (CL-07)
 - [eduide] New `keycloak.audience`. When set, the service requires it in the `aud` claim of access tokens. Empty (the default) keeps the old behavior. Add an audience mapper to the Keycloak client before setting it (CL-08)
