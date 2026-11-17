@@ -18,7 +18,8 @@ spec:
       labels:
         app: operator
       annotations:
-        helm.sh/revision: {{ .Release.Revision | quote }}
+        checksum/service-secret: {{ include (print $.Template.BasePath "/service-config-secret.yaml") . | sha256sum }}
+        checksum/operator-config: {{ include (print $.Template.BasePath "/operator-configmap.yaml") . | sha256sum }}
         {{- if .Values.operator.logging.override }}
         checksum/config: {{ include (print $.Template.BasePath "/operator-configmap-logging.yaml") . | sha256sum }}
         {{- end }}

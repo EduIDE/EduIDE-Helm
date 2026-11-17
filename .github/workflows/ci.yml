@@ -53,6 +53,9 @@ jobs:
       - name: global.nodeSelector reaches every workload
         run: ./scripts/test-node-selector.sh
 
+      - name: No revision restarts, certificate alerts namespace scoped
+        run: ./scripts/test-no-revision-restarts.sh
+
       - name: Session isolation (anchored skip-auth routes, sidecar policy)
         run: ./scripts/test-session-isolation.sh
 

@@ -29,7 +29,10 @@ versions:
   # Workspace is deleted (the garbage collector deletes them). 3.0.0 carries the
   # security fixes of the 2026-11-16 audit; this chart renders what it needs
   # (data bridge token Role, sidecar NetworkPolicy RBAC, management port).
-  cloud: "3.0.0" # renovate: datasource=github-releases depName=EduIDE/EduIDE-Cloud
+  # 3.0.1 gives lazy sessions the data bridge and turns the admin API off by
+  # default. 3.0.2 keeps pool sidecars, skips broken pool instances, resets
+  # orphaned claims on a timer and survives operator restarts.
+  cloud: "3.0.2" # renovate: datasource=github-releases depName=EduIDE/EduIDE-Cloud
   # -- EduIDE-Landing-Page. Released independently as well.
   # 1.2.2 is the first release whose privacy page reads the `landingPage.privacy`
   # block below. 2.2.0 shipped that block while still pinning 1.2.1, which

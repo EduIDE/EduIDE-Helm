@@ -23,9 +23,11 @@ spec:
         {{- /* Tells the PodMonitor in eduide-cluster to scrape the management port; pods without it are scraped on `http`. */}}
         eduide.io/metrics-port: management
       annotations:
-        helm.sh/revision: {{ .Release.Revision | quote }}
         checksum/config: {{ include (print $.Template.BasePath "/service-configmap.yaml") . | sha256sum }}
         checksum/secret: {{ include (print $.Template.BasePath "/service-config-secret.yaml") . | sha256sum }}
+        {{- if .Values.service.adminApiTokenSecret.create }}
+        checksum/admin-api-token: {{ include (print $.Template.BasePath "/admin-api-token-secret.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       # we need to be able to create and read sessions
       automountServiceAccountToken: true
