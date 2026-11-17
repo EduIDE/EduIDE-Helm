@@ -48,8 +48,10 @@ global:
 
 # --- CRDs and the conversion webhook ---
 conversion:
-  # -- The image of the webhook container
-  image: theiacloud/theia-cloud-conversion-webhook:1.2.0-next
+  # -- The image of the webhook container. Our EduIDE-Cloud build: it knows
+  # every AppDefinition version this chart ships and runs on a JDK with the
+  # Java4Shell fix (CVE-2026-114938); the upstream 1.2.0-next ran on Temurin 21.0.10.
+  image: ghcr.io/eduide/eduide-cloud/conversion-webhook:3.0.3
   # -- The location of where the certificates are mounted into the container (needs to match with application.properties)
   certMountPath: /etc/webhook/certs
   # -- The certificate reload period in seconds
