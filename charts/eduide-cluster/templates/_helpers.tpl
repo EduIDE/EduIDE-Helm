@@ -22,6 +22,20 @@ not silently fall back to `.*` and start graphing other tenants' namespaces.
 {{- end -}}
 
 {{/*
+The namespaces whose certificates EduIDE alerts on: the monitored environments
+plus the ones this chart itself puts certificates in (the release namespace for
+the conversion webhook, the Gateway's namespace for the listener certificates,
+and the alerting namespace, normally all `eduide-system`).
+
+cert-manager exports every Certificate on the cluster. On a shared cluster that
+includes other tenants' broken ones, which must not page as EduIDE alerts.
+*/}}
+{{- define "eduide.certificateNamespaceRegex" -}}
+{{- $ns := concat (.Values.monitoring.targetNamespaces | default list) (list .Release.Namespace .Values.gateway.namespace .Values.monitoring.alerting.namespace) | uniq | compact -}}
+^({{ join "|" $ns }})$
+{{- end -}}
+
+{{/*
 Alerting depends on monitoring, and saying so beats rendering nothing.
 
 Both the PrometheusRule and the AlertmanagerConfig are gated on
