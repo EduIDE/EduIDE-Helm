@@ -302,6 +302,16 @@ if render --set-json 'appDefinitions.enabled=["python"]' --set-json 'landingPage
 else
   bad "landingPage.additionalApps must count as rendering the default app"
 fi
+if render --set landingPage.allowedGitHosts=github.com >/dev/null; then
+  bad "a landingPage.allowedGitHosts that is not a list must fail the render"
+else
+  ok "a landingPage.allowedGitHosts that is not a list fails the render"
+fi
+if render --set 'landingPage.allowedGitHosts={github.com,gitea.example:3000}' | grep -qF 'allowedGitHosts: ["github.com","gitea.example:3000"],'; then
+  ok "landingPage.allowedGitHosts reaches the landing page as a list"
+else
+  bad "landingPage.allowedGitHosts did not render as a list"
+fi
 if render --set-string appDefinitions.apps.python-standalone.landingPage.ephemeral=false >/dev/null; then
   bad "a non-boolean landingPage.ephemeral must fail the render"
 else

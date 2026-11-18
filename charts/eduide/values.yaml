@@ -246,6 +246,15 @@ landingPage:
   # -- Optional: If specified with a value, this overrides the message shown to the user while the session is started.
   # Empty values are ignored and the default text is used.
   loadingText:
+  # -- Alpha: opening GitHub, GitLab or Gitea repositories from a link
+  # (`?gitUri=`), off while this list is empty (the default). Lists the hosts
+  # such a link may clone from when it is not a trusted Artemis link (see
+  # trustedArtemisHosts), for example `[github.com, gitlab.com]` plus your own
+  # Gitea or GitLab. A host on a non-default port is listed as `host:port`, e.g.
+  # `gitea.example.org:3000`. Only public repositories over HTTPS open. Before turning it
+  # on, list your Artemis host in trustedArtemisHosts: once on, other Artemis
+  # links lose their Artemis token. Off, Artemis links work as before.
+  allowedGitHosts: []
   # -- The logo of the application that should be displayed on the landing pages
   logo: logos/theiablueprint.svg
   # -- Set a base64 encoded svg image that should be displayed on the landing pages.
