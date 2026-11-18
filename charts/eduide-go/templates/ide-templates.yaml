@@ -1,0 +1,50 @@
+{{- range $name, $o := .Values.templates }}
+{{- $e := mergeOverwrite (deepCopy ($.Values.templateDefaults | default dict)) (deepCopy (index $.Values.catalog $name | default dict)) (deepCopy ($o | default dict)) }}
+{{- $image := required (printf "templates.%s needs an image (or a catalog entry)" $name) $e.image }}
+{{- if not (contains ":" $image) }}{{ $image = printf "%s/%s:%s" $.Values.images.registry $image ($e.tag | default $.Values.images.tag) }}{{ end }}
+---
+apiVersion: eduide.github.io/v1alpha1
+kind: IDETemplate
+metadata:
+  name: {{ $name }}
+spec:
+  displayName: {{ required (printf "templates.%s needs a displayName" $name) $e.displayName | quote }}
+  image: {{ $image | quote }}
+  port: {{ $e.port }}
+  resources:
+    {{- toYaml $e.resources | nindent 4 }}
+  env:
+    {{- toYaml $e.env | nindent 4 }}
+  injectableKeys:
+  - {name: GIT_URI, source: Request, format: HTTPSURL}
+  - {name: ARTEMIS_URL, source: Request, format: HTTPSURL}
+  - {name: ARTEMIS_TOKEN, source: Request, format: Token}
+  {{- with $e.buildSystems }}
+  - name: TEMPLATE
+    source: Request
+    format: Enum
+    values: {{ toJson . }}
+  {{- end }}
+  - {name: GIT_USER, source: UserName}
+  - {name: GIT_MAIL, source: UserEmail}
+  persistence:
+    {{- toYaml $e.persistence | nindent 4 }}
+  timeouts:
+    {{- toYaml $e.timeouts | nindent 4 }}
+  {{- with $e.placement }}
+  placement:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- with $e.pool }}
+---
+apiVersion: eduide.github.io/v1alpha1
+kind: IDEPool
+metadata:
+  name: {{ $name }}
+spec:
+  templateRef: {{ $name }}
+  minIdle: {{ .minIdle }}
+  targetIdle: {{ .targetIdle | default .minIdle }}
+  maxInstances: {{ .maxInstances }}
+{{- end }}
+{{- end }}

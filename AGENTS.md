@@ -228,3 +228,7 @@ instead of running unauthenticated.
 `eduide.preflightKeycloak` refuses to render on the placeholder values.
 An installation that genuinely has no identity provider yet sets
 `keycloak.allowUnauthenticated: true`.
+
+## `eduide-go` (experimental)
+
+`charts/eduide-go` is the umbrella for the Go control plane, separate from `eduide` and `eduide-cluster`. Its CRDs come from `eduide-control-plane-crds`, installed once per cluster before it. `scripts/test-eduide-go.sh` lints, renders and checks it against a checkout of EduIDE-control-plane (`CP_CHARTS`). `deployments/test3` holds the values of the first test deployment.

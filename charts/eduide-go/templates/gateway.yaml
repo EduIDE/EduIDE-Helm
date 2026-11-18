@@ -1,0 +1,59 @@
+{{- if .Values.gateway.create }}
+{{- $h := include "eduide-go.hosts" . | fromYaml }}
+{{- $gw := include "eduide-go.gatewayName" . }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $gw }}
+  annotations:
+    {{- include "eduide-go.issuerAnnotations" . | nindent 4 }}
+    {{- with .Values.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  gatewayClassName: {{ required "gateway.className is required" .Values.gateway.className }}
+  listeners:
+  {{- range $role := list "service" "instance" "webview" }}
+  - name: https-{{ $role }}
+    protocol: HTTPS
+    port: 443
+    hostname: {{ index $h $role | quote }}
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - {kind: Secret, name: {{ printf "%s-%s-tls" $gw $role }}}
+    allowedRoutes:
+      namespaces: {from: Same}
+  {{- end }}
+  {{- range $role := list "service" "instance" "webview" }}
+  - name: http-{{ $role }}
+    protocol: HTTP
+    port: 80
+    hostname: {{ index $h $role | quote }}
+    allowedRoutes:
+      namespaces: {from: Same}
+  {{- end }}
+{{- end }}
+{{- if .Values.issuer.create }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.issuer.name }}
+spec:
+  acme:
+    server: {{ .Values.issuer.acme.server | quote }}
+    email: {{ required "issuer.acme.email is required" .Values.issuer.acme.email | quote }}
+    privateKeySecretRef:
+      name: {{ .Values.issuer.name }}-account-key
+    solvers:
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: {{ include "eduide-go.gatewayName" . }}
+            {{- if not .Values.gateway.create }}
+            namespace: {{ (index .Values "eduide-control-plane").config.gateway.namespace | default .Release.Namespace }}
+            {{- end }}
+{{- end }}

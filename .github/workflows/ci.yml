@@ -76,6 +76,25 @@ jobs:
           echo "both charts are at $a"
 
   # ---------------------------------------------------------------------------
+  # EXPERIMENTAL eduide-go umbrella: needs the control plane charts from their repository.
+  # ---------------------------------------------------------------------------
+  eduide-go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: helm
+      - uses: actions/checkout@v4
+        with:
+          repository: EduIDE/EduIDE-control-plane
+          path: cp
+      - uses: azure/setup-helm@v4
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Lint, render and check
+        run: CP_CHARTS="$PWD/cp/charts" ./helm/scripts/test-eduide-go.sh
+
+  # ---------------------------------------------------------------------------
   # Validate rendered output against real Kubernetes and CRD schemas.
   # ---------------------------------------------------------------------------
   kubeconform:
@@ -114,6 +133,8 @@ jobs:
           failed=0
           for chart in charts/*/; do
             name="$(basename "$chart")"
+            # eduide-go depends on charts that are not published yet; scripts/test-eduide-go.sh covers it.
+            [[ "$name" == "eduide-go" ]] && continue
             echo "::group::kubeconform $name"
             ./scripts/resolve-deps.sh "$chart"
             # Render from the chart's own example where it has one. Bare

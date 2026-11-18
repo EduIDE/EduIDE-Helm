@@ -1,0 +1,9 @@
+{{- /* The same facts are stated in two subcharts; refuse a render where they disagree. */ -}}
+{{- $cp := index .Values "eduide-control-plane" -}}
+{{- $lp := index .Values "eduide-landing-page" -}}
+{{- if ne $lp.host $cp.config.hosts.service }}{{ fail "eduide-landing-page.host must equal eduide-control-plane.config.hosts.service" }}{{ end -}}
+{{- if ne $lp.gateway.name $cp.config.gateway.name }}{{ fail "eduide-landing-page.gateway.name must equal eduide-control-plane.config.gateway.name" }}{{ end -}}
+{{- if ne ($lp.gateway.namespace | default "") ($cp.config.gateway.namespace | default "") }}{{ fail "landing page and control plane gateway namespaces differ" }}{{ end -}}
+{{- if ne ($lp.gateway.sectionName | default "") ($cp.config.gateway.sectionName | default "") }}{{ fail "landing page and control plane gateway sectionName differ" }}{{ end -}}
+{{- if not (has $lp.config.keycloak.clientId $cp.config.oidc.clientIDs) }}{{ fail "the landing page keycloak.clientId must be listed in eduide-control-plane.config.oidc.clientIDs" }}{{ end -}}
+{{- if and .Values.gateway.create (not (eq ($cp.config.gateway.namespace | default .Release.Namespace) .Release.Namespace)) }}{{ fail "gateway.create renders the Gateway in the release namespace; config.gateway.namespace must be empty or equal to it" }}{{ end -}}

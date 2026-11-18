@@ -1,0 +1,107 @@
+# EXPERIMENTAL umbrella for the Go control plane. One namespace per deployment.
+# Hosts, gateway and OIDC settings are stated in the subchart blocks below and checked against each
+# other at render time (templates/validate.yaml); keep them in one place with YAML anchors in your
+# values file, see deployments/test3/values-test3.yaml.
+
+gateway:
+  # Render a Gateway in the release namespace with HTTPS listeners for the service host, the
+  # instance host and the fixed webview host (no wildcard, G3) and HTTP :80 listeners for ACME.
+  create: true
+  # required when create is true
+  className: ""
+  annotations: {}
+
+# cert-manager reads the Gateway annotations and issues one certificate per HTTPS listener.
+certManager:
+  # Used when issuer.create is false; with issuer.create the namespaced Issuer below is used.
+  issuerRef:
+    name: ""
+    kind: ClusterIssuer
+
+# Namespaced ACME Issuer for clusters whose ClusterIssuer solves HTTP01 only through a shared
+# Gateway. Its solver attaches to THIS Gateway.
+issuer:
+  create: false
+  name: acme
+  acme:
+    # required when create is true
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: ""
+
+# Where the IDE images come from: <registry>/<image>:<tag>.
+images:
+  registry: ghcr.io/eduide
+  tag: latest
+
+# Applied to every template before its catalog entry and its override.
+templateDefaults:
+  port: 3000
+  resources:
+    requests: {cpu: 200m, memory: 500M}
+    limits: {cpu: "2", memory: 2400M}
+  timeouts: {idle: 60m, warning: 50m, max: 24h}
+  persistence: {allowed: [none, volume], default: none}
+  env:
+  - {name: THEIA, value: "1"}
+
+# IDE images EduIDE releases (Artemis editions). buildSystems feeds the TEMPLATE key.
+catalog:
+  java-17:
+    displayName: Java 17
+    image: eduide/java-17-artemis
+    buildSystems: [maven, gradle]
+    resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+  java-25:
+    displayName: Java 25
+    image: eduide/java-25-artemis
+    buildSystems: [maven, gradle]
+    resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+  python:
+    displayName: Python
+    image: eduide/python-artemis
+    buildSystems: [python]
+  javascript:
+    displayName: JavaScript
+    image: eduide/javascript-artemis
+    buildSystems: [node, web]
+  c:
+    displayName: C
+    image: eduide/c-artemis
+    buildSystems: [make, bazel]
+  rust:
+    displayName: Rust
+    image: eduide/rust-artemis
+    buildSystems: [cargo]
+    resources: {limits: {memory: 3000M}}
+  go:
+    displayName: Go
+    image: eduide/go-artemis
+    buildSystems: [go]
+
+# Templates this deployment offers: catalog name -> overrides (merged over the catalog entry).
+# Keys: displayName, image, tag, port, resources, buildSystems, placement, pool {minIdle, targetIdle, maxInstances}.
+# An entry without a catalog match needs displayName and image.
+templates: {}
+# java-17:
+#   tag: pr-123
+#   pool: {minIdle: 1, maxInstances: 5}
+
+# Values of the subcharts (the required ones are enforced by their schemas).
+eduide-control-plane:
+  config:
+    deployment: ""
+    hosts: {service: "", instance: "", webview: ""}
+    gateway: {name: "", namespace: "", sectionName: ""}
+    oidc: {issuerURL: "", clientIDs: [], gatewayClientID: ""}
+  oidc:
+    clientSecretName: ""
+
+eduide-landing-page:
+  host: ""
+  gateway: {name: "", namespace: "", sectionName: ""}
+  config:
+    title: EduIDE
+    keycloak:
+      url: https://auth.example.org
+      realm: eduide
+      clientId: eduide-landing

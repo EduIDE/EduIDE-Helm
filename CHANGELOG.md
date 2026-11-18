@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- [eduide-go] EXPERIMENTAL new umbrella chart `charts/eduide-go` for the Go control plane (`eduide-control-plane`, `eduide-landing-page`, from [EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane)). It renders the Gateway with HTTPS listeners for the service, instance and fixed `webview.<instance>` hosts (no wildcard), an optional namespaced ACME Issuer, and the IDETemplates and IDEPools from a catalog. The CRD chart `eduide-control-plane-crds` stays a separate per-cluster install. `charts/eduide` and `charts/eduide-cluster` are unchanged. First deployment: `deployments/test3`
+
 Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10, I-01). The service changes need an EduIDE-Cloud release that contains the matching service fixes.
 
 - [eduide-cluster] The conversion webhook runs our EduIDE-Cloud image `ghcr.io/eduide/eduide-cloud/conversion-webhook:3.0.3` (OpenJDK 27.0.1.1, Java4Shell fix) instead of the upstream `theiacloud/theia-cloud-conversion-webhook:1.2.0-next` (Temurin 21.0.10). It runs as uid 10001 and listens on 8443 as before
