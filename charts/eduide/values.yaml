@@ -47,8 +47,9 @@ versions:
   # back to `landingPage.ephemeralStorage` for every app, so bump this pin in the
   # same release. 1.4.0 is that release; 1.4.1 fixes the contrast of the
   # persistence hint. 1.5.0 checks every gitUri link (trusted Artemis hosts,
-  # allowedGitHosts) and brings the alpha Git repository links.
-  landingPage: "1.5.0" # renovate: datasource=github-releases depName=EduIDE/EduIDE-Landing-Page
+  # allowedGitHosts) and brings the alpha Git repository links. 1.5.1 also
+  # checks a resumed external link.
+  landingPage: "1.5.1" # renovate: datasource=github-releases depName=EduIDE/EduIDE-Landing-Page
 
 # -- The container registry every EduIDE image is pulled from.
 imageRegistry: ghcr.io/eduide
