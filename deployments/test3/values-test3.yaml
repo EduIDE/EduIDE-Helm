@@ -36,14 +36,17 @@ images:
   registry: ghcr.io/eduide
   tag: pr-238 # EduIDE/EduIDE#238 builds the images with eduide-session
 
+# Pinned by digest: the IDE image PR reuses the tag pr-238, and nodes keep cached images (IfNotPresent).
 templates:
   java-17:
+    tag: pr-238@sha256:5dc51a62ca622b2eea0b182f0f65dc01593a8b73cd51eb2ad841eaae0d23b448
     pool: {minIdle: 1, maxInstances: 5}
-  c: {}
+  c:
+    tag: pr-238@sha256:32135d30c09dc395eaddc2b3799f4b4e5a381923fd1845472e0ee503f27933dd
 
 eduide-control-plane:
   image:
-    tag: sha-7337860 # EduIDE-control-plane main
+    tag: sha-2bb3ecc # EduIDE-control-plane main
   config:
     deployment: test3
     hosts: *hosts
@@ -68,6 +71,15 @@ eduide-control-plane:
       # The eduide nodes of stud carry no taints, so no toleration is needed.
     telemetry:
       otlpEndpoint: jaeger-collector.eduide-test3:4317
+  networkPolicy:
+    monitoringNamespace: cattle-monitoring-system
+    # stud uses public address ranges inside the cluster: nodes 131.159.88.0/24 and 2a09:80c0:88::/64,
+    # pods 198.18.0.0/16, services 198.19.0.0/16. Artemis and Keycloak sit in 131.159.89.0/24, outside.
+    sessionEgressExtraDeny: [131.159.88.0/24, 198.18.0.0/16, 198.19.0.0/16, "2a09:80c0:88::/64"]
+  monitoring:
+    podMonitor: {enabled: true}
+    rules: {enabled: true}
+    dashboard: {enabled: true}
   oidc:
     # Created separately, see README.md.
     clientSecretName: eduide-oidc
@@ -81,9 +93,13 @@ eduide-control-plane:
 
 eduide-landing-page:
   image:
-    tag: sha-7337860 # EduIDE-control-plane main (landing page)
+    tag: sha-2bb3ecc # EduIDE-control-plane main (landing page)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
     title: EduIDE test3
+    # Legal pages of the existing TUM landing page (U6: they live outside the control plane repo).
+    legal:
+      imprintUrl: https://test1.eduide.student.k8s.aet.cit.tum.de/imprint
+      privacyUrl: https://test1.eduide.student.k8s.aet.cit.tum.de/privacy
     keycloak: *keycloak
