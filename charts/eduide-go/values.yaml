@@ -45,6 +45,8 @@ templateDefaults:
   persistence: {allowed: [none, volume], default: none}
   env:
   - {name: THEIA, value: "1"}
+  # Scorpio reads launch data through the eduide-session extension (the old operator set this per pod).
+  - {name: SCORPIO_THEIA_ENV_STRATEGY, value: data-bridge}
 
 # IDE images EduIDE releases (Artemis editions). buildSystems feeds the TEMPLATE key.
 catalog:
