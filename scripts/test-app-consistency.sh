@@ -302,12 +302,20 @@ if render --set-json 'appDefinitions.enabled=["python"]' --set-json 'landingPage
 else
   bad "landingPage.additionalApps must count as rendering the default app"
 fi
-if render --set landingPage.allowedGitHosts=github.com >/dev/null; then
-  bad "a landingPage.allowedGitHosts that is not a list must fail the render"
+for bad_hosts in 'landingPage.allowedGitHosts=github.com' 'landingPage.allowedGitHosts=false' 'landingPage.allowedGitHosts={github.com,null}'; do
+  if render --set "$bad_hosts" >/dev/null; then
+    bad "--set $bad_hosts must fail the render"
+  else
+    ok "--set $bad_hosts fails the render"
+  fi
+done
+if render --set landingPage.allowedGitHosts=null | grep -F 'allowedGitHosts: [],' >/dev/null; then
+  ok "a null landingPage.allowedGitHosts renders as an empty list"
 else
-  ok "a landingPage.allowedGitHosts that is not a list fails the render"
+  bad "a null landingPage.allowedGitHosts must render as an empty list"
 fi
-if render --set 'landingPage.allowedGitHosts={github.com,gitea.example:3000}' | grep -qF 'allowedGitHosts: ["github.com","gitea.example:3000"],'; then
+# grep without -q reads the whole render, so helm never writes into a closed pipe.
+if render --set 'landingPage.allowedGitHosts={github.com,gitea.example:3000}' | grep -F 'allowedGitHosts: ["github.com","gitea.example:3000"],' >/dev/null; then
   ok "landingPage.allowedGitHosts reaches the landing page as a list"
 else
   bad "landingPage.allowedGitHosts did not render as a list"
