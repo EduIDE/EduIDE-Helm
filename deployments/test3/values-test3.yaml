@@ -10,8 +10,9 @@ x-hosts: &hosts
 x-gateway: &gateway
   name: eduide
   namespace: eduide-test3
-  # Empty: routes attach to every listener whose hostname matches their hostnames.
   sectionName: ""
+  # Only the HTTPS listeners: sessions and pages are never served on the ACME :80 listeners.
+  port: 443
 
 x-keycloak: &keycloak
   url: https://keycloak-test.aet.cit.tum.de/
@@ -33,7 +34,7 @@ issuer:
 
 images:
   registry: ghcr.io/eduide
-  tag: pr-0 # set to the pr-<N> tag of the EduIDE-c-makefile PR that builds eduide-session
+  tag: pr-238 # EduIDE/EduIDE#238 builds the images with eduide-session
 
 templates:
   java-17:
@@ -42,7 +43,7 @@ templates:
 
 eduide-control-plane:
   image:
-    tag: pr-0 # set to the pr-<N> tag of the EduIDE-control-plane PR
+    tag: sha-4bbb572 # EduIDE-control-plane main
   config:
     deployment: test3
     hosts: *hosts
@@ -68,10 +69,17 @@ eduide-control-plane:
   oidc:
     # Created separately, see README.md.
     clientSecretName: eduide-oidc
+    # stud: Envoy pods have no direct egress to Keycloak, see keycloak-egress.yaml.
+    providerBackendRefs:
+    - {name: keycloak-egress, port: 443}
+    # Set, so Envoy Gateway does not discover them through the backend.
+    authorizationEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/auth
+    tokenEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/token
+    endSessionEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/logout
 
 eduide-landing-page:
   image:
-    tag: pr-0 # set to the pr-<N> tag of the landing page PR
+    tag: sha-4bbb572 # EduIDE-control-plane main (landing page)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:

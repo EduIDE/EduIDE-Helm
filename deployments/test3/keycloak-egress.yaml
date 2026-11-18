@@ -1,0 +1,124 @@
+# stud only, test3: Envoy cannot complete TLS with keycloak-test.aet.cit.tum.de. That host accepts only
+# the ECDH groups P-384 and P-521, while Envoy offers X25519 and P-256 (upstream ssl.connection_error,
+# 503 "Failed to get access token"). The curves could be set in the shared EnvoyProxy (backendTLS) or
+# in an Envoy Gateway Backend, but the Backend API is disabled and the EnvoyProxy is shared.
+# So this namespace runs a small TLS bridge: Envoy talks TLS to nginx (own certificate, trusted via the
+# BackendTLSPolicy), nginx talks TLS 1.3 to Keycloak with the system CAs.
+# Values: eduide-control-plane.oidc.providerBackendRefs: [{name: keycloak-egress, port: 443}]
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: keycloak-egress-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: keycloak-egress
+spec:
+  secretName: keycloak-egress-tls
+  dnsNames: [keycloak-test.aet.cit.tum.de]
+  duration: 8760h
+  issuerRef: {name: keycloak-egress-selfsigned, kind: Issuer}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-egress-nginx
+data:
+  default.conf: |
+    server {
+      listen 8443 ssl;
+      server_name keycloak-test.aet.cit.tum.de;
+      ssl_certificate /tls/tls.crt;
+      ssl_certificate_key /tls/tls.key;
+      access_log off;
+      location / {
+        proxy_pass https://keycloak-test.aet.cit.tum.de;
+        proxy_ssl_server_name on;
+        proxy_ssl_name keycloak-test.aet.cit.tum.de;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 3;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_set_header Host keycloak-test.aet.cit.tum.de;
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak-egress
+  labels: {app.kubernetes.io/name: keycloak-egress}
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app.kubernetes.io/name: keycloak-egress}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: keycloak-egress}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.29-alpine
+          ports:
+            - {name: tls, containerPort: 8443}
+          readinessProbe:
+            tcpSocket: {port: 8443}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 64Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: conf, mountPath: /etc/nginx/conf.d}
+            - {name: tls, mountPath: /tls, readOnly: true}
+      volumes:
+        - name: conf
+          configMap: {name: keycloak-egress-nginx}
+        - name: tls
+          secret: {secretName: keycloak-egress-tls}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-egress
+spec:
+  selector: {app.kubernetes.io/name: keycloak-egress}
+  ports:
+    - {name: tls, port: 443, targetPort: 8443}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: keycloak-egress
+spec:
+  targetRefs:
+    - {group: "", kind: Service, name: keycloak-egress}
+  validation:
+    hostname: keycloak-test.aet.cit.tum.de
+    caCertificateRefs:
+      - {group: "", kind: Secret, name: keycloak-egress-tls}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-egress-from-envoy
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: keycloak-egress}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: envoy-gateway-system}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: envoy}
+      ports:
+        - {port: 8443}
