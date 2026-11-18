@@ -22,11 +22,14 @@ spec:
   - {name: GIT_URI, source: Request, format: HTTPSURL}
   - {name: ARTEMIS_URL, source: Request, format: HTTPSURL}
   - {name: ARTEMIS_TOKEN, source: Request, format: Token}
-  {{- with $e.buildSystems }}
+  {{- if $e.buildSystems }}
   - name: TEMPLATE
     source: Request
     format: Enum
-    values: {{ toJson . }}
+    values: {{ toJson $e.buildSystems }}
+  {{- else }}
+  # Project template variants come from the image metadata (U12); the service accepts their ids.
+  - {name: TEMPLATE, source: Request, format: Pattern, pattern: "[a-z0-9-]{1,32}"}
   {{- end }}
   - {name: GIT_USER, source: UserName}
   - {name: GIT_MAIL, source: UserEmail}
