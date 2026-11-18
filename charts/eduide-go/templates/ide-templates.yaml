@@ -11,6 +11,9 @@ spec:
   displayName: {{ required (printf "templates.%s needs a displayName" $name) $e.displayName | quote }}
   image: {{ $image | quote }}
   port: {{ $e.port }}
+  {{- with $e.runAsUser }}
+  runAsUser: {{ . }}
+  {{- end }}
   resources:
     {{- toYaml $e.resources | nindent 4 }}
   env:

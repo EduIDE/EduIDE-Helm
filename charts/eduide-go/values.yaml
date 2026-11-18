@@ -36,6 +36,8 @@ images:
 # Applied to every template before its catalog entry and its override.
 templateDefaults:
   port: 3000
+  # The EduIDE images run as user 101; it also becomes the fsGroup, so workspace volumes are writable.
+  runAsUser: 101
   resources:
     requests: {cpu: 200m, memory: 500M}
     limits: {cpu: "2", memory: 2400M}
