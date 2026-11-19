@@ -18,6 +18,9 @@ eduide-control-plane:
   oidc: {clientSecretName: eduide-oidc}
 eduide-landing-page:
   host: ide.example.org
+  legal:
+    imprint: {url: https://example.org/imprint}
+    privacy: {url: https://example.org/privacy}
   gateway: {name: eduide}
   config:
     keycloak: {url: https://auth.example.org, realm: eduide, clientId: eduide-landing}

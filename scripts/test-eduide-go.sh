@@ -40,8 +40,8 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   ok "HTTP to HTTPS redirect route (301, ACME challenge paths stay more specific)"
 
   gw=$(d '.kind == "Gateway"' | yq -p=json '.metadata.name')
-  [ "$(d '.kind == "Issuer"' | yq -p=json '.spec.acme.solvers[0].http01.gatewayHTTPRoute.parentRefs[0].name')" = "$gw" ] || fail "Issuer solver does not point at the Gateway"
-  [ "$(d '.kind == "Gateway"' | yq -p=json '.metadata.annotations["cert-manager.io/issuer"]')" = "$(d '.kind == "Issuer"' | yq -p=json '.metadata.name')" ] || fail "Gateway annotation does not name the Issuer"
+  [ "$(d '.kind == "Issuer" and .spec.acme' | yq -p=json '.spec.acme.solvers[0].http01.gatewayHTTPRoute.parentRefs[0].name')" = "$gw" ] || fail "Issuer solver does not point at the Gateway"
+  [ "$(d '.kind == "Gateway"' | yq -p=json '.metadata.annotations["cert-manager.io/issuer"]')" = "$(d '.kind == "Issuer" and .spec.acme' | yq -p=json '.metadata.name')" ] || fail "Gateway annotation does not name the Issuer"
   ok "Issuer solver points at Gateway $gw"
 
   [ "$(d '.kind == "NetworkPolicy"' | wc -l)" -ge 3 ] || fail "NetworkPolicies missing"
@@ -51,9 +51,14 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   [ "$(d '.kind == "IDEPool"' | yq -p=json '.spec | has("targetIdle")')" = false ] || fail "IDEPool renders targetIdle, which the pool scaler owns"
   keys=$(d '.kind == "IDETemplate" and .metadata.name == "java-17"' | yq -p=json '[.spec.injectableKeys[].name] | join(",")')
   [ "$keys" = "GIT_URI,ARTEMIS_URL,ARTEMIS_TOKEN,TEMPLATE,GIT_USER,GIT_MAIL" ] || fail "injectable keys: $keys"
-  echo "$out" | grep -q 'name: webview\|webview\.' || fail "webview host missing in render"
+  grep -q 'name: webview\|webview\.' <<<"$out" || fail "webview host missing in render"
   ok "NetworkPolicy, SecurityPolicy, IDETemplate, IDEPool"
 done
+
+# GIT_URI accepts credentials only where a deployment asks for it (Artemis#14702).
+[ "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -c 'allowCredentials')" -eq 0 ] || fail "allowCredentials set by default"
+[ "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set templateDefaults.gitUriAllowCredentials=true | yq -N 'select(.kind == "IDETemplate") | .spec.injectableKeys[] | select(.allowCredentials == true) | .name' | sort -u)" = GIT_URI ] || fail "gitUriAllowCredentials does not set allowCredentials on GIT_URI only"
+ok "gitUriAllowCredentials"
 
 # The OIDC bridge follows the issuer host and only Envoy may reach it.
 br=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set oidcBridge.enabled=true) || fail "render with oidcBridge"

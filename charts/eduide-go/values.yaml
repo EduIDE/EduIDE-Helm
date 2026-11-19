@@ -55,6 +55,9 @@ templateDefaults:
     limits: {cpu: "2", memory: 2400M}
   timeouts: {idle: 60m, warning: 50m, max: 24h}
   persistence: {allowed: [none, volume], default: none}
+  # Accept a GIT_URI with user info: Artemis (Artemis#14702) sends the repository URL with the student's VCS token.
+  # The host allowlist still applies; the value reaches only the launch data Secret.
+  gitUriAllowCredentials: false
   env:
   - {name: THEIA, value: "1"}
   # Scorpio reads launch data through the eduide-session extension (the old operator set this per pod).

@@ -19,7 +19,7 @@ spec:
   env:
     {{- toYaml $e.env | nindent 4 }}
   injectableKeys:
-  - {name: GIT_URI, source: Request, format: HTTPSURL}
+  - {name: GIT_URI, source: Request, format: HTTPSURL{{ if $e.gitUriAllowCredentials }}, allowCredentials: true{{ end }}}
   - {name: ARTEMIS_URL, source: Request, format: HTTPSURL}
   - {name: ARTEMIS_TOKEN, source: Request, format: Token}
   {{- if $e.buildSystems }}

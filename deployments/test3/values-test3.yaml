@@ -37,6 +37,10 @@ images:
   tag: pr-238 # EduIDE/EduIDE#238 builds the images with eduide-session
 
 # Pinned by digest: the IDE image PR reuses the tag pr-238, and nodes keep cached images (IfNotPresent).
+# All test3 templates are Artemis editions: Artemis sends the repository URL with the VCS token (Artemis#14702).
+templateDefaults:
+  gitUriAllowCredentials: true
+
 templates:
   java-17:
     tag: pr-238@sha256:aad00615bc45a44b1641feba6e8c79989be71445644ed844573553b3be087d07
