@@ -46,7 +46,7 @@ templates:
 
 eduide-control-plane:
   image:
-    tag: sha-1272757 # EduIDE-control-plane main
+    tag: sha-fd75be0 # EduIDE-control-plane main
   # Pool scaler (POOL-18), active with tight limits so the shared cluster is not loaded.
   poolScaler:
     enabled: true
