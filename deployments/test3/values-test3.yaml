@@ -43,6 +43,9 @@ templates:
     pool: {minIdle: 1, maxInstances: 5}
   c:
     tag: pr-238@sha256:7f58bedc8cc67babdb3fadf3026e31a937ec05e2fd78680c31951bf5f765bbb4
+  # Java 25 for testing with Artemis.
+  java-25:
+    tag: pr-238@sha256:5c7a0c78923bb6be2c8a07cff3200d4b425006f5c627d9fe24b50d08bc3e9e3f
 
 oidcBridge:
   enabled: true
@@ -74,7 +77,8 @@ eduide-control-plane:
     - github.com
     - gitlab.com
     - codeberg.org
-    # Artemis test hosts: add the artemis-test*.artemis.cit.tum.de hosts in use.
+    # Artemis test hosts in use (repository URLs and ARTEMIS_URL).
+    - artemis-test3.artemis.cit.tum.de
     workspaces:
       storageClassName: csi-rbd-sc
     placement:
@@ -116,7 +120,7 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: pr-1@sha256:5442d02dac1be0b86d1da7cfc7cae40e016c19986644ff79d18603f28c51f496 # EduIDE/EduIDE-control-plane#1 (U15 to U18), pinned by digest
+    tag: sha-770716a # EduIDE-control-plane main (landing page PR #1 merged)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
