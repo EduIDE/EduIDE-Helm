@@ -32,6 +32,13 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   [ "$(d '.kind == "Gateway"' | yq -p=json '[.spec.listeners[] | select(.protocol == "HTTP" and .port == 80)] | length')" -eq 3 ] || fail "expected 3 HTTP ACME listeners"
   ok "Gateway: three hosts, 3 HTTPS + 3 HTTP listeners, no wildcard"
 
+  r=$(d '.kind == "HTTPRoute" and (.metadata.name | test("https-redirect$"))')
+  [ "$(echo "$r" | yq -p=json '[.spec.parentRefs[].sectionName] | sort | join(",")')" = "http-instance,http-service,http-webview" ] || fail "redirect route is not attached to the three http listeners"
+  [ "$(echo "$r" | yq -p=json '.spec.hostnames | sort | join(",")')" = "$(echo "$hosts" | paste -sd, -)" ] || fail "redirect route hostnames differ from the listener hosts"
+  [ "$(echo "$r" | yq -p=json '.spec.rules[0].filters[0].requestRedirect | .scheme + .statusCode')" = "https301" ] || fail "redirect is not https 301"
+  [ "$(echo "$r" | yq -p=json '.spec.rules[0].matches[0].path | .type + .value')" = "PathPrefix/" ] || fail "redirect must match PathPrefix / so exact ACME challenge paths stay more specific"
+  ok "HTTP to HTTPS redirect route (301, ACME challenge paths stay more specific)"
+
   gw=$(d '.kind == "Gateway"' | yq -p=json '.metadata.name')
   [ "$(d '.kind == "Issuer"' | yq -p=json '.spec.acme.solvers[0].http01.gatewayHTTPRoute.parentRefs[0].name')" = "$gw" ] || fail "Issuer solver does not point at the Gateway"
   [ "$(d '.kind == "Gateway"' | yq -p=json '.metadata.annotations["cert-manager.io/issuer"]')" = "$(d '.kind == "Issuer"' | yq -p=json '.metadata.name')" ] || fail "Gateway annotation does not name the Issuer"
