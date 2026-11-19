@@ -46,7 +46,7 @@ templates:
 
 eduide-control-plane:
   image:
-    tag: sha-dc8faa1 # EduIDE-control-plane main
+    tag: sha-abbbb80 # EduIDE-control-plane main
   config:
     deployment: test3
     hosts: *hosts
@@ -96,14 +96,15 @@ eduide-control-plane:
     endSessionEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/logout
 
 eduide-landing-page:
+  # Placeholders for test3 (the chart requires both; U6: real legal texts live with the deployment).
+  legal:
+    imprint:
+      url: https://example.org/imprint
+    privacy:
+      url: https://example.org/privacy
   image:
-    tag: sha-dc8faa1 # EduIDE-control-plane main (landing page)
+    tag: sha-abbbb80 # EduIDE-control-plane main (landing page)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
     title: EduIDE test3
-    # Legal pages of the existing TUM landing page (U6: they live outside the control plane repo).
-    legal:
-      imprintUrl: https://test1.eduide.student.k8s.aet.cit.tum.de/imprint
-      privacyUrl: https://test1.eduide.student.k8s.aet.cit.tum.de/privacy
-    keycloak: *keycloak
