@@ -46,7 +46,7 @@ templates:
 
 eduide-control-plane:
   image:
-    tag: sha-fab5905 # EduIDE-control-plane main
+    tag: sha-dfb21f6 # EduIDE-control-plane main
   config:
     deployment: test3
     hosts: *hosts
@@ -104,7 +104,7 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: pr-1@sha256:b9d81325bb866273b594b3ac66743b993eea439e2b5a6b1ab763878317dbfd8f # EduIDE/EduIDE-control-plane#1 (U15 to U18), pinned by digest
+    tag: pr-1@sha256:bbd77c74eaded842d9514e74e32eb66ba05f1eb3839ff650390c24b77b175b40 # EduIDE/EduIDE-control-plane#1 (U15 to U18), pinned by digest
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
