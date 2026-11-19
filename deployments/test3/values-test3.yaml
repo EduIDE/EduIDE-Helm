@@ -56,7 +56,7 @@ oidcBridge:
 
 eduide-control-plane:
   image:
-    tag: sha-fd75be0 # EduIDE-control-plane main
+    tag: sha-c2134d4 # EduIDE-control-plane main
   # Pool scaler (POOL-18), active with tight limits so the shared cluster is not loaded.
   poolScaler:
     enabled: true
@@ -124,7 +124,7 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: sha-770716a # EduIDE-control-plane main (landing page PR #1 merged)
+    tag: sha-c2134d4 # EduIDE-control-plane main (landing page)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
