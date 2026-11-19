@@ -105,7 +105,7 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: pr-1@sha256:334e89ac7e7c220470e864085430654072ca22415a7c798db1500c0f1275bf50 # EduIDE/EduIDE-control-plane#1 (U15 to U18), pinned by digest
+    tag: pr-1@sha256:5442d02dac1be0b86d1da7cfc7cae40e016c19986644ff79d18603f28c51f496 # EduIDE/EduIDE-control-plane#1 (U15 to U18), pinned by digest
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
