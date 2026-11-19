@@ -50,7 +50,7 @@ metadata:
 spec:
   templateRef: {{ $name }}
   minIdle: {{ .minIdle }}
-  targetIdle: {{ .targetIdle | default .minIdle }}
+  {{- /* targetIdle belongs to the pool scaler (/scale); rendering it makes every Helm upgrade conflict with it. */}}
   maxInstances: {{ .maxInstances }}
 {{- end }}
 {{- end }}

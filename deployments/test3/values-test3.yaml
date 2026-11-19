@@ -47,6 +47,14 @@ templates:
 eduide-control-plane:
   image:
     tag: sha-1272757 # EduIDE-control-plane main
+  # Pool scaler (POOL-18), active with tight limits so the shared cluster is not loaded.
+  poolScaler:
+    enabled: true
+    mode: active
+    config:
+      prometheus: {url: http://rancher-monitoring-prometheus.cattle-monitoring-system:9090}
+      poolLimits:
+        java-17: {floor: 1, ceiling: 4}
   config:
     deployment: test3
     hosts: *hosts

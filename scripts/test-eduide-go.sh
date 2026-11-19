@@ -48,6 +48,7 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   [ "$(d '.kind == "SecurityPolicy"' | wc -l)" -eq 1 ] || fail "SecurityPolicy missing"
   [ "$(d '.kind == "IDETemplate"' | wc -l)" -ge 1 ] || fail "IDETemplate missing"
   [ "$(d '.kind == "IDEPool"' | wc -l)" -eq 1 ] || fail "expected one IDEPool (java-17)"
+  [ "$(d '.kind == "IDEPool"' | yq -p=json '.spec | has("targetIdle")')" = false ] || fail "IDEPool renders targetIdle, which the pool scaler owns"
   keys=$(d '.kind == "IDETemplate" and .metadata.name == "java-17"' | yq -p=json '[.spec.injectableKeys[].name] | join(",")')
   [ "$keys" = "GIT_URI,ARTEMIS_URL,ARTEMIS_TOKEN,TEMPLATE,GIT_USER,GIT_MAIL" ] || fail "injectable keys: $keys"
   echo "$out" | grep -q 'name: webview\|webview\.' || fail "webview host missing in render"

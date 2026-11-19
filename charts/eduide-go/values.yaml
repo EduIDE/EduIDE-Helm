@@ -83,7 +83,7 @@ catalog:
     buildSystems: [go]
 
 # Templates this deployment offers: catalog name -> overrides (merged over the catalog entry).
-# Keys: displayName, image, tag, port, resources, buildSystems, placement, pool {minIdle, targetIdle, maxInstances}.
+# Keys: displayName, image, tag, port, resources, buildSystems, placement, pool {minIdle, maxInstances} (targetIdle is left to the pool scaler).
 # An entry without a catalog match needs displayName and image.
 templates: {}
 # java-17:
