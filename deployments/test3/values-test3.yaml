@@ -43,13 +43,13 @@ templateDefaults:
 
 templates:
   java-17:
-    tag: pr-238@sha256:aad00615bc45a44b1641feba6e8c79989be71445644ed844573553b3be087d07
+    tag: pr-238@sha256:c82273f318b631d6d0e5b8a731822d87a3295ec0cfa7467d9c0c5e52d275d742
     pool: {minIdle: 1, maxInstances: 5}
   c:
-    tag: pr-238@sha256:7f58bedc8cc67babdb3fadf3026e31a937ec05e2fd78680c31951bf5f765bbb4
+    tag: pr-238@sha256:77e15e8af46a54c9e0aa2caec5ed726534a4e477e9f810ffd31ee6ffb8957c92
   # Java 25 for testing with Artemis.
   java-25:
-    tag: pr-238@sha256:5c7a0c78923bb6be2c8a07cff3200d4b425006f5c627d9fe24b50d08bc3e9e3f
+    tag: pr-238@sha256:e6255c1309865f62db226ae5e5c70f5379497871f1a53861a0dbb4be6b1a6f07
 
 oidcBridge:
   enabled: true
