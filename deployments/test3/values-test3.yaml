@@ -103,8 +103,9 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: sha-abbbb80 # EduIDE-control-plane main (landing page)
+    tag: pr-1 # EduIDE/EduIDE-control-plane#1 (U15 to U18)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:
     title: EduIDE test3
+    keycloak: *keycloak
