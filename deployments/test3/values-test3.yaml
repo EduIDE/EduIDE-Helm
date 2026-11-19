@@ -44,6 +44,9 @@ templates:
   c:
     tag: pr-238@sha256:7f58bedc8cc67babdb3fadf3026e31a937ec05e2fd78680c31951bf5f765bbb4
 
+oidcBridge:
+  enabled: true
+
 eduide-control-plane:
   image:
     tag: sha-fd75be0 # EduIDE-control-plane main
@@ -97,9 +100,9 @@ eduide-control-plane:
   oidc:
     # Created separately, see README.md.
     clientSecretName: eduide-oidc
-    # stud: Envoy pods have no direct egress to Keycloak, see keycloak-egress.yaml.
+    # keycloak-test speaks only P-384/P-521, Envoy only X25519/P-256: the chart's TLS bridge (oidcBridge) in between.
     providerBackendRefs:
-    - {name: keycloak-egress, port: 443}
+    - {name: eduide-oidc-bridge, port: 443}
     # Set, so Envoy Gateway does not discover them through the backend.
     authorizationEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/auth
     tokenEndpoint: https://keycloak-test.aet.cit.tum.de/realms/tum/protocol/openid-connect/token

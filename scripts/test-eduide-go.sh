@@ -55,6 +55,16 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   ok "NetworkPolicy, SecurityPolicy, IDETemplate, IDEPool"
 done
 
+# The OIDC bridge follows the issuer host and only Envoy may reach it.
+br=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set oidcBridge.enabled=true) || fail "render with oidcBridge"
+iss_host=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --show-only charts/eduide-control-plane/templates/config.yaml 2>/dev/null | grep -o 'issuerURL: [^ ]*' | head -1 | sed -E 's#issuerURL: "?https://([^/"]*).*#\1#')
+[ -n "$iss_host" ] || fail "no issuer host in the test values"
+[ "$(yq -N 'select(.kind == "BackendTLSPolicy") | .spec.validation.hostname' <<<"$br")" = "$iss_host" ] || fail "BackendTLSPolicy hostname is not the issuer host"
+grep -q "proxy_pass https://$iss_host;" <<<"$br" || fail "bridge does not proxy to the issuer host"
+[ "$(yq -N 'select(.kind == "NetworkPolicy" and .metadata.name == "r-oidc-bridge-from-envoy") | .spec.ingress[0].ports[0].port' <<<"$br")" = 8443 ] || fail "bridge NetworkPolicy missing"
+! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'oidc-bridge' || fail "oidcBridge renders while disabled"
+ok "oidcBridge"
+
 # Mismatching landing page host must be refused.
 if helm template r "$chart" -f "$chart/ci/test-values.yaml" --set eduide-landing-page.host=other.example.org >/dev/null 2>&1; then fail "landing page host mismatch accepted"; fi
 ok "host mismatch refused"

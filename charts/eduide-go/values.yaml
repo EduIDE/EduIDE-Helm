@@ -28,6 +28,18 @@ issuer:
     server: https://acme-v02.api.letsencrypt.org/directory
     email: ""
 
+# TLS bridge from Envoy to the OIDC provider. Envoy offers only X25519 and P-256 for upstream TLS; the
+# TUM Keycloak servers (keycloak.aet.cit.tum.de and keycloak-test) accept only P-384 and P-521, so the
+# gateway login fails without it. An nginx in the namespace terminates TLS from Envoy with a self-signed
+# certificate (trusted through a BackendTLSPolicy) and talks to the provider with verified TLS. The host is
+# taken from eduide-control-plane.config.oidc.issuerURL. Point the control plane at it:
+#   eduide-control-plane.oidc.providerBackendRefs: [{name: <release>-oidc-bridge, port: 443}]
+# and set authorizationEndpoint, tokenEndpoint and endSessionEndpoint explicitly.
+oidcBridge:
+  enabled: false
+  replicas: 2
+  image: nginxinc/nginx-unprivileged:1.29-alpine
+
 # Where the IDE images come from: <registry>/<image>:<tag>.
 images:
   registry: ghcr.io/eduide

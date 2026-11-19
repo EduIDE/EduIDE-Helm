@@ -45,6 +45,8 @@ Until `eduide-go` is published, package it locally (`helm dependency update char
 
 ## Checks
 
+- keycloak-test and the production Keycloak (`keycloak.aet.cit.tum.de`) accept only the TLS curves P-384 and P-521; Envoy offers X25519 and P-256. The chart's `oidcBridge` (an nginx TLS bridge in the namespace) is therefore enabled, and `providerBackendRefs` points at `eduide-oidc-bridge`. Production needs the same until Keycloak or the EnvoyProxy allow a common curve.
+
 - cert-manager needs the Gateway API feature enabled so the Gateway annotation and the Issuer solver work.
 - The `eduide` node pool has no taints on stud, so the values carry no toleration.
 - Add the `artemis-test*.artemis.cit.tum.de` hosts in use to `config.allowedHosts`.

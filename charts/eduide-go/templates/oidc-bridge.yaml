@@ -1,62 +1,60 @@
-# stud only, test3: Envoy cannot complete TLS with keycloak-test.aet.cit.tum.de. That host accepts only
-# the ECDH groups P-384 and P-521, while Envoy offers X25519 and P-256 (upstream ssl.connection_error,
-# 503 "Failed to get access token"). The curves could be set in the shared EnvoyProxy (backendTLS) or
-# in an Envoy Gateway Backend, but the Backend API is disabled and the EnvoyProxy is shared.
-# So this namespace runs a small TLS bridge: Envoy talks TLS to nginx (own certificate, trusted via the
-# BackendTLSPolicy), nginx talks TLS 1.3 to Keycloak with the system CAs.
-# Values: eduide-control-plane.oidc.providerBackendRefs: [{name: keycloak-egress, port: 443}]
+{{- if .Values.oidcBridge.enabled }}
+{{- $host := (urlParse (required "eduide-control-plane.config.oidc.issuerURL is required for oidcBridge" (index .Values "eduide-control-plane").config.oidc.issuerURL)).host }}
+{{- $name := printf "%s-oidc-bridge" .Release.Name }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: keycloak-egress-selfsigned
+  name: {{ $name }}-selfsigned
 spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: keycloak-egress
+  name: {{ $name }}
 spec:
-  secretName: keycloak-egress-tls
-  dnsNames: [keycloak-test.aet.cit.tum.de]
+  secretName: {{ $name }}-tls
+  dnsNames: [{{ $host | quote }}]
   duration: 8760h
-  issuerRef: {name: keycloak-egress-selfsigned, kind: Issuer}
+  issuerRef: {name: {{ $name }}-selfsigned, kind: Issuer}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: keycloak-egress-nginx
+  name: {{ $name }}
 data:
   default.conf: |
     server {
       listen 8443 ssl;
-      server_name keycloak-test.aet.cit.tum.de;
+      server_name {{ $host }};
       ssl_certificate /tls/tls.crt;
       ssl_certificate_key /tls/tls.key;
       access_log off;
       location / {
-        proxy_pass https://keycloak-test.aet.cit.tum.de;
+        proxy_pass https://{{ $host }};
         proxy_ssl_server_name on;
-        proxy_ssl_name keycloak-test.aet.cit.tum.de;
+        proxy_ssl_name {{ $host }};
         proxy_ssl_verify on;
         proxy_ssl_verify_depth 3;
         proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
-        proxy_set_header Host keycloak-test.aet.cit.tum.de;
+        proxy_set_header Host {{ $host }};
       }
     }
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: keycloak-egress
-  labels: {app.kubernetes.io/name: keycloak-egress}
+  name: {{ $name }}
+  labels: {app.kubernetes.io/name: oidc-bridge, app.kubernetes.io/instance: {{ .Release.Name }}}
 spec:
-  replicas: 2
+  replicas: {{ .Values.oidcBridge.replicas }}
   selector:
-    matchLabels: {app.kubernetes.io/name: keycloak-egress}
+    matchLabels: {app.kubernetes.io/name: oidc-bridge, app.kubernetes.io/instance: {{ .Release.Name }}}
   template:
     metadata:
-      labels: {app.kubernetes.io/name: keycloak-egress}
+      labels: {app.kubernetes.io/name: oidc-bridge, app.kubernetes.io/instance: {{ .Release.Name }}}
+      annotations:
+        checksum/config: {{ $host | sha256sum | trunc 16 }}
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -65,7 +63,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: nginx
-          image: nginxinc/nginx-unprivileged:1.29-alpine
+          image: {{ .Values.oidcBridge.image }}
           ports:
             - {name: tls, containerPort: 8443}
           readinessProbe:
@@ -81,38 +79,39 @@ spec:
             - {name: tls, mountPath: /tls, readOnly: true}
       volumes:
         - name: conf
-          configMap: {name: keycloak-egress-nginx}
+          configMap: {name: {{ $name }}}
         - name: tls
-          secret: {secretName: keycloak-egress-tls}
+          secret: {secretName: {{ $name }}-tls}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: keycloak-egress
+  name: {{ $name }}
 spec:
-  selector: {app.kubernetes.io/name: keycloak-egress}
+  selector: {app.kubernetes.io/name: oidc-bridge, app.kubernetes.io/instance: {{ .Release.Name }}}
   ports:
     - {name: tls, port: 443, targetPort: 8443}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: BackendTLSPolicy
 metadata:
-  name: keycloak-egress
+  name: {{ $name }}
 spec:
   targetRefs:
-    - {group: "", kind: Service, name: keycloak-egress}
+    - {group: "", kind: Service, name: {{ $name }}}
   validation:
-    hostname: keycloak-test.aet.cit.tum.de
+    hostname: {{ $host | quote }}
     caCertificateRefs:
-      - {group: "", kind: Secret, name: keycloak-egress-tls}
+      - {group: "", kind: Secret, name: {{ $name }}-tls}
 ---
+# Only the Envoy proxies reach the bridge.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: keycloak-egress-from-envoy
+  name: {{ $name }}-from-envoy
 spec:
   podSelector:
-    matchLabels: {app.kubernetes.io/name: keycloak-egress}
+    matchLabels: {app.kubernetes.io/name: oidc-bridge, app.kubernetes.io/instance: {{ .Release.Name }}}
   policyTypes: [Ingress]
   ingress:
     - from:
@@ -122,3 +121,4 @@ spec:
             matchLabels: {app.kubernetes.io/name: envoy}
       ports:
         - {port: 8443}
+{{- end }}
