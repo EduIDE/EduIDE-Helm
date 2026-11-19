@@ -84,7 +84,8 @@ eduide-control-plane:
     podMonitor: {enabled: true}
     # stud routes EduIDE alerts through the AlertmanagerConfig in eduide-system (namespace matcher).
     rules: {enabled: true, extraLabels: {namespace: eduide-system}}
-    dashboard: {enabled: true}
+    # Grafana on stud only reads dashboards from cattle-dashboards (approved by the environment owner, MON-07).
+    dashboard: {enabled: true, namespace: cattle-dashboards}
   oidc:
     # Created separately, see README.md.
     clientSecretName: eduide-oidc
