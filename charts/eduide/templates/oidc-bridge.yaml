@@ -64,13 +64,17 @@ spec:
       containers:
         - name: nginx
           image: {{ .Values.oidcBridge.image }}
+          # nginx starts one worker per node CPU by default, which exceeds the memory limit on big nodes
+          # (256 CPUs on parma); the entrypoint sizes the workers from the CPU limit instead.
+          env:
+            - {name: NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE, value: "1"}
           ports:
             - {name: tls, containerPort: 8443}
           readinessProbe:
             tcpSocket: {port: 8443}
           resources:
             requests: {cpu: 5m, memory: 16Mi}
-            limits: {memory: 64Mi}
+            limits: {cpu: "1", memory: 64Mi}
           securityContext:
             allowPrivilegeEscalation: false
             capabilities: {drop: [ALL]}

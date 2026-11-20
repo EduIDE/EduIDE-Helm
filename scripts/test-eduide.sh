@@ -80,6 +80,8 @@ iss_host=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --show
 [ "$(yq -N 'select(.kind == "BackendTLSPolicy") | .spec.validation.hostname' <<<"$br")" = "$iss_host" ] || fail "BackendTLSPolicy hostname is not the issuer host"
 grep -q "proxy_pass https://$iss_host;" <<<"$br" || fail "bridge does not proxy to the issuer host"
 [ "$(yq -N 'select(.kind == "NetworkPolicy" and .metadata.name == "r-oidc-bridge-from-envoy") | .spec.ingress[0].ports[0].port' <<<"$br")" = 8443 ] || fail "bridge NetworkPolicy missing"
+# One nginx worker per node CPU blew the memory limit on a 256-CPU node: workers follow the CPU limit.
+[ "$(yq -N 'select(.kind == "Deployment" and .metadata.name == "r-oidc-bridge") | .spec.template.spec.containers[0] | (.env[] | select(.name == "NGINX_ENTRYPOINT_WORKER_PROCESSES_AUTOTUNE") | .value) + "/" + .resources.limits.cpu' <<<"$br")" = "1/1" ] || fail "bridge workers are not bound to its CPU limit"
 ! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'oidc-bridge' || fail "oidcBridge renders while disabled"
 ok "oidcBridge"
 
