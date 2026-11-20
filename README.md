@@ -22,7 +22,7 @@ helm install eduide oci://ghcr.io/eduide/charts/eduide \
 
 Both charts always carry the same version. Take `<chart version>` from the
 [releases page](https://github.com/EduIDE/EduIDE-Helm/releases); pass a
-prerelease such as `3.0.0-rc.9` explicitly, because `helm` skips prereleases
+prerelease such as `3.0.0-rc.10` explicitly, because `helm` skips prereleases
 otherwise. `docs/charts.md` explains why the split exists.
 
 **Never upgrade `eduide-cluster` on a cluster that still runs a 2.x Theia Cloud
