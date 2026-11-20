@@ -12,8 +12,10 @@ outright - the CRD permits envoyDeployment or envoyDaemonSet, never both - an
 HPA already owns the field, and a `Host` provider has no Deployment to scale.
 `type` comes along with the default because the CRD requires it as soon as
 `provider` exists at all, and a spec of `{}` is a valid install.
+
+mergeGateways defaults to true so every EduIDE deployment's Gateway shares one data plane.
 */}}
-{{- $spec := deepCopy (default (dict) .Values.envoyProxy.spec) }}
+{{- $spec := mergeOverwrite (dict "mergeGateways" true) (deepCopy (default (dict) .Values.envoyProxy.spec)) }}
 {{- $kubernetes := default (dict) (dig "provider" "kubernetes" (dict) $spec) }}
 {{- $onKubernetes := eq (dig "provider" "type" "Kubernetes" $spec) "Kubernetes" }}
 {{- $ownsReplicas := or (hasKey $kubernetes "envoyDaemonSet") (hasKey $kubernetes "envoyHpa") }}

@@ -21,13 +21,12 @@ cluster and belong to different people: Bonn and Mannheim both live on the
 gets a sub-route matching those namespaces, and first match wins.
 
 **Anything not claimed by a scoped channel goes to every channel.** The
-top-level receiver holds all of them deliberately. Cluster-scoped alerts - the
-conversion webhook being down, a certificate about to expire - are not about any
+top-level receiver holds all of them deliberately. Cluster-scoped alerts, such as a certificate about to expire, are not about any
 one tenant's namespace, and dropping them because they failed to match a tenant
 route would silently lose exactly the alerts that matter most.
 
 **Only warning and above is notified.** Everything fires and is visible in
-Alertmanager and on the dashboards, but the channels get a filtered subset. A
+Alertmanager, but the channels get a filtered subset. A
 channel that receives every capacity blip stops being read, and then the
 platform is unmonitored no matter how many rules exist.
 */}}

@@ -1,8 +1,13 @@
 apiVersion: v2
 name: eduide-cluster
 description: |
-  Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
-  cert-manager issuers. Install once per cluster, before any eduide release.
+  Cluster-scoped half of EduIDE 3.0: the control plane CRDs, the cluster identity marker and,
+  optionally, the Envoy Gateway GatewayClass and EnvoyProxy and cluster alerting.
+  Install once per cluster, before any eduide release.
 type: application
-version: 3.0.0
-appVersion: "2.0.0"
+version: 3.0.0-rc.9
+appVersion: "3.0.0-rc.9"
+dependencies:
+  - name: eduide-control-plane-crds
+    version: "0.2.0"
+    repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"

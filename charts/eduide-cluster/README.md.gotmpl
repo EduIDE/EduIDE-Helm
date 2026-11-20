@@ -5,6 +5,25 @@
 
 {{ template "chart.description" . }}
 
+## Install and upgrade notes
+
+Install once per cluster, before any `eduide` release:
+
+```sh
+helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
+  --version {{ template "chart.version" . }} -n eduide-system --create-namespace
+```
+
+The chart carries the control plane CRDs (`eduide-control-plane-crds`), the cluster identity ConfigMap `eduide-system/eduide-cluster-identity` (set `clusterName`) and, optionally, the Envoy Gateway GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`; `mergeGateways` defaults to true) and cert-manager alerting.
+Gateways, certificates and issuers belong to the `eduide` release of each deployment.
+
+**Do not upgrade this chart on a cluster that still runs a 2.x (Theia Cloud) installation.**
+Version 3 no longer ships the Theia CRDs, so Helm would delete them and with them every Theia Cloud session and workspace.
+The chart looks up the CRD `appdefinitions.theia.cloud` and fails the install or upgrade with a clear message when it exists.
+Set `allowRemovingTheiaCloud: true` only when the old installation is gone or should be destroyed.
+The check needs a cluster: `helm template` has no `lookup` and never trips it.
+To run 3.x next to 2.x, use a separate cluster, or install `eduide-control-plane-crds` alone and leave this chart on the 2.x release line.
+
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
 

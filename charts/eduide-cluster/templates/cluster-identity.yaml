@@ -1,0 +1,11 @@
+{{- if .Values.clusterName }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eduide-cluster-identity
+  namespace: eduide-system
+  labels:
+    app.kubernetes.io/part-of: eduide
+data:
+  clusterName: {{ .Values.clusterName | quote }}
+{{- end }}

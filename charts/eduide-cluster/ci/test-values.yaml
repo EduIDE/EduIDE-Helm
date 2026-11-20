@@ -1,0 +1,14 @@
+clusterName: ci
+gatewayClass: {create: true}
+envoyProxy: {create: true}
+monitoring:
+  enabled: true
+  certManager: {enabled: true}
+  alerting:
+    enabled: true
+    channels:
+      - {name: platform, type: slack, secretKey: slack-platform, channel: "#alerts"}
+      - {name: team, type: discord, secretKey: discord-team, environments: [eduide-team]}
+    webhookSecret:
+      create: true
+      data: {slack-platform: eA==, discord-team: eQ==}
