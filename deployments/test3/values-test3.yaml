@@ -1,4 +1,4 @@
-# EXPERIMENTAL: test deployment "test3" of the Go control plane on cluster stud, namespace eduide-test3.
+# Test deployment "test3" of the Go control plane on cluster stud, namespace eduide-test3.
 # Install steps are in README.md. The image tags pr-<N> are placeholders the deployer sets.
 # The anchors state hosts and gateway once for both subcharts.
 

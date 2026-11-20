@@ -1,21 +1,26 @@
 #!/usr/bin/env bash
-# Lints and renders charts/eduide-go with the test3 and CI values and checks the rules that must hold.
-# The subcharts are not published yet: CP_CHARTS points at a checkout of EduIDE-control-plane/charts
-# and the dependencies are rewritten to file:// in a temp copy. Needs helm and yq (mikefarah).
+# Lints and renders charts/eduide and charts/eduide-cluster with the CI and test3 values and checks the rules that must hold.
+# Dependencies come from the published OCI repository. CP_CHARTS points at a checkout of
+# EduIDE-control-plane/charts to test against unreleased subcharts: the dependencies are then
+# rewritten to file:// in a temp copy. Needs helm and yq (mikefarah).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-CP_CHARTS=${CP_CHARTS:-../../EduIDE-control-plane/charts}
-CP_CHARTS=$(cd "$CP_CHARTS" && pwd)
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ok() { echo "ok: $*"; }
 
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-cp -R charts/eduide-go "$tmp/eduide-go"
-for d in eduide-control-plane eduide-landing-page; do
-  yq -i '(.dependencies[] | select(.name == "'$d'") | .repository) = "file://'"$CP_CHARTS/$d"'"' "$tmp/eduide-go/Chart.yaml"
-done
-helm dependency update "$tmp/eduide-go" >/dev/null
-chart="$tmp/eduide-go"
+cp -R charts/eduide "$tmp/eduide"
+cp -R charts/eduide-cluster "$tmp/eduide-cluster"
+rm -rf "$tmp"/eduide/charts "$tmp"/eduide-cluster/charts
+if [ -n "${CP_CHARTS:-}" ]; then
+  CP_CHARTS=$(cd "$CP_CHARTS" && pwd)
+  for c in eduide:eduide-control-plane eduide:eduide-landing-page eduide-cluster:eduide-control-plane-crds; do
+    yq -i '(.dependencies[] | select(.name == "'${c#*:}'") | .repository) = "file://'"$CP_CHARTS/${c#*:}"'"' "$tmp/${c%%:*}/Chart.yaml"
+  done
+fi
+for c in eduide eduide-cluster; do helm dependency update "$tmp/$c" >/dev/null || fail "helm dependency update $c"; done
+chart="$tmp/eduide"
+cluster="$tmp/eduide-cluster"
 
 for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   helm lint "$chart" -f "$v" -n eduide-test3 >/dev/null || fail "helm lint -f $v"
@@ -81,4 +86,37 @@ ok "oidcBridge"
 # Mismatching landing page host must be refused.
 if helm template r "$chart" -f "$chart/ci/test-values.yaml" --set eduide-landing-page.host=other.example.org >/dev/null 2>&1; then fail "landing page host mismatch accepted"; fi
 ok "host mismatch refused"
-echo "all eduide-go checks passed"
+
+# The IDE image tag follows the chart appVersion unless a deployment or a template says otherwise.
+app=$(yq .appVersion "$chart/Chart.yaml")
+tags=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | yq -N 'select(.kind == "IDETemplate") | .spec.image' | sed 's/.*://' | sort -u)
+[ "$tags" = "$app" ] || fail "default image tag is '$tags', want appVersion $app"
+[ "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set images.tag=pr-1 | yq -N 'select(.kind == "IDETemplate") | .spec.image' | sed 's/.*://' | sort -u)" = pr-1 ] || fail "images.tag override ignored"
+ok "image tag defaults to appVersion $app"
+
+# --- eduide-cluster ---
+helm lint "$cluster" -f "$cluster/ci/test-values.yaml" >/dev/null || fail "helm lint eduide-cluster"
+co=$(helm template c "$cluster" -n eduide-system -f "$cluster/ci/test-values.yaml") || fail "helm template eduide-cluster"
+[ "$(yq -N 'select(.kind == "CustomResourceDefinition") | .metadata.name' <<<"$co" | wc -l)" -eq 4 ] || fail "expected the 4 control plane CRDs"
+! grep -q 'theia' <<<"$co" || fail "Theia Cloud leftovers in the cluster chart"
+[ "$(yq -N 'select(.kind == "ConfigMap" and .metadata.name == "eduide-cluster-identity") | .metadata.namespace + "/" + .data.clusterName' <<<"$co")" = "eduide-system/ci" ] || fail "cluster identity ConfigMap"
+[ "$(yq -N 'select(.kind == "EnvoyProxy") | .spec.mergeGateways' <<<"$co")" = true ] || fail "EnvoyProxy does not default mergeGateways to true"
+[ "$(yq -N 'select(.kind == "GatewayClass") | .metadata.name' <<<"$co")" = envoy ] || fail "GatewayClass missing"
+[ "$(helm template c "$cluster" -n eduide-system -f "$cluster/ci/test-values.yaml" --set envoyProxy.spec.mergeGateways=false | yq -N 'select(.kind == "EnvoyProxy") | .spec.mergeGateways')" = false ] || fail "EnvoyProxy spec cannot override mergeGateways"
+[ "$(yq -N 'select(.kind == "EnvoyProxy") | .spec.provider.kubernetes.envoyDeployment.replicas' <<<"$co")" = 1 ] || fail "EnvoyProxy replicas default"
+ok "eduide-cluster: CRDs, identity, GatewayClass, EnvoyProxy, no Theia Cloud"
+
+# The guard must refuse a cluster that still has the Theia Cloud CRDs. lookup is empty in helm template, so the
+# test wrapper chart swaps it for a value; the real template is included unchanged.
+mkdir -p "$tmp/guard/templates"
+printf 'apiVersion: v2\nname: guard\nversion: 0.0.0\n' > "$tmp/guard/Chart.yaml"
+cp "$cluster/templates/_helpers.tpl" "$tmp/guard/templates/_helpers.tpl"
+printf '{{- include "eduide-cluster.theiaGuard" (dict "found" .Values.found "allow" .Values.allowRemovingTheiaCloud) }}\n' > "$tmp/guard/templates/guard.yaml"
+if helm template g "$tmp/guard" --set found=true >/dev/null 2>&1; then fail "guard accepted a cluster with Theia Cloud CRDs"; fi
+msg=$(helm template g "$tmp/guard" --set found=true 2>&1 || true)
+grep -q 'allowRemovingTheiaCloud' <<<"$msg" || fail "guard message does not name the override"
+helm template g "$tmp/guard" --set found=true --set allowRemovingTheiaCloud=true >/dev/null || fail "guard ignores allowRemovingTheiaCloud"
+helm template g "$tmp/guard" --set found=false >/dev/null || fail "guard fails on a clean cluster"
+grep -q 'appdefinitions.theia.cloud' "$cluster/templates/theia-guard.yaml" || fail "guard template does not look up appdefinitions.theia.cloud"
+ok "Theia Cloud CRD guard"
+echo "all eduide checks passed"

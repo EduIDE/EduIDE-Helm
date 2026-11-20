@@ -1,18 +1,21 @@
-# test3 (EXPERIMENTAL)
+# test3
 
-Go control plane on cluster `stud`, namespace `eduide-test3`. Values: `values-test3.yaml`.
+Example deployment of the 3.x charts: Go control plane on cluster `stud`, namespace `eduide-test3`. Values: `values-test3.yaml`.
 Set the `pr-<N>` image tags in the values (or with `--set`) before installing.
 Run everything from the repository root. Never use another kube context.
 
 ## 1. CRDs (once per cluster)
 
+Install `eduide-cluster` (it carries the CRDs through its `eduide-control-plane-crds` dependency), or the CRD chart alone:
+
 ```bash
 helm upgrade --install eduide-control-plane-crds \
   oci://ghcr.io/eduide/eduide-control-plane/charts/eduide-control-plane-crds \
-  --version 0.1.0 --kube-context stud
+  --version 0.2.0 --kube-context stud
 ```
 
-The CRDs are cluster wide and additive; install this chart before any deployment chart.
+The CRDs are cluster wide and additive; install them before any deployment chart.
+The stud cluster still runs Theia Cloud, so use the CRD chart there: `eduide-cluster` refuses to install next to the Theia CRDs.
 
 ## 2. Namespace
 
@@ -35,12 +38,12 @@ kubectl --context stud -n eduide-test1 get secret service-config-secret \
 
 ```bash
 helm upgrade --install eduide \
-  oci://ghcr.io/eduide/eduide-control-plane/charts/eduide-go \
-  --version 0.1.0 --kube-context stud -n eduide-test3 \
+  oci://ghcr.io/eduide/charts/eduide \
+  --version 3.0.0-rc.9 --kube-context stud -n eduide-test3 \
   -f deployments/test3/values-test3.yaml
 ```
 
-Until `eduide-go` is published, package it locally (`helm dependency update charts/eduide-go`) and pass the path.
+To test an unreleased chart, run `helm dependency update charts/eduide` and pass `charts/eduide` instead of the OCI reference.
 `helm template` renders without a cluster. Add `--wait` only after the images exist.
 
 ## Checks

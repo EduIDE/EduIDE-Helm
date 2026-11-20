@@ -1,68 +1,83 @@
-{{- if and .Values.gateway.enabled .Values.gateway.create }}
-{{- /*
-This is the per-namespace Gateway, not the shared one. Its HTTPS listeners name
-three Secrets that neither chart creates, so unless you have made them yourself
-the listeners never program and the only symptom is a TLS failure in a browser.
-Refuse to render rather than hand over something that applies cleanly and does
-not work.
-*/}}
-{{- if and .Values.gateway.tls (not .Values.gateway.acknowledgeManualCertificates) }}
-{{- fail (printf "gateway.create is true with TLS, which needs the Secrets %q, %q and %q to already exist in namespace %q - no chart creates them. Either use the shared Gateway (gateway.create=false plus gateway.parentRefs, the supported path), or create those three Secrets and set gateway.acknowledgeManualCertificates=true."
-      "ws-cert-secret" "service-cert-secret" "landing-page-cert-secret" .Release.Namespace) }}
-{{- end }}
+{{- if .Values.gateway.create }}
+{{- $h := include "eduide.hosts" . | fromYaml }}
+{{- $gw := include "eduide.gatewayName" . }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ .Values.gateway.name }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ $gw }}
+  annotations:
+    {{- include "eduide.issuerAnnotations" . | nindent 4 }}
+    {{- with .Values.gateway.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
-  gatewayClassName: {{ .Values.gateway.className }}
+  gatewayClassName: {{ required "gateway.className is required" .Values.gateway.className }}
   listeners:
-  {{- if .Values.gateway.tls }}
-  - name: https-instances
+  {{- range $role := list "service" "instance" "webview" }}
+  - name: https-{{ $role }}
     protocol: HTTPS
-    port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ include "theia-cloud.host.instance" . }}
+    port: 443
+    hostname: {{ index $h $role | quote }}
     tls:
       mode: Terminate
       certificateRefs:
-      - kind: Secret
-        name: ws-cert-secret
-  - name: https-service
-    protocol: HTTPS
-    port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ include "theia-cloud.host.service" . }}
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - kind: Secret
-        name: service-cert-secret
-  {{- if .Values.landingPage.enabled }}
-  - name: https-landing
-    protocol: HTTPS
-    port: {{ .Values.gateway.httpsPort }}
-    hostname: {{ include "theia-cloud.host.landing" . }}
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - kind: Secret
-        name: landing-page-cert-secret
+      - {kind: Secret, name: {{ printf "%s-%s-tls" $gw $role }}}
+    allowedRoutes:
+      namespaces: {from: Same}
   {{- end }}
-  {{- range $wildcard := .Values.hosts.allWildcardInstances }}
-  - name: {{ include "theia-cloud.gateway.wildcardListenerName" (dict "wildcard" $wildcard) }}
-    protocol: HTTPS
-    port: {{ $.Values.gateway.httpsPort }}
-    hostname: {{ printf "%s%s" (tpl $wildcard $) (include "theia-cloud.host.instance" $) | quote }}
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - kind: Secret
-        name: {{ if hasKey $.Values.gateway.instancesWildcardSecretNames $wildcard }}{{ tpl (get $.Values.gateway.instancesWildcardSecretNames $wildcard) $ | quote }}{{ else }}ws-cert-secret{{ end }}
-  {{- end }}
-  {{- end }}
-  {{- if .Values.gateway.httpEnabled }}
-  - name: http
+  {{- range $role := list "service" "instance" "webview" }}
+  - name: http-{{ $role }}
     protocol: HTTP
-    port: {{ .Values.gateway.httpPort }}
+    port: 80
+    hostname: {{ index $h $role | quote }}
+    allowedRoutes:
+      namespaces: {from: Same}
   {{- end }}
+---
+# Plain HTTP redirects to HTTPS. cert-manager HTTP01 challenge routes match the exact path
+# /.well-known/acme-challenge/<token>, which wins over the PathPrefix / below.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $gw }}-https-redirect
+spec:
+  parentRefs:
+  {{- range $role := list "service" "instance" "webview" }}
+  - {group: gateway.networking.k8s.io, kind: Gateway, name: {{ $gw }}, sectionName: http-{{ $role }}}
+  {{- end }}
+  hostnames:
+  {{- range $role := list "service" "instance" "webview" }}
+  - {{ index $h $role | quote }}
+  {{- end }}
+  rules:
+  - matches:
+    - path: {type: PathPrefix, value: /}
+    filters:
+    - type: RequestRedirect
+      requestRedirect:
+        scheme: https
+        statusCode: 301
+{{- end }}
+{{- if .Values.issuer.create }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Values.issuer.name }}
+spec:
+  acme:
+    server: {{ .Values.issuer.acme.server | quote }}
+    email: {{ required "issuer.acme.email is required" .Values.issuer.acme.email | quote }}
+    privateKeySecretRef:
+      name: {{ .Values.issuer.name }}-account-key
+    solvers:
+    - http01:
+        gatewayHTTPRoute:
+          parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: Gateway
+            name: {{ include "eduide.gatewayName" . }}
+            {{- if not .Values.gateway.create }}
+            namespace: {{ (index .Values "eduide-control-plane").config.gateway.namespace | default .Release.Namespace }}
+            {{- end }}
 {{- end }}
