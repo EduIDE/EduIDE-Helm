@@ -47,8 +47,8 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
   [ "$(d '.kind == "NetworkPolicy"' | wc -l)" -ge 3 ] || fail "NetworkPolicies missing"
   [ "$(d '.kind == "SecurityPolicy"' | wc -l)" -eq 1 ] || fail "SecurityPolicy missing"
   [ "$(d '.kind == "IDETemplate"' | wc -l)" -ge 1 ] || fail "IDETemplate missing"
-  [ "$(d '.kind == "IDEPool"' | wc -l)" -eq 1 ] || fail "expected one IDEPool (java-17)"
-  [ "$(d '.kind == "IDEPool"' | yq -p=json '.spec | has("targetIdle")')" = false ] || fail "IDEPool renders targetIdle, which the pool scaler owns"
+  [ "$(d '.kind == "IDEPool"' | wc -l)" -ge 1 ] || fail "IDEPool missing"
+  [ "$(d '.kind == "IDEPool"' | yq -N -p=json '.spec | has("targetIdle")' | sort -u)" = false ] || fail "IDEPool renders targetIdle, which the pool scaler owns"
   keys=$(d '.kind == "IDETemplate" and .metadata.name == "java-17"' | yq -p=json '[.spec.injectableKeys[].name] | join(",")')
   [ "$keys" = "GIT_URI,ARTEMIS_URL,ARTEMIS_TOKEN,TEMPLATE,GIT_USER,GIT_MAIL" ] || fail "injectable keys: $keys"
   grep -q 'name: webview\|webview\.' <<<"$out" || fail "webview host missing in render"
@@ -59,6 +59,14 @@ done
 [ "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -c 'allowCredentials')" -eq 0 ] || fail "allowCredentials set by default"
 [ "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set templateDefaults.gitUriAllowCredentials=true | yq -N 'select(.kind == "IDETemplate") | .spec.injectableKeys[] | select(.allowCredentials == true) | .name' | sort -u)" = GIT_URI ] || fail "gitUriAllowCredentials does not set allowCredentials on GIT_URI only"
 ok "gitUriAllowCredentials"
+
+# The landing page offers only listed templates: the artemis editions are unlisted, the standalone ones keep the
+# CRD default (listed), and a deployment can override either.
+lv="$tmp/listed-values.yaml"
+printf 'templates:\n  java-17-standalone: {}\n  c: {listed: true}\n' > "$lv"
+lo=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -f "$lv" -n ns | yq -N 'select(.kind == "IDETemplate") | .metadata.name + "=" + (.spec.listed | tostring)' | sort | paste -sd, -)
+[ "$lo" = "c=true,java-17-standalone=,java-17=false" ] || fail "listed: $lo"
+ok "listed (artemis editions unlisted, standalone listed, overridable)"
 
 # The OIDC bridge follows the issuer host and only Envoy may reach it.
 br=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set oidcBridge.enabled=true) || fail "render with oidcBridge"

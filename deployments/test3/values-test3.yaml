@@ -42,6 +42,14 @@ templateDefaults:
   gitUriAllowCredentials: true
 
 templates:
+  # The landing page offers the standalone editions; Artemis links start the unlisted artemis editions below.
+  java-17-standalone:
+    tag: pr-241@sha256:b07bc23a5abbb72ab455173a8160d697884520e02e7ee38de74e43177e7c9d72
+    pool: {minIdle: 1, maxInstances: 5}
+  java-25-standalone:
+    tag: pr-241@sha256:c95988f2d5da5bcdeb322410a80a2ebdb1024d26a5cb1ea62e9412258e583164
+  c-standalone:
+    tag: pr-241@sha256:f25aabe5e78eacfff0a59f2df84e86d86ac5c31102af597424c9f64cff84896d
   java-17:
     tag: pr-241@sha256:a16ce059fadfa59f8a50563673b28aff9080a6e9ba0122a7af5d82e5dba39c58
     pool: {minIdle: 1, maxInstances: 5}
@@ -56,7 +64,7 @@ oidcBridge:
 
 eduide-control-plane:
   image:
-    tag: sha-c57925d # EduIDE-control-plane#18 (audit fixes)
+    tag: pr-19 # EduIDE-control-plane#19 (listed templates, on main with the #18 audit fixes)
   # Pool scaler (POOL-18), active with tight limits so the shared cluster is not loaded.
   poolScaler:
     enabled: true
@@ -65,6 +73,7 @@ eduide-control-plane:
       prometheus: {url: http://rancher-monitoring-prometheus.cattle-monitoring-system:9090}
       poolLimits:
         java-17: {floor: 1, ceiling: 4}
+        java-17-standalone: {floor: 1, ceiling: 4}
   config:
     deployment: test3
     hosts: *hosts
@@ -124,7 +133,7 @@ eduide-landing-page:
     privacy:
       url: https://example.org/privacy
   image:
-    tag: sha-c57925d # EduIDE-control-plane#18 (audit fixes, landing page)
+    tag: pr-19 # EduIDE-control-plane#19 (listed templates, landing page)
   host: test3.eduide.student.k8s.aet.cit.tum.de
   gateway: *gateway
   config:

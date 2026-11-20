@@ -63,42 +63,82 @@ templateDefaults:
   # Scorpio reads launch data through the eduide-session extension (the old operator set this per pod).
   - {name: SCORPIO_THEIA_ENV_STRATEGY, value: data-bridge}
 
-# IDE images EduIDE releases (Artemis editions). buildSystems feeds the TEMPLATE key.
+# IDE images EduIDE releases. buildSystems feeds the TEMPLATE key.
+# listed: whether the landing page offers the template as a start tile. Unlisted templates still launch by
+# name through the API and Artemis links, so Artemis starts the artemis editions and students pick a standalone one.
 catalog:
   java-17:
     displayName: Java 17
     image: eduide/java-17-artemis
     buildSystems: [maven, gradle]
     resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+    listed: false
   java-25:
     displayName: Java 25
     image: eduide/java-25-artemis
     buildSystems: [maven, gradle]
     resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+    listed: false
   python:
     displayName: Python
     image: eduide/python-artemis
     buildSystems: [python]
+    listed: false
   javascript:
     displayName: JavaScript
     image: eduide/javascript-artemis
     buildSystems: [node, web]
+    listed: false
   c:
     displayName: C
     image: eduide/c-artemis
     buildSystems: [make, bazel]
+    listed: false
   rust:
     displayName: Rust
     image: eduide/rust-artemis
     buildSystems: [cargo]
     resources: {limits: {memory: 3000M}}
+    listed: false
   go:
     displayName: Go
     image: eduide/go-artemis
     buildSystems: [go]
+    listed: false
+  java-17-standalone:
+    displayName: Java 17
+    image: eduide/java-17-standalone
+    buildSystems: [maven, gradle]
+    resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+  java-25-standalone:
+    displayName: Java 25
+    image: eduide/java-25-standalone
+    buildSystems: [maven, gradle]
+    resources: {requests: {cpu: 500m}, limits: {memory: 3000M}}
+  python-standalone:
+    displayName: Python
+    image: eduide/python-standalone
+    buildSystems: [python]
+  javascript-standalone:
+    displayName: JavaScript
+    image: eduide/javascript-standalone
+    buildSystems: [node, web]
+  c-standalone:
+    displayName: C
+    image: eduide/c-standalone
+    buildSystems: [make, bazel]
+  rust-standalone:
+    displayName: Rust
+    image: eduide/rust-standalone
+    buildSystems: [cargo]
+    resources: {limits: {memory: 3000M}}
+  go-standalone:
+    displayName: Go
+    image: eduide/go-standalone
+    buildSystems: [go]
 
 # Templates this deployment offers: catalog name -> overrides (merged over the catalog entry).
-# Keys: displayName, image, tag, port, resources, buildSystems, placement, pool {minIdle, maxInstances} (targetIdle is left to the pool scaler).
+# Keys: displayName, image, tag, port, resources, buildSystems, listed, placement, pool {minIdle, maxInstances} (targetIdle is left to the pool scaler).
 # An entry without a catalog match needs displayName and image.
 templates: {}
 # java-17:

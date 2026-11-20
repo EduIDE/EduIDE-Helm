@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - [eduide-go] EXPERIMENTAL new umbrella chart `charts/eduide-go` for the Go control plane (`eduide-control-plane`, `eduide-landing-page`, from [EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane)). It renders the Gateway with HTTPS listeners for the service, instance and fixed `webview.<instance>` hosts (no wildcard), an optional namespaced ACME Issuer, and the IDETemplates and IDEPools from a catalog. The CRD chart `eduide-control-plane-crds` stays a separate per-cluster install. `charts/eduide` and `charts/eduide-cluster` are unchanged. First deployment: `deployments/test3`
+- [eduide-go] The catalog holds both IDE editions: `<lang>` is the artemis edition and unlisted (`listed: false`), `<lang>-standalone` is the standalone edition and listed. The landing page offers only listed templates as start tiles; Artemis links and the API still start every template by name. Set `listed` per template to change it. Needs the `listed` field of EduIDE-control-plane (IDETemplate CRD and REST API). test3 offers `java-17-standalone`, `java-25-standalone` and `c-standalone`
 
 Security fixes from the internal security audit 2026-11-16 (CL-07, CL-08, CL-10, I-01). The service changes need an EduIDE-Cloud release that contains the matching service fixes.
 
