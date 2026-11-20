@@ -1,4 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>EduIDE/.github:renovate-config"]
+  "extends": ["local>EduIDE/.github:renovate-config"],
+  "packageRules": [
+    {
+      "description": "The control plane subcharts and the CRD chart are one release of EduIDE-control-plane",
+      "matchManagers": ["helmv3"],
+      "matchPackageNames": ["/eduide-control-plane/", "/eduide-landing-page/"],
+      "groupName": "eduide-control-plane charts"
+    }
+  ]
 }

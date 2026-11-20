@@ -1,7 +1,8 @@
-# AGENTS.md — EduIDE-Helm
+# AGENTS.md - EduIDE-Helm
 
-The Helm charts. This is the installable product: an administrator anywhere
-gets EduIDE from here.
+The Helm charts of EduIDE 3.0 on the Go control plane. This is the installable
+product: an administrator anywhere gets EduIDE from here. The Java (Theia Cloud)
+charts of 2.x live on the branch release/2.x.
 
 `CLAUDE.md` is a symlink to this file.
 
@@ -9,61 +10,56 @@ gets EduIDE from here.
 
 | Chart | Installed | Owns |
 |---|---|---|
-| `eduide-cluster` | once per **cluster** | CRDs, conversion webhook, ClusterRoles, cert-manager issuers |
-| `eduide` | once per **environment** | operator, REST service, landing page, routes |
+| `eduide-cluster` | once per **cluster** | control plane CRDs (dependency `eduide-control-plane-crds`), cluster identity ConfigMap, optional GatewayClass and EnvoyProxy, optional cert-manager alerting |
+| `eduide` | once per **deployment** | control plane and landing page (dependencies), Gateway, optional ACME Issuer, OIDC bridge, IDETemplates and IDEPools |
 
-Released together, same version. Environment values live in
-**EduIDE-deployment**, not here.
+Released together, same version. Deployment values live in
+**EduIDE-deployment**, not here; `deployments/test3` is an example.
 
 ## Before you change a template
 
 ```bash
+./scripts/resolve-deps.sh
 helm lint charts/eduide charts/eduide-cluster
-./scripts/render-envs.sh /tmp/out          # renders every real environment
+./scripts/test-eduide.sh        # CP_CHARTS=<EduIDE-control-plane>/charts for unreleased subcharts
 ```
 
-CI additionally renders the PR base and head and posts the diff. **For a pure
-refactor the expected result is an empty diff.** That is the acceptance
-criterion, not "it still lints".
+`scripts/test-eduide.sh` renders both charts with the CI and test3 values and
+asserts the rules below. CI also renders the PR base and head of every
+EduIDE-deployment environment whose `chartVersion` is 3.0.0-rc.9 or newer
+(`scripts/render-envs.sh`); until one moves to 3.x that diff is empty.
 
 ## Things that will catch you out
 
-**Do not release-prefix resource names.** The operator mounts
-`oauth2-proxy-config`, `oauth2-templates` and `oauth2-emails` **by literal name**
-into every session pod — see `AddedHandlerUtil.java:88` and
-`templateDeployment.yaml` in EduIDE-Cloud. Renaming them breaks every running
-session. One install is one namespace, so prefixing buys no collision
-protection anyway. Use `app.kubernetes.io/*` labels for grouping; they are
-additive on upgrade.
+**The Theia Cloud guard.** `charts/eduide-cluster/templates/theia-guard.yaml`
+fails an install or upgrade while the CRD `appdefinitions.theia.cloud` exists
+(a 2.x cluster), unless `allowRemovingTheiaCloud: true`. It protects every
+session and workspace of that cluster. `lookup` is empty under `helm template`;
+the logic is tested through a wrapper chart in `scripts/test-eduide.sh`. Never
+remove the guard.
 
-**CRDs are templates, not `crds/`.** Helm never upgrades anything in `crds/`,
-and these change most releases (`v1beta8` through `v1beta11`). They carry
-`helm.sh/resource-policy: keep` because deleting a CRD deletes every live
-Session, Workspace and AppDefinition on the cluster.
+**Three hostnames, no wildcard.** The `eduide` Gateway has HTTPS listeners for
+the service host, the instance host and `webview.<instance host>` and HTTP :80
+listeners for ACME. `charts/eduide/templates/validate.yaml` refuses a render where the two
+subcharts disagree on hosts, gateway or Keycloak client.
 
-**The conversion webhook belongs to the cluster chart.** A CRD names exactly
-one conversion service, so it cannot be a per-environment resource.
+**The IDE image tag follows `appVersion`.** `images.tag` is empty by default;
+a template's own `tag` wins over it. Never default it to `latest`.
 
-**Preloading must not be under `--wait`.** It pulls 14 multi-GB images on every
-node. Inside the main release it would time out and `--atomic` would roll back a
-healthy deploy.
+**`listed`.** The artemis editions (`<lang>`) are `listed: false`, the
+`<lang>-standalone` editions are listed. `listed` renders to
+`IDETemplate.spec.listed` and only hides the start tile; launches by name still
+work.
 
-**`hosts.usePaths` is gone.** Do not reintroduce path-based routing without
-wiring it through the Gateway API properly; it branched in seven files and no
-environment ever set it.
-
-**Host names come from the helpers.** `theia-cloud.host.{base,landing,service,instance}`
-and `theia-cloud.url.service` in `_helpers.tpl`. Before those existed the same
-two-line `printf` was re-derived inline in about a dozen places, each wrapped in
-`tpl (X | toString) .`.
+**`mergeGateways` defaults to true** in the EnvoyProxy of `eduide-cluster`, so
+all deployments of a cluster share one data plane.
 
 ## `lookup` makes rendering nondeterministic
 
-`theia-appdefinitions` preserves live scaling values and `theia-shared-cache`
-generates a Redis password when its lookup finds nothing. Both are correct, but
-`lookup` returns empty under `helm template`, so both are masked in
-`scripts/render-envs.sh`. **Add any new `lookup` to the mask list**, or
-render-diff fills with false changes and stops being read.
+`lookup` returns empty under `helm template`. Keep templates correct for both
+cases, and test the cluster-side behavior through a wrapper chart or a local
+kind cluster with an isolated `KUBECONFIG`. Never test against the default kube
+context.
 
 ## Releasing
 
@@ -82,116 +78,20 @@ and finally publishes the release, which creates the tag. Nothing releases on pu
   version. CI still checks that both charts carry the same version.
 - Chart READMEs are generated. Run helm-docs and commit the result; CI fails on
   drift.
-- `kubeconform` skips `HTTPRoute`: the CRDs-catalog schema declares
-  `minItems: 1` on `spec.rules`, but the upstream Gateway API CRD does not, and
-  `httproute-instances.yaml` deliberately omits the field. The operator does not
-  patch that route - it reads its `parentRefs` and `hostnames` and copies them
-  onto a new, Session-owned route per session.
+- The subchart versions (`eduide-control-plane`, `eduide-landing-page` and
+  `eduide-control-plane-crds`) must be the same release of EduIDE-control-plane.
 
 ## Renovate
 
-`renovate.json` is three lines: it extends `local>EduIDE/.github:renovate-config`,
-the org-wide preset. Policy changes belong there, not here. Nothing is
+`renovate.json` extends `local>EduIDE/.github:renovate-config`, the org-wide
+preset, and adds one rule that groups the control plane subcharts into one pull
+request. The `helmv3` manager reads the `dependencies:` blocks of
+`charts/eduide/Chart.yaml` and `charts/eduide-cluster/Chart.yaml`. Nothing is
 automerged.
 
-Three managers see this repo. `helmv3` reads the `dependencies:` block in
-`charts/eduide/Chart.yaml` and refreshes `charts/eduide/Chart.lock` with it.
-`helm-values` reads the image pins in `charts/eduide/values.yaml` and
-`charts/eduide-cluster/values.yaml`. A regex manager from the preset reads
-`versions.cloud` and `versions.landingPage` through their trailing
-`# renovate: datasource=github-releases depName=...` comment and proposes the
-latest release of that repository. Keep that comment on the same line, a comment
-above the key ends up in the helm-docs README. `versions.ide` stays empty and
-follows `appVersion`, which the release sets.
-
-Expect a Renovate pull request touching a chart to arrive **red**, and to need
-two things done by hand before it merges:
-
-- an entry under `## [Unreleased]` in `CHANGELOG.md`;
-- regenerated chart READMEs, because helm-docs renders both the dependency table
-  and the values defaults, so a bump of either drifts them.
-
-That is the intended shape while automerge is off: the bot proposes the version,
-a human takes the release decision.
-
-## eduide.apps is the single source of truth
-
-The `eduide.apps` helper merges `appDefinitions.catalog` (the images EduIDE
-officially releases) with `appDefinitions.apps` (an installation's own apps and
-overrides), then keeps the names `appDefinitions.enabled` lists, or all of them
-when it is empty. A name in `enabled` with no definition is skipped and
-`NOTES.txt` warns about it on install and upgrade.
-
-**The catalog holds only official releases.** Every image in EduIDE's build
-matrix that is meant for any installation, and nothing else: a custom build for
-one installation is defined in that installation's own `apps`. Every installation on chart defaults offers the
-whole catalog, production included, so adding an entry is a decision for all of
-them. `scripts/test-app-consistency.sh` writes the set out and fails when it
-changes.
-
-App names: no suffix is the Artemis edition (`java-17`, image `java-17-artemis`),
-`-standalone` the standalone one (`java-17-standalone`). Artemis stores the name
-per exercise, so the Artemis names never change. `buildSystems` ids must exist
-in the image (`scripts/fetch-image-templates.sh` reads the published image,
-`scripts/check-build-systems.sh` compares; `release.yml` runs both for a new
-chart version).
-
-Three things derive from that map, each through the helper: the AppDefinition
-custom resources, the app list the landing page offers, and the images the
-preloading DaemonSet pulls onto every node. **Never write a preload list, and never add an app in two places.**
-
-They used to be three hand-maintained lists across two repositories, the
-preload one addressed by array index, with production's list one shorter than
-test's. Production offered one app while preloading everything except it. `scripts/test-app-consistency.sh` asserts they agree and CI runs
-it; it also fails on any floating tag in a default render.
-
-## One version knob per source repository
-
-`versions.ide` (EduIDE), `versions.cloud` (EduIDE-Cloud), `versions.landingPage`
-(EduIDE-Landing-Page). `versions.ide` empty means the chart's `appVersion`, so
-`helm install --version X` with no overrides pins every image to that release.
-
-A deploy override names exactly one. Never set a blanket tag - a pull request
-only builds the images of the repo it came from, so the rest of the namespace
-goes into `ImagePullBackOff`.
-
-The three image values are plain strings rendered through `tpl`, so they can
-interpolate `.Values.versions.*` without any template change. Keep it that way:
-turning them into `{registry, repository, tag}` maps would break every values
-file for no gain.
-
-## The garbage collector image follows its chart version
-
-The garbage collector chart dependency (1.0.0 and later) pins its own versioned
-image through its appVersion, so this chart sets no `image.tag` for it. Bumping
-the dependency version in `charts/eduide/Chart.yaml` is the whole upgrade.
-
-## Dependency aliases must be lowercase
-
-An `alias:` becomes `.Chart.Name` inside the subchart, and charts build resource
-names and label values from it. `alias: sharedCache` rendered
-`sharedCache-redis`, which the API server rejects - RFC 1123 names are lowercase
-only, and `helm template` renders it happily. The dependencies are declared
-under their real names for that reason, so the values keys are
-`eduide-shared-cache:` and `theia-workspace-garbage-collector:`.
-`test-app-consistency.sh` checks every rendered name.
-
-## One expected warning from `helm template`
-
-```
-warning: cannot overwrite table with non table for eduide-shared-cache.gateway.parentRefs
-```
-
-Both this chart and the cache subchart have a top-level `gateway:` table, and
-this chart's `parentRefs` is a list where the subchart's is a map. Helm
-coalesces the parent's table down and says so. The subchart's map wins, its
-HTTPRoutes stay off, and only this chart's three routes render -
-`test-app-consistency.sh` asserts exactly that, so the day the behaviour
-changes it fails rather than quietly publishing routes for hostnames nobody
-configured.
-
-Do not parse `helm template` output with `2>&1`. That warning lands in the YAML
-and anything downstream reads it as a broken document.
+Expect a Renovate pull request touching a chart to arrive **red** until an entry
+under `## [Unreleased]` in `CHANGELOG.md` and regenerated chart READMEs are
+added by hand.
 
 ## Always resolve dependencies before touching a chart
 
@@ -201,35 +101,5 @@ used to. The cost is that a fresh checkout has none, and `helm template`,
 `helm package` and `helm dependency list` all refuse outright rather than
 degrading.
 
-That was rediscovered four times in one afternoon: the kubeconform job,
-`render-envs.sh`, `test-app-consistency.sh` and the PR preview publish. Call
-`scripts/resolve-deps.sh <chart>` first; every caller does.
-
-## Preflight checks must stay silent offline
-
-`helm template`, the render diff and CI all run without a cluster. A preflight
-that fires there breaks all three. `lookup` returns empty both offline and when
-the thing is genuinely missing, so it cannot tell them apart alone - look up the
-`kube-system` namespace first, and only check anything if that comes back.
-
-The earlier version keyed off `.Release.IsInstall`, which is true under
-`helm template` too. It went unnoticed because the define was never invoked from
-any template. Both are fixed; the includes are at the top of `operator.yaml`,
-which every install renders.
-
-## The oauth2 ConfigMaps are not gated on keycloak.enable
-
-They cannot be: the operator mounts `oauth2-proxy-config`, `oauth2-templates`
-and `oauth2-emails` into every session pod by literal name. So a chart left at
-the default `keycloak.authUrl` ships a live proxy pointed at
-`https://keycloak.url/auth/realms/TheiaCloud`, and sessions fail at the proxy
-instead of running unauthenticated.
-
-`eduide.preflightKeycloak` refuses to render on the placeholder values.
-An installation that genuinely has no identity provider yet sets
-`keycloak.allowUnauthenticated: true`.
-
-## `eduide-go` (experimental)
-
-`charts/eduide-go` is the umbrella for the Go control plane, separate from `eduide` and `eduide-cluster`. Its CRDs come from `eduide-control-plane-crds`, installed once per cluster before it. `scripts/test-eduide-go.sh` lints, renders and checks it against a checkout of EduIDE-control-plane (`CP_CHARTS`). `deployments/test3` holds the values of the first test deployment.
-The catalog has two entries per language: `<lang>` (artemis edition, `listed: false`, started by Artemis links) and `<lang>-standalone` (listed, offered as a start tile on the landing page). `listed` renders to `IDETemplate.spec.listed` and only hides the tile; launches by name still work.
+Call `scripts/resolve-deps.sh <chart>` first; every caller does. The
+dependencies are OCI charts from `oci://ghcr.io/eduide/eduide-control-plane/charts`.
