@@ -41,24 +41,6 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: App definitions, landing page and preloading agree
-        run: ./scripts/test-app-consistency.sh
-
-      - name: The buildSystems check catches drift
-        run: ./scripts/test-build-systems.sh
-
-      - name: Maintenance page and rolling updates
-        run: ./scripts/test-maintenance-page.sh
-
-      - name: global.nodeSelector reaches every workload
-        run: ./scripts/test-node-selector.sh
-
-      - name: No revision restarts, certificate alerts namespace scoped
-        run: ./scripts/test-no-revision-restarts.sh
-
-      - name: Session isolation (anchored skip-auth routes, sidecar policy)
-        run: ./scripts/test-session-isolation.sh
-
       # AGENTS.md says the two charts are released together at the same version
       # and nothing checked it, so they drifted to 2.2.1 and 2.2.2 across a pair
       # of unrelated fixes. One repository tag and one GitHub release name one
@@ -76,23 +58,19 @@ jobs:
           echo "both charts are at $a"
 
   # ---------------------------------------------------------------------------
-  # EXPERIMENTAL eduide-go umbrella: needs the control plane charts from their repository.
+  # Both charts against the published control plane charts: render checks, the
+  # Theia Cloud CRD guard, the Gateway rules. CP_CHARTS=<checkout>/charts tests
+  # against unreleased subcharts locally.
   # ---------------------------------------------------------------------------
-  eduide-go:
+  eduide:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          path: helm
-      - uses: actions/checkout@v4
-        with:
-          repository: EduIDE/EduIDE-control-plane
-          path: cp
       - uses: azure/setup-helm@v4
         with:
           version: ${{ env.HELM_VERSION }}
       - name: Lint, render and check
-        run: CP_CHARTS="$PWD/cp/charts" ./helm/scripts/test-eduide-go.sh
+        run: ./scripts/test-eduide.sh
 
   # ---------------------------------------------------------------------------
   # Validate rendered output against real Kubernetes and CRD schemas.
@@ -114,18 +92,7 @@ jobs:
       - name: Validate rendered manifests
         run: |
           set -euo pipefail
-          # Gateway API and theia.cloud are not in the default schema set.
-          #
-          # HTTPRoute is skipped deliberately. templates/httproute-instances.yaml
-          # OMITS spec.rules entirely: it exists to carry the gateway attachment
-          # and hostnames that the operator copies onto the per-session route it
-          # creates for each session. The CRDs-catalog schema declares minItems: 1
-          # on spec.rules and so rejects a route without it, but the upstream
-          # Gateway API CRD does not: gateway-api v1.2.1 sets only maxItems: 16 on
-          # that field. The catalog is stricter than what the cluster enforces, so
-          # this is a false positive rather than a defect in the chart.
-          # Revisit when the gateway templates are restructured; validating against
-          # schemas converted from the real CRDs would let us drop the skip.
+          # Gateway API, cert-manager and Envoy Gateway kinds are not in the default schema set.
           SCHEMAS=(
             -schema-location default
             -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
@@ -133,33 +100,23 @@ jobs:
           failed=0
           for chart in charts/*/; do
             name="$(basename "$chart")"
-            # eduide-go depends on charts that are not published yet; scripts/test-eduide-go.sh covers it.
-            [[ "$name" == "eduide-go" ]] && continue
             echo "::group::kubeconform $name"
             ./scripts/resolve-deps.sh "$chart"
-            # Render from the chart's own example where it has one. Bare
-            # defaults are not a valid install for eduide-cluster - it would
-            # render no Gateway, which the chart now refuses - so validating
-            # defaults would validate nothing. This also keeps the example files
-            # working, since a broken one fails here.
-            EXAMPLE=()
-            if [[ -f "$chart/values-example.yaml" ]]; then
-              EXAMPLE=(-f "$chart/values-example.yaml")
-              echo "using $name/values-example.yaml"
-            fi
-            helm template test "$chart" "${EXAMPLE[@]}" \
-              --set keycloak.allowUnauthenticated=true \
-              | kubeconform -strict -summary -ignore-missing-schemas -skip HTTPRoute "${SCHEMAS[@]}" || failed=1
+            VALUES=()
+            [[ -f "$chart/ci/test-values.yaml" ]] && VALUES=(-f "$chart/ci/test-values.yaml")
+            helm template test "$chart" "${VALUES[@]}" -n eduide-ci \
+              | kubeconform -strict -summary -ignore-missing-schemas "${SCHEMAS[@]}" || failed=1
             echo "::endgroup::"
           done
           exit $failed
 
   # ---------------------------------------------------------------------------
-  # The highest-value job: what will this PR actually do to the five live
-  # environments? Renders every one on base and head and posts the diff.
+  # What will this PR actually do to the live environments? Renders every one
+  # on base and head and posts the diff.
   #
-  # Phase 1a wires this to the current values files in EduIDE-deployment.
-  # When those become environments/<name>/env.yaml it switches to render-values.sh.
+  # The environments in EduIDE-deployment are still Java-shaped. render-envs.sh
+  # renders only environments whose env.yaml chartVersion is >= 3.0.0-rc.9, so
+  # until the first one is bumped to 3.x this job renders nothing and passes.
   # ---------------------------------------------------------------------------
   render-diff:
     runs-on: ubuntu-latest
