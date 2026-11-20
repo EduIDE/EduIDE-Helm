@@ -34,22 +34,22 @@ issuer:
 
 images:
   registry: ghcr.io/eduide
-  tag: pr-238 # EduIDE/EduIDE#238 builds the images with eduide-session
+  tag: pr-241 # EduIDE/EduIDE#241: slimmed images (main with #238 and #240)
 
-# Pinned by digest: the IDE image PR reuses the tag pr-238, and nodes keep cached images (IfNotPresent).
+# Pinned by digest: the IDE image PR reuses its tag pr-<N>, and nodes keep cached images (IfNotPresent).
 # All test3 templates are Artemis editions: Artemis sends the repository URL with the VCS token (Artemis#14702).
 templateDefaults:
   gitUriAllowCredentials: true
 
 templates:
   java-17:
-    tag: pr-238@sha256:c82273f318b631d6d0e5b8a731822d87a3295ec0cfa7467d9c0c5e52d275d742
+    tag: pr-241@sha256:a16ce059fadfa59f8a50563673b28aff9080a6e9ba0122a7af5d82e5dba39c58
     pool: {minIdle: 1, maxInstances: 5}
   c:
-    tag: pr-238@sha256:77e15e8af46a54c9e0aa2caec5ed726534a4e477e9f810ffd31ee6ffb8957c92
+    tag: pr-241@sha256:6d872f9df26b8434ddfa12aaf07eb7cffc67fba1299bdc531adfcd80f601ff4d
   # Java 25 for testing with Artemis.
   java-25:
-    tag: pr-238@sha256:e6255c1309865f62db226ae5e5c70f5379497871f1a53861a0dbb4be6b1a6f07
+    tag: pr-241@sha256:ee6805269b2fdf04805417b40d987e9b5d7311981bbb95821aa0ad7214389b89
 
 oidcBridge:
   enabled: true
