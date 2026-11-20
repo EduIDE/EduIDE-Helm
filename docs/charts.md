@@ -4,155 +4,70 @@ Two charts, released together with the same version.
 
 | Chart | Installed | Owns |
 |---|---|---|
-| `eduide-cluster` | once per **cluster** | CRDs, the conversion webhook, ClusterRoles, cert-manager issuers |
-| `eduide` | once per **environment** | operator, REST service, landing page, routes, config |
+| `eduide-cluster` | once per **cluster** | control plane CRDs, cluster identity ConfigMap, optional GatewayClass and EnvoyProxy, optional cert-manager alerting |
+| `eduide` | once per **deployment** (one namespace) | control plane, landing page, Gateway, optional ACME Issuer, OIDC bridge, IDETemplates and IDEPools |
 
 ```bash
 # once per cluster
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version <chart version> -n eduide-system --create-namespace
+  --version <chart version> -n eduide-system --create-namespace --set clusterName=<name>
 
-# once per environment
+# once per deployment
 helm install eduide oci://ghcr.io/eduide/charts/eduide \
-  --version <chart version> -n eduide-test1 -f my-values.yaml
+  --version <chart version> -n my-deployment --create-namespace -f my-values.yaml
 ```
 
 ## Why two charts and not one
 
-Everything in `eduide-cluster` is cluster-scoped or singular: a CRD exists once,
-and a CRD names exactly one conversion webhook service. Everything in `eduide`
-exists once per environment.
+A CRD exists once per cluster, a Gateway data plane and the cluster identity too.
+Everything in `eduide` exists once per deployment. One owner for the cluster
+objects means a deployment upgrade cannot touch a CRD, so it cannot break the
+other deployments on the same cluster.
 
-Before the split, every tenant deploy also reinstalled the cluster-scoped
-charts into the `default` namespace. Three concurrent test deploys therefore
-raced over the same objects, which was worked around with a six-attempt retry
-loop. One owner removes the race instead of retrying through it.
+`eduide-cluster` pulls the CRDs in through its dependency
+`eduide-control-plane-crds`. Clusters that must not get the rest of the chart
+install that CRD chart alone.
 
-It also means a tenant upgrade cannot touch a CRD, so it cannot break the other
-environments on the same cluster.
+## The Theia Cloud guard
 
-The one cluster-scoped exception the tenant chart owns is the operator's
-unavoidable cluster-scoped access: it lists `customresourcedefinitions`
-(read-only) at startup and reads `persistentvolumes`, writing them for workspace
-storage only when `operator.cloudProvider` is `MINIKUBE`. A namespaced RoleBinding
-can grant neither. The tenant chart therefore
-renders a minimal `operator-api-access-cluster-<namespace>` ClusterRole and
-ClusterRoleBinding, named per namespace so tenants never collide on them. The
-broad, namespaced operator verbs stay bound through the shared
-`operator-api-access` ClusterRole (a RoleBinding by default, see
-`operator.clusterWideRbac`). That role includes write verbs on
-`persistentvolumes` and `customresourcedefinitions`, so setting
-`operator.clusterWideRbac=true` grants those writes cluster-wide.
+Version 3 ships no Theia CRDs. Upgrading `eduide-cluster` from 2.x on a cluster
+that still runs Theia Cloud would delete them and with them every session and
+workspace. `templates/theia-guard.yaml` looks up `appdefinitions.theia.cloud` and
+fails the install or upgrade while it exists, unless `allowRemovingTheiaCloud` is
+true. `lookup` is empty under `helm template`, so the guard only fires against a
+cluster; `scripts/test-eduide.sh` tests the logic through a wrapper chart.
 
-### The conversion webhook belongs to the cluster
+## Merged gateways
 
-A CRD's `conversion.webhook.clientConfig.service` names one namespace and one
-service. If the webhook were a tenant resource, "which of the four environments
-on this cluster serves CRD conversion?" would have no answer, and tenants on
-different chart versions would fight over one conversion schema.
+The EnvoyProxy rendered by `eduide-cluster` sets `mergeGateways: true`, so the
+Gateway of every deployment on the cluster shares one Envoy data plane (one
+load balancer, one hostPort). Set `envoyProxy.spec.mergeGateways: false` to
+change that.
 
 ## Install order
 
-`eduide-cluster` first. The tenant chart checks for it and fails with a usable
-message if it is missing; without that check the first symptom is the operator
-crash-looping on an absent CRD. Set `skipPreflight=true` to bypass it.
+`eduide-cluster` (or the CRD chart) first, then the `eduide` releases. The
+control plane crash-loops on absent CRDs otherwise.
 
-## CRDs are annotated `helm.sh/resource-policy: keep`
+## CRDs
 
-`helm uninstall eduide-cluster` will not delete them. Deleting a CRD deletes
-every object of that kind, which here means every live Session, Workspace and
-AppDefinition on the cluster. Remove them by hand if you really mean to.
+The CRDs are templates of `eduide-control-plane-crds`, not files under `crds/`,
+so Helm upgrades them. See that chart's README for its uninstall behavior.
 
-They are ordinary templates rather than files under `crds/`, because Helm never
-upgrades anything in `crds/` and these change with almost every release
-(`v1beta8` through `v1beta11` so far).
+## Renaming an existing release
 
-## Renaming an existing installation
-
-Helm will not manage an object it did not create, so pointing a new release
-name at existing objects normally deletes and recreates everything. Adopt them
-instead:
+Helm will not manage an object it did not create. Adopt the objects instead:
 
 ```bash
-DRY_RUN=1 ./scripts/adopt-release.sh test1 eduide \
-  deploy/operator-deployment deploy/service-deployment deploy/landing-page-deployment
+DRY_RUN=1 ./scripts/adopt-release.sh my-deployment eduide deploy/<name>
 ```
 
 Drop `DRY_RUN` once the output looks right, then upgrade under the new name.
 
-## Resource names are deliberately not release-prefixed
-
-The operator mounts `oauth2-proxy-config`, `oauth2-templates` and
-`oauth2-emails` **by literal name** into every session pod
-(`AddedHandlerUtil.java:88` and `templateDeployment.yaml`). Prefixing them would
-break every running session.
-
-One install means one namespace, so prefixing buys no collision protection
-anyway. Standard `app.kubernetes.io/*` labels give the same grouping without
-the rename, and labels are additive on upgrade.
-
-## Maintenance page and rolling updates
-
-While the landing page has no ready pod, Envoy would answer with a bare
-`no healthy upstream`. The `eduide` chart ships a `BackendTrafficPolicy` on
-`landing-route` that replaces every 502/503/504 there with
-`charts/eduide/files/maintenance.html` ("EduIDE is currently unavailable").
-Envoy serves the page from the `maintenance-page` ConfigMap itself, so it works
-with the landing page down and loads nothing from anywhere else. The status
-code stays 5xx. It needs Envoy Gateway; turn it off with
-`maintenancePage.enabled: false` elsewhere.
-
-Keep `%` out of the page. Envoy reads the body as a format string, rejects
-the override because of it and still reports the policy as Accepted, so
-visitors get an empty 503. `scripts/test-maintenance-page.sh` checks for it.
-
-It covers the landing page only. The REST service and sessions keep their own
-errors, and nothing helps while Envoy itself is down.
-
-To show the page on purpose, scale `landing-page-deployment` to 0 - the
-`maintenance.yml` workflow in EduIDE-deployment does exactly that. The next
-deploy scales it back.
-
-So that deploys rarely show it:
-
-- the landing page and REST service start the new pod before stopping the old
-  one (`maxUnavailable: 0`), and the REST service is only ready once its port
-  is open
-- both sleep 10s in `preStop`, so Envoy stops sending traffic before the
-  process exits
-- `landingPage.replicas` / `service.replicas` above 1 add a
-  PodDisruptionBudget each (`podDisruptionBudget.enabled`, off on single-node
-  clusters, where it would block every drain) and prefer different nodes
-
-## Pinning EduIDE to a node pool
-
-`global.nodeSelector` pins every EduIDE pod to the nodes carrying those labels,
-so sessions start where their images are preloaded. Set it on both charts:
-
-```yaml
-global:
-  nodeSelector:
-    aet.cit.tum.de/pool: pve
-```
-
-The `eduide` chart renders it on the operator, the REST service, the landing
-page and image preloading, and passes it to the operator as
-`--sessionNodeSelector aet.cit.tum.de/pool=pve` for the session pods it creates.
-`eduide-cluster` renders it on the conversion webhook. Helm hands `global` to
-the garbage collector, which reads it from its next chart version. The shared
-cache does not read it. It is a plain node selector: the nodes need no taint and stay open to
-other workloads. With too few labelled nodes, sessions stay `Pending`.
-
-`preloading.nodeSelector` still works on its own and wins when set.
-`scripts/test-node-selector.sh` checks every workload gets the selector.
-
 ## Checking a change
 
 ```bash
+./scripts/resolve-deps.sh
 helm lint charts/eduide charts/eduide-cluster
-./scripts/render-envs.sh /tmp/out                # render every real environment
+./scripts/test-eduide.sh
 ```
-
-CI additionally renders the PR base and head and posts the diff, which is the
-only reliable answer to "what will this do to production". For a pure refactor
-the expected result is an empty diff.

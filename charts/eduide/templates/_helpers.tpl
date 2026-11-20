@@ -1,231 +1,25 @@
-{{/*
-Hostname composition.
 
-Every hostname in this chart derives from hosts.configuration. Before these
-helpers existed the same two-line printf was re-derived inline in roughly a
-dozen places across seven files, each wrapping every value in
-`tpl (X | toString) .`. Call these instead and get a plain string back.
-
-  theia-cloud.host.base       artemis.cit.tum.de
-  theia-cloud.host.landing    theia.artemis.cit.tum.de
-  theia-cloud.host.service    service.theia.artemis.cit.tum.de
-  theia-cloud.host.instance   instance.theia.artemis.cit.tum.de
-  theia-cloud.url.service     https://service.theia.artemis.cit.tum.de
-
-`tpl` is kept here - and only here - because environment values legitimately
-use template expressions in hostnames.
-*/}}
-
-{{- define "theia-cloud.host.base" -}}
-{{- tpl (.Values.hosts.configuration.baseHost | toString) . -}}
-{{- end -}}
-
-{{- define "theia-cloud.host.landing" -}}
-{{- printf "%s.%s" (tpl (.Values.hosts.configuration.landing | toString) .) (include "theia-cloud.host.base" .) -}}
-{{- end -}}
-
-{{- define "theia-cloud.host.service" -}}
-{{- printf "%s.%s" (tpl (.Values.hosts.configuration.service | toString) .) (include "theia-cloud.host.base" .) -}}
-{{- end -}}
-
-{{- define "theia-cloud.host.instance" -}}
-{{- printf "%s.%s" (tpl (.Values.hosts.configuration.instance | toString) .) (include "theia-cloud.host.base" .) -}}
-{{- end -}}
-
-{{- define "theia-cloud.url.service" -}}
-{{- printf "%s://%s" (tpl (.Values.service.protocol | toString) .) (include "theia-cloud.host.service" .) -}}
-{{- end -}}
-
-{{/*
-Wildcard instance hostnames, e.g. "*.webview." -> "*.webview.instance.<base>".
-
-Emits a YAML list, so callers can `include ... | nindent N` directly.
-*/}}
-{{- define "theia-cloud.host.wildcardInstances" -}}
-{{- $root := . -}}
-{{- range .Values.hosts.allWildcardInstances }}
-- {{ printf "%s%s" (tpl . $root) (include "theia-cloud.host.instance" $root) | quote }}
-{{- end }}
-{{- end -}}
-
-{{/*
-Gateway listener name for a wildcard hostname. Must be a valid Gateway API
-section name, so non-alphanumerics collapse to hyphens and it is capped at 63.
-*/}}
-{{- define "theia-cloud.gateway.wildcardListenerName" -}}
-{{- printf "https-%s" (regexReplaceAll "[^a-zA-Z0-9-]" .wildcard "-") | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{/*
-The tag every IDE image carries. versions.ide wins if set, otherwise the
-chart's appVersion, so `helm install --version 2.0.0` with no overrides pins
-every IDE image to the tag that release published.
-*/}}
-{{- define "eduide.ideTag" -}}
-{{- .Values.versions.ide | default .Chart.AppVersion -}}
-{{- end -}}
-
-{{/*
-One app's fully qualified image. `image` is a bare repository; a value that
-already carries a tag or a digest is passed through untouched so an environment
-can pin one app without restructuring anything.
-Call with (dict "app" $app "ctx" $).
-*/}}
-{{- define "eduide.appImage" -}}
-{{- $app := .app -}}
-{{- $ctx := .ctx -}}
-{{- $repo := $app.image | toString -}}
-{{- if or (contains "@sha256:" $repo) (regexMatch ".*:[^/]+$" $repo) -}}
-{{- $repo -}}
-{{- else -}}
-{{- $tag := $app.imageTag | default (include "eduide.ideTag" $ctx) -}}
-{{- if contains "/" $repo -}}
-{{- if hasPrefix $ctx.Values.imageRegistry $repo -}}
-{{- printf "%s:%s" $repo $tag -}}
-{{- else -}}
-{{- printf "%s/%s:%s" $ctx.Values.imageRegistry $repo $tag -}}
-{{- end -}}
-{{- else -}}
-{{- printf "%s/%s:%s" $ctx.Values.imageRegistry $repo $tag -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Every app definition this installation knows, as JSON: appDefinitions.catalog
-with each appDefinitions.apps entry merged over the catalog entry of the same
-name, or added if the catalog has none. `apps.<name>: null` removes one.
-*/}}
-{{- define "eduide.appDefinitions" -}}
-{{- $ad := .Values.appDefinitions | default dict -}}
-{{- $out := deepCopy ($ad.catalog | default dict) -}}
-{{- range $name, $app := ($ad.apps | default dict) -}}
-{{- if kindIs "invalid" $app -}}
-{{- $_ := unset $out $name -}}
-{{- else -}}
-{{- $_ := set $out $name (include "eduide.deepMerge" (dict "base" (get $out $name | default dict) "over" $app) | fromJson) -}}
-{{- end -}}
-{{- end -}}
-{{- toJson $out -}}
-{{- end -}}
-
-{{/*
-The apps this installation renders, as JSON: the definitions appDefinitions.enabled
-names, or all of them when enabled is empty. A name with no definition is
-skipped, and NOTES.txt warns about it. Every consumer reads this one map, so the
-AppDefinitions, the landing page and preloading cannot disagree. defaults are
-not merged in here; each consumer falls back to them per field.
-*/}}
-{{- define "eduide.apps" -}}
-{{- $all := include "eduide.appDefinitions" . | fromJson -}}
-{{- $enabled := .Values.appDefinitions.enabled | default list -}}
-{{- if not $enabled -}}
-{{- toJson $all -}}
-{{- else -}}
-{{- $out := dict -}}
-{{- range $name := $enabled -}}
-{{- if hasKey $all $name -}}
-{{- $_ := set $out $name (get $all $name) -}}
-{{- end -}}
-{{- end -}}
-{{- toJson $out -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Template apps that were renamed in chart 3.0.0, old name to new, as JSON.
-*/}}
-{{- define "eduide.renamedApps" -}}
-{{- dict "java-17-templates" "java-17-standalone" "java-25-templates" "java-25-standalone" "c-templates" "c-standalone" | toJson -}}
-{{- end -}}
-
-{{/*
-Names in appDefinitions.enabled with no definition in the catalog or in apps,
-one per line. Usually a typo, or an app the chart no longer ships.
-*/}}
-{{- define "eduide.unknownEnabledApps" -}}
-{{- $all := include "eduide.appDefinitions" . | fromJson -}}
-{{- range $name := (.Values.appDefinitions.enabled | default list) -}}
-{{- if not (hasKey $all $name) }}
-{{ $name }}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-`over` merged into `base`, map by map, as JSON. Not sprig's mergeOverwrite: it
-skips false and 0, so `visible: false` could not override a catalog entry.
-*/}}
-{{- define "eduide.deepMerge" -}}
-{{- $out := deepCopy .base -}}
-{{- range $k, $v := .over -}}
-{{- $cur := get $out $k -}}
-{{- if and (kindIs "map" $v) (kindIs "map" $cur) -}}
-{{- $_ := set $out $k (include "eduide.deepMerge" (dict "base" $cur "over" $v) | fromJson) -}}
-{{- else -}}
-{{- $_ := set $out $k $v -}}
-{{- end -}}
-{{- end -}}
-{{- toJson $out -}}
-{{- end -}}
-
-{{/*
-Every image this installation needs on every node: one per app, one per
-sidecar, plus the landing page. Derived rather than listed, so it cannot
-disagree with what the installation offers.
-*/}}
-{{- define "eduide.preloadImages" -}}
-{{- $out := list -}}
-{{- if .Values.preloading.deriveFromApps -}}
-{{- if .Values.landingPage.enabled -}}
-{{- $out = append $out (tpl (.Values.landingPage.image | toString) .) -}}
-{{- end -}}
-{{- $ctx := . -}}
-{{- $apps := include "eduide.apps" . | fromJson -}}
-{{- range $name := ($apps | keys | sortAlpha) -}}
-{{- $app := index $apps $name -}}
-{{- $out = append $out (include "eduide.appImage" (dict "app" $app "ctx" $ctx)) -}}
-{{- range $sc := ($app.sidecars | default list) -}}
-{{- $out = append $out (include "eduide.appImage" (dict "app" $sc "ctx" $ctx)) -}}
-{{- end -}}
-{{- end -}}
-{{- /* With Keycloak the operator starts every session pod with an oauth2-proxy
-sidecar, so a cold node would pull it on the first session. Same image and tag
-the operator uses (its default is "latest"). The image is distroless - no
-/bin/sh for the default echo - so it runs its own binary, which exits 0. */ -}}
-{{- if .Values.keycloak.enable -}}
-{{- $proxy := printf "quay.io/oauth2-proxy/oauth2-proxy:%s" (tpl (.Values.operator.oAuth2ProxyVersion | default "latest" | toString) .) -}}
-{{- $out = append $out (dict "image" $proxy "command" (list "/bin/oauth2-proxy") "args" (list "--version")) -}}
-{{- end -}}
-{{- end -}}
-{{- range $extra := (.Values.preloading.images | default list) -}}
-{{- $out = append $out $extra -}}
-{{- end -}}
-{{- $out | toJson -}}
-{{- end -}}
-
-{{/*
-Keep serving for a few seconds after the pod is marked for deletion. Envoy only
-learns that the endpoint is gone after the Pod is deleted, so without this it
-keeps sending requests to a process that is already shutting down.
-*/}}
-{{- define "eduide.preStopDrain" -}}
-preStop:
-  exec:
-    command: ["sleep", "10"]
+{{/* Hosts as a dict: service, instance, webview. Derived once, used by Gateway and checks. */}}
+{{- define "eduide.hosts" -}}
+{{- $h := (index .Values "eduide-control-plane").config.hosts -}}
+service: {{ $h.service | quote }}
+instance: {{ $h.instance | quote }}
+webview: {{ $h.webview | default (printf "webview.%s" $h.instance) | quote }}
 {{- end }}
 
-{{/*
-Prefer putting the replicas of a Deployment on different nodes, so one node
-going away does not take all of them. Soft, so a single-node cluster still
-schedules every replica.
-*/}}
-{{- define "eduide.spreadAcrossNodes" -}}
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: ScheduleAnyway
-    labelSelector:
-      matchLabels:
-        app: {{ . }}
+{{- define "eduide.gatewayName" -}}{{ (index .Values "eduide-control-plane").config.gateway.name }}{{- end }}
+
+{{/* issuer name and kind for the cert-manager annotation of the Gateway */}}
+{{- define "eduide.issuerAnnotations" -}}
+{{- if .Values.issuer.create -}}
+cert-manager.io/issuer: {{ .Values.issuer.name }}
+cert-manager.io/issuer-kind: Issuer
+cert-manager.io/issuer-group: cert-manager.io
+{{- else if eq (.Values.certManager.issuerRef.kind | default "ClusterIssuer") "ClusterIssuer" -}}
+cert-manager.io/cluster-issuer: {{ required "certManager.issuerRef.name or issuer.create is required" .Values.certManager.issuerRef.name }}
+{{- else -}}
+cert-manager.io/issuer: {{ required "certManager.issuerRef.name is required" .Values.certManager.issuerRef.name }}
+cert-manager.io/issuer-kind: {{ .Values.certManager.issuerRef.kind }}
+cert-manager.io/issuer-group: cert-manager.io
+{{- end }}
 {{- end }}

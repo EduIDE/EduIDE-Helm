@@ -25,7 +25,7 @@ Version files (release.yml refuses a stable version they do not state):
 | `charts/eduide/Chart.yaml` | `version` |
 | `charts/eduide-cluster/Chart.yaml` | `version` (always equal to the other chart) |
 
-`appVersion` is not the chart version: it pins the EduIDE IDE images (see dependencies). helm-docs renders the README badges from `version`, so run it after the bump.
+`appVersion` is not the chart version: it is the default IDE image tag (see dependencies). For a stable release `appVersion` equals the chart version. helm-docs renders the README badges from `version`, so run it after the bump.
 
 What a release publishes:
 
@@ -39,14 +39,10 @@ EduIDE dependencies this repository pins:
 
 | Repository | Pinned in | Current pin | How to bump |
 |---|---|---|---|
-| EduIDE | `charts/eduide/Chart.yaml` and `charts/eduide-cluster/Chart.yaml`, key `appVersion` (both equal; renders every IDE image tag) | `yq -r .appVersion charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE --exclude-drafts --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`) |
-| EduIDE-Cloud | `charts/eduide/values.yaml`, key `versions.cloud` (operator, service) | `yq -r .versions.cloud charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Cloud --exclude-drafts --exclude-pre-releases --limit 1` |
-| EduIDE-Landing-Page | `charts/eduide/values.yaml`, key `versions.landingPage` | `yq -r .versions.landingPage charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-Landing-Page --exclude-drafts --exclude-pre-releases --limit 1` |
-| EduIDE-shared-cache | `charts/eduide/Chart.yaml`, `dependencies[name=eduide-shared-cache].version` (OCI) | `yq '.dependencies[] \| select(.name=="eduide-shared-cache").version' charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE-shared-cache --exclude-drafts --exclude-pre-releases --limit 1` (tag `eduide-shared-cache-X.Y.Z`, pin is `X.Y.Z`); then refresh `Chart.lock` with `helm dependency update charts/eduide` |
-| workspace-garbage-collector | `charts/eduide/Chart.yaml`, `dependencies[name=theia-workspace-garbage-collector].version` (OCI); the chart pins its own versioned image, so there is no `image.tag` in `values.yaml` | same pattern as shared-cache | latest: `gh release list -R EduIDE/workspace-garbage-collector --exclude-drafts --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`); `Chart.lock` refresh as above |
-| EduIDE-pool-scaler | `charts/eduide/values.yaml`, key `versions.poolScaler`, only when present on main | `yq -r .versions.poolScaler charts/eduide/values.yaml` | latest: `gh release list -R EduIDE/EduIDE-pool-scaler`; never pin an unreleased version |
+| EduIDE | `charts/eduide/Chart.yaml` and `charts/eduide-cluster/Chart.yaml`, key `appVersion` (both equal; the default IDE image tag) | `yq -r .appVersion charts/eduide/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE --exclude-drafts --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`) |
+| EduIDE-control-plane | `charts/eduide/Chart.yaml`, `dependencies[name=eduide-control-plane]` and `[name=eduide-landing-page]`, and `charts/eduide-cluster/Chart.yaml`, `dependencies[name=eduide-control-plane-crds]` (all three the same version, OCI) | `yq '.dependencies[].version' charts/eduide/Chart.yaml charts/eduide-cluster/Chart.yaml` | latest: `gh release list -R EduIDE/EduIDE-control-plane --exclude-drafts --exclude-pre-releases --limit 1` (tag `vX.Y.Z`, pin is `X.Y.Z`); the images carry the subchart `appVersion` as tag |
 
-`charts/eduide-cluster/values.yaml` `conversion.image` points at the upstream `theiacloud/theia-cloud-conversion-webhook`, not at an EduIDE-Cloud release, so it is not a pin to bump here. Upstream images (`wondershaperImage`, demo image) are Renovate's job.
+Upstream and Renovate manage nothing else here. Never pin an unreleased build in a stable release.
 
 Who pins this repository (tell the user after the release):
 
@@ -160,7 +156,7 @@ Rules:
   when the Unreleased entry has none.
 - Leave out empty groups. Merge entries that describe one change. Leave out
   pure CI, test and refactoring changes unless a user can notice them.
-- Dependency bumps (appVersion, `versions.*`, chart dependencies) are a
+- Dependency bumps (appVersion, chart dependencies) are a
   `[eduide]` entry naming old and new version.
 - Add `### Upgrade notes` when an operator has to do something beyond
   installing the new version.
@@ -177,7 +173,7 @@ On a branch `release/X.Y.Z` from the latest `origin/main`:
 2. Apply the dependency bumps agreed in step 3.
 3. Write the CHANGELOG section from step 4.
 4. Run the repository's checks (see AGENTS.md / CI) and anything a version
-   bump regenerates (helm-docs, so the README badges match: `docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2`; `scripts/test-app-consistency.sh`).
+   bump regenerates (helm-docs, so the README badges match: `docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2`; `scripts/test-eduide.sh`).
 
 Show the user the diff and ask before committing and pushing. Then:
 

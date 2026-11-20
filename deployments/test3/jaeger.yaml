@@ -1,0 +1,129 @@
+# Jaeger v2 for test3 (G17): OTLP gRPC on :4317, UI on :16686 via port-forward only, Badger on a small
+# PVC with 7 days retention. Not exposed through the Gateway.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jaeger-config
+data:
+  config.yaml: |
+    service:
+      extensions: [jaeger_storage, jaeger_query, healthcheckv2]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [jaeger_storage_exporter]
+    extensions:
+      healthcheckv2:
+        use_v2: true
+        http:
+          endpoint: 0.0.0.0:13133
+      jaeger_query:
+        storage:
+          traces: store
+        http:
+          endpoint: 0.0.0.0:16686
+      jaeger_storage:
+        backends:
+          store:
+            badger:
+              directories:
+                keys: /badger/keys
+                values: /badger/values
+              ephemeral: false
+              ttl:
+                spans: 168h
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      batch: {}
+    exporters:
+      jaeger_storage_exporter:
+        trace_storage: store
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jaeger-badger
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: csi-rbd-sc
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  labels: {app.kubernetes.io/name: jaeger}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: jaeger}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: jaeger}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: jaeger
+          image: jaegertracing/jaeger:2.23.0
+          args: ["--config=/etc/jaeger/config.yaml"]
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: ui, containerPort: 16686}
+          readinessProbe:
+            httpGet: {path: /status, port: 13133}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/jaeger}
+            - {name: badger, mountPath: /badger}
+      volumes:
+        - name: config
+          configMap: {name: jaeger-config}
+        - name: badger
+          persistentVolumeClaim: {claimName: jaeger-badger}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger-collector
+spec:
+  selector: {app.kubernetes.io/name: jaeger}
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+    - {name: otlp-http, port: 4318, targetPort: 4318}
+    - {name: ui, port: 16686, targetPort: 16686}
+---
+# Default deny in the namespace blocks ingress to Jaeger; allow OTLP from the control plane pods only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jaeger-otlp
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: jaeger}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - {port: 4317}
+        - {port: 4318}
+      from:
+        - podSelector: {}

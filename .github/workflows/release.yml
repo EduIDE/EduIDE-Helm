@@ -1,6 +1,6 @@
 # Manual release. The only way this repository releases.
 #
-#   gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=2.11.0
+#   gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=3.0.0
 #
 # Both charts (eduide, eduide-cluster) ship under the same version. See
 # .claude/skills/release/SKILL.md for the whole flow.
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Chart version without the leading v, e.g. 2.11.0, or 2.11.0-rc.1 for a prerelease"
+        description: "Chart version without the leading v, e.g. 3.0.0, or 3.0.0-rc.1 for a prerelease"
         required: true
         type: string
 
@@ -35,8 +35,7 @@ jobs:
       packages: read
     outputs:
       ide: ${{ steps.pins.outputs.ide }}
-      cloud: ${{ steps.pins.outputs.cloud }}
-      landing: ${{ steps.pins.outputs.landing }}
+      cp: ${{ steps.pins.outputs.cp }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -54,8 +53,8 @@ jobs:
           echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "$OWNER" --password-stdin
 
       # A chart version is a promise about images: appVersion pins every IDE
-      # image, versions.cloud the operator and service, versions.landingPage the
-      # landing page. Publishing a chart that names a tag nobody pushed produces
+      # image, the appVersion of the control plane subchart pins the control
+      # plane images and the landing page. Publishing a chart that names a tag nobody pushed produces
       # an ImagePullBackOff in whichever environment installs it next, which is
       # the slowest possible place to find out. Check first, publish second.
       - name: Install crane and yq
@@ -75,8 +74,13 @@ jobs:
           set -uo pipefail
 
           ide=$(yq -r '.appVersion' charts/eduide/Chart.yaml)
-          cloud=$(yq -r '.versions.cloud' charts/eduide/values.yaml)
-          landing=$(yq -r '.versions.landingPage' charts/eduide/values.yaml)
+          ./scripts/resolve-deps.sh charts/eduide
+          cp=$(helm show chart charts/eduide/charts/eduide-control-plane-*.tgz | yq -r '.appVersion')
+          lp=$(helm show chart charts/eduide/charts/eduide-landing-page-*.tgz | yq -r '.appVersion')
+          if [[ -z "$cp" || "$cp" == "null" || "$cp" != "$lp" ]]; then
+            echo "::error::control plane ($cp) and landing page ($lp) subcharts must have the same appVersion"
+            exit 1
+          fi
 
           # The IDE image list is read from EduIDE's build matrix rather than
           # kept here: a hand-written copy drifts the moment someone adds an
@@ -116,28 +120,15 @@ jobs:
           }
 
           for img in $ide_base $ide_images; do check "ghcr.io/eduide/${img}:${ide}"; done
-          for img in eduide-cloud/operator eduide-cloud/service eduide-cloud/conversion-webhook; do
-            check "ghcr.io/eduide/${img}:${cloud}"
+          for img in operator service authz agent pool-scaler landing-page; do
+            check "ghcr.io/eduide/eduide-control-plane/${img}:${cp}"
           done
-          check "ghcr.io/eduide/eduide-landing-page:${landing}"
 
           {
             echo "ide=$ide"
-            echo "cloud=$cloud"
-            echo "landing=$landing"
+            echo "cp=$cp"
           } >> "$GITHUB_OUTPUT"
           exit $fail
-
-      # buildSystems in the catalog is a hand-kept list of template ids; the
-      # image is the source of truth. Read each template.json from the
-      # published image itself, so nothing depends on build artifacts, which
-      # expire.
-      - name: Every buildSystems id exists in its image
-        run: |
-          set -euo pipefail
-          ide=$(yq -r '.appVersion' charts/eduide/Chart.yaml)
-          ./scripts/fetch-image-templates.sh "$ide" /tmp/templates
-          ./scripts/check-build-systems.sh /tmp/templates
 
       # A published chart version is never replaced: helm push overwrites.
       - name: Chart versions are not published yet
@@ -224,8 +215,7 @@ jobs:
         env:
           TAG: ${{ needs.release.outputs.tag }}
           IDE: ${{ needs.pins.outputs.ide }}
-          CLOUD: ${{ needs.pins.outputs.cloud }}
-          LANDING: ${{ needs.pins.outputs.landing }}
+          CP: ${{ needs.pins.outputs.cp }}
         run: |
           set -euo pipefail
           {
@@ -237,11 +227,11 @@ jobs:
             echo "| Component | Version |"
             echo "|---|---|"
             echo "| IDE images (EduIDE) | ${IDE} |"
-            echo "| Operator and service (EduIDE-Cloud) | ${CLOUD} |"
-            echo "| Landing page | ${LANDING} |"
+            echo "| Control plane and landing page (images and charts) | ${CP} |"
+            echo "| Control plane CRDs (\`eduide-control-plane-crds\`, in \`eduide-cluster\`) | ${CP} |"
             echo
             echo "Charts published to \`oci://ghcr.io/eduide/charts\`: \`eduide\` and \`eduide-cluster\` at ${VERSION}."
-            echo "Every image above was verified to exist and be multi-arch before the charts were pushed."
+            echo "The IDE images and the control plane images (operator, service, authz, agent, pool-scaler, landing-page) were verified to exist and be multi-arch before the charts were pushed."
             echo
             echo "## Deploying it"
             echo

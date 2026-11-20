@@ -1,52 +1,27 @@
 {{/*
-A RE2 alternation of the namespaces this cluster monitors, anchored, for use in
-a PromQL label matcher and in Grafana variable queries.
-
-The dashboards used to carry a hand-written list of namespaces. It went stale
-the moment the environments were renamed - the picker still offered `theia`,
-`theia-staging` and `test1`, none of which exist any more, so every panel was
-empty whatever you selected. Deriving it from the same list the PodMonitors use
-means it cannot drift again.
-
-An empty list yields `^$`, which matches nothing. That is deliberate: a cluster
-where every environment opted out of monitoring should show an empty picker,
-not silently fall back to `.*` and start graphing other tenants' namespaces.
-*/}}
-{{- define "eduide.monitoredNamespaceRegex" -}}
-{{- $ns := .Values.monitoring.targetNamespaces | default list -}}
-{{- if $ns -}}
-^({{ join "|" $ns }})$
-{{- else -}}
-^$
-{{- end -}}
-{{- end -}}
-
-{{/*
-The namespaces whose certificates EduIDE alerts on: the monitored environments
-plus the ones this chart itself puts certificates in (the release namespace for
-the conversion webhook, the Gateway's namespace for the listener certificates,
-and the alerting namespace, normally all `eduide-system`).
+A RE2 alternation of the namespaces whose certificates EduIDE alerts on: the
+monitored environments plus the release and alerting namespaces.
 
 cert-manager exports every Certificate on the cluster. On a shared cluster that
 includes other tenants' broken ones, which must not page as EduIDE alerts.
 */}}
 {{- define "eduide.certificateNamespaceRegex" -}}
-{{- $ns := concat (.Values.monitoring.targetNamespaces | default list) (list .Release.Namespace .Values.gateway.namespace .Values.monitoring.alerting.namespace) | uniq | compact -}}
+{{- $ns := concat (.Values.monitoring.targetNamespaces | default list) (list .Release.Namespace .Values.monitoring.alerting.namespace) | uniq | compact -}}
 ^({{ join "|" $ns }})$
 {{- end -}}
 
 {{/*
-Alerting depends on monitoring, and saying so beats rendering nothing.
+Alerting depends on monitoring and cert-manager scraping, and saying so beats rendering nothing.
 
 Both the PrometheusRule and the AlertmanagerConfig are gated on
 `monitoring.enabled` as well as `monitoring.alerting.enabled`, because alerts
-built on metrics nobody scrapes are decoration. Asking for alerting with
-monitoring off used to render neither resource and succeed, which is the worst
-outcome: the install reports fine and the feature is absent.
+built on metrics nobody scrapes are decoration. Rendering nothing and
+succeeding would be the worst outcome: the install reports fine and the
+feature is absent.
 */}}
 {{- define "eduide.checkAlertingPrerequisites" -}}
-{{- if and .Values.monitoring.alerting.enabled (not .Values.monitoring.enabled) -}}
-{{- fail "monitoring.alerting.enabled is true but monitoring.enabled is false - alerting needs the PodMonitors and the metrics they collect, so this would install nothing at all" -}}
+{{- if and .Values.monitoring.alerting.enabled (not (and .Values.monitoring.enabled .Values.monitoring.certManager.enabled)) -}}
+{{- fail "monitoring.alerting.enabled needs monitoring.enabled and monitoring.certManager.enabled, otherwise there are no metrics to alert on" -}}
 {{- end -}}
 {{- end -}}
 
@@ -113,3 +88,13 @@ the whole AlertmanagerConfig is guarded by one.
   {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Fails when the cluster still has the Theia Cloud CRDs and nobody allowed removing them.
+Called by theia-guard.yaml with the lookup result; split out so the test can feed it a value.
+*/}}
+{{- define "eduide-cluster.theiaGuard" -}}
+{{- if and .found (not .allow) -}}
+{{- fail "this cluster still has the CRD appdefinitions.theia.cloud, so it runs a Theia Cloud (EduIDE 2.x) installation. Upgrading eduide-cluster to 3.x removes the Theia CRDs and with them every session and workspace. Install the 3.x charts on a separate cluster or after migrating, then set allowRemovingTheiaCloud=true to proceed." -}}
+{{- end -}}
+{{- end -}}

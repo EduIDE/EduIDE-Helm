@@ -5,6 +5,18 @@
 
 {{ template "chart.description" . }}
 
+## Install
+
+Install the CRDs first (chart `eduide-cluster`, or `eduide-control-plane-crds` alone), then one release per deployment in its own namespace:
+
+```sh
+helm install my-deployment oci://ghcr.io/eduide/charts/eduide \
+  --version {{ template "chart.version" . }} -n my-deployment --create-namespace -f values.yaml
+```
+
+The IDE images default to the chart appVersion, so a chart release pins the IDE images it was tested with.
+`deployments/test3/` in the repository is a worked example.
+
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
 

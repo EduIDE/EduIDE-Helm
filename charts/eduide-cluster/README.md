@@ -1,75 +1,68 @@
 # eduide-cluster
 
-![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 2.0.0](https://img.shields.io/badge/AppVersion-2.0.0-informational?style=flat-square)
+![Version: 3.0.0-rc.9](https://img.shields.io/badge/Version-3.0.0--rc.9-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.0-rc.9](https://img.shields.io/badge/AppVersion-3.0.0--rc.9-informational?style=flat-square)
 
-Cluster-scoped half of EduIDE: CRDs, the conversion webhook, ClusterRoles and
-cert-manager issuers. Install once per cluster, before any eduide release.
+Cluster-scoped half of EduIDE 3.0: the control plane CRDs, the cluster identity marker and,
+optionally, the Envoy Gateway GatewayClass and EnvoyProxy and cluster alerting.
+Install once per cluster, before any eduide release.
+
+## Install and upgrade notes
+
+Install once per cluster, before any `eduide` release:
+
+```sh
+helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
+  --version 3.0.0-rc.9 -n eduide-system --create-namespace
+```
+
+The chart carries the control plane CRDs (`eduide-control-plane-crds`), the cluster identity ConfigMap `eduide-system/eduide-cluster-identity` (set `clusterName`) and, optionally, the Envoy Gateway GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`; `mergeGateways` defaults to true) and cert-manager alerting.
+Gateways, certificates and issuers belong to the `eduide` release of each deployment.
+
+**Do not upgrade this chart on a cluster that still runs a 2.x (Theia Cloud) installation.**
+Version 3 no longer ships the Theia CRDs, so Helm would delete them and with them every Theia Cloud session and workspace.
+The chart looks up the CRD `appdefinitions.theia.cloud` and fails the install or upgrade with a clear message when it exists.
+Set `allowRemovingTheiaCloud: true` only when the old installation is gone or should be destroyed.
+The check needs a cluster: `helm template` has no `lookup` and never trips it.
+To run 3.x next to 2.x, use a separate cluster, or install `eduide-control-plane-crds` alone and leave this chart on the 2.x release line.
 
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
+
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane-crds | 0.2.0 |
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| certmanager.namespace | string | `"cert-manager"` | the namespace where the cert-manager is installed |
-| clusterIssuer | string | `"theia-cloud-selfsigned-issuer"` | The cluster issuer to use for the certificate |
-| conversion.certMountPath | string | `"/etc/webhook/certs"` | The location of where the certificates are mounted into the container (needs to match with application.properties) |
-| conversion.certReloadPeriod | int | `604800` | The certificate reload period in seconds |
-| conversion.image | string | `"ghcr.io/eduide/eduide-cloud/conversion-webhook:3.0.3"` | The image of the webhook container. Our EduIDE-Cloud build: it knows every AppDefinition version this chart ships and runs on a JDK with the Java4Shell fix (CVE-2026-114938); the upstream 1.2.0-next ran on Temurin 21.0.10. |
+| allowRemovingTheiaCloud | bool | `false` | Set to true to let an install or upgrade proceed on a cluster that still has the Theia Cloud CRD appdefinitions.theia.cloud. Removing the Theia CRDs deletes every Theia Cloud session and workspace with them, so the chart refuses by default. |
+| clusterName | string | `""` | Name of this cluster. Written to the ConfigMap eduide-system/eduide-cluster-identity that the deploy workflows compare against the cluster they think they talk to. Empty renders no ConfigMap (the bootstrap workflow can write it with kubectl instead). |
 | envoyProxy.annotations | object | `{}` |  |
 | envoyProxy.create | bool | `false` |  |
 | envoyProxy.labels | object | `{}` |  |
-| envoyProxy.name | string | `"theia-shared-gateway"` |  |
+| envoyProxy.name | string | `"eduide"` |  |
 | envoyProxy.namespace | string | `"envoy-gateway-system"` |  |
-| envoyProxy.replicas | int | `1` | Data plane replica count, rendered into the spec at `provider.kubernetes.envoyDeployment.replicas`. Envoy Gateway stops reconciling that field when the EnvoyProxy leaves it out, which makes a manual scale to zero permanent and the Gateway unreachable for good. A `spec` that names its own replicas wins over this, and `null` leaves the field out entirely. Ignored for a spec that scales some other way - an `envoyHpa`, an `envoyDaemonSet`, or a `Host` provider. |
-| envoyProxy.spec | object | `{}` |  |
-| gateway | object | `{"addresses":[],"allowedRoutes":{"namespaces":{"from":"All"}},"annotations":{},"className":"envoy","create":true,"labels":{},"listeners":[],"name":"theia-shared-gateway","namespace":"eduide-system","redirects":[]}` | ------------------------------------------------------------------------ |
-| gateway.create | bool | `true` | Create the shared Gateway. Set false only if you terminate and route traffic some other way; EduIDE then has no ingress of its own. |
-| gateway.listeners | list | `[]` | The Gateway's listeners. **Required.** With none, no Gateway is created and nothing routes.  Every environment contributes four, named `<prefix>-landing`, `<prefix>-service`, `<prefix>-instances` and `<prefix>-webview`. Those names are load-bearing: each must match a `gateway.parentRefs[].sectionName` in that environment's values for the `eduide` chart, or its routes attach to nothing. The prefix is yours to choose and must be unique on the cluster.  A certificate that does not cover a listener's hostname is NOT detected - the Gateway reports Programmed=True and browsers reject it. See `managedCertificates` below, and note the webview listener needs a WILDCARD certificate that ACME HTTP-01 cannot issue.  For one environment at eduide.example.edu:  listeners:   - name: prod-landing     hostname: eduide.example.edu     tlsSecretName: eduide-tls   - name: prod-service     hostname: service.eduide.example.edu     tlsSecretName: eduide-tls   - name: prod-instances     hostname: instance.eduide.example.edu     tlsSecretName: eduide-tls   - name: prod-webview     hostname: "*.webview.instance.eduide.example.edu"     tlsSecretName: eduide-webview-tls  Each entry takes `name`, `hostname` and `tlsSecretName`, plus optionally `protocol` (HTTPS by default, HTTP for an ACME challenge listener), `port` and `allowedRoutes`. |
-| gateway.redirects | list | `[]` | Permanent redirects from hostnames this cluster used to serve.  Each entry needs a listener of the same `name` on the Gateway - which `bootstrap-cluster.yml` emits from `spec.redirects` in the cluster manifest - and renders an HTTPRoute that 301s `from` to `to`, keeping the path and the query string.  redirects:   - name: legacy-landing     from: theia.example.edu     to: eduide.example.edu |
-| gatewayAcmeIssuer.email | string | `""` |  |
-| gatewayAcmeIssuer.enabled | bool | `false` |  |
-| gatewayAcmeIssuer.name | string | `"letsencrypt-prod-gateway"` |  |
-| gatewayAcmeIssuer.privateKeySecretName | string | `"letsencrypt-prod-gateway-priv-key"` |  |
-| gatewayAcmeIssuer.server | string | `"https://acme-v02.api.letsencrypt.org/directory"` |  |
-| gatewayAcmeIssuer.serviceType | string | `"ClusterIP"` |  |
-| gatewayAcmeIssuer.solvers | list | `[]` | Override the ACME solvers entirely. Leave empty for the built-in HTTP-01 solver, which is enough for every hostname EXCEPT the webview wildcard.  ACME cannot issue a wildcard over HTTP-01. If you want cert-manager to issue `*.webview.instance.<host>` you need DNS-01, which means an API credential for your DNS zone. For example:  solvers:   - dns01:       cloudflare:         apiTokenSecretRef: { name: cloudflare-api-token, key: token }     selector:       dnsNames: ["*.webview.instance.eduide.example.edu"]   - http01:       gatewayHTTPRoute:         parentRefs:           - { group: gateway.networking.k8s.io, kind: Gateway, name: theia-shared-gateway, namespace: eduide-system }  If you cannot get a DNS-01 credential, obtain the wildcard some other way and supply it through `wildcardTLSSecret` below. |
+| envoyProxy.replicas | int | `1` | Data plane replica count, rendered into the spec at `provider.kubernetes.envoyDeployment.replicas`. Envoy Gateway stops reconciling that field when the EnvoyProxy leaves it out, which makes a manual scale to zero permanent. A `spec` that names its own replicas wins over this, and `null` leaves the field out. Ignored for a spec that scales some other way (`envoyHpa`, `envoyDaemonSet`, a `Host` provider). |
+| envoyProxy.spec | object | `{}` | EnvoyProxy spec (hostPort, service type, resources and so on). The chart adds `mergeGateways: true` so all EduIDE deployments share one data plane; set `mergeGateways` here to override. |
+| gateway.className | string | `"envoy"` | Name of the GatewayClass rendered when `gatewayClass.create` is true. |
 | gatewayClass.annotations | object | `{}` |  |
 | gatewayClass.controllerName | string | `"gateway.envoyproxy.io/gatewayclass-controller"` |  |
 | gatewayClass.create | bool | `false` |  |
 | gatewayClass.labels | object | `{}` |  |
-| gatewayClass.parametersRef | object | `{}` |  |
-| global.nodeSelector | object | `{}` | Node labels the conversion webhook must run on, e.g. `aet.cit.tum.de/pool: pve`. Same key as in the eduide chart, but the two are separate releases: pass the value to this release and to every eduide release, or each schedules anywhere. Empty schedules anywhere. |
-| issuer.email | string | `"mmorlock@example.com"` | email used to issue let's encrypt certificates |
-| issuerca.enable | bool | `true` | whether to install the CA certificate signer |
-| issuerca.name | string | `"theia-cloud-ca-certificate-signer"` | name for the issuer preparing a self signed CA certificate |
-| issuerprod.enable | bool | `false` | whether to install the let's encrypt production cluster issuer |
-| issuerprod.name | string | `"letsencrypt-prod"` | name for the let's encrypt production cluster issuer |
-| issuerprod.solvers | list | `[]` | ACME solver list for cert-manager (required when `issuerprod.enable=true`) |
-| issuerstaging.name | string | `"theia-cloud-selfsigned-issuer"` | name for the self signed cluster issuer |
-| managedCertificates.certificates | list | `[]` | Each entry takes either `hostname` (one name) or `dnsNames` (a list). `bootstrap-cluster.yml` fills this in from the environments on the cluster, so a new environment gets its certificate names without a second edit - which is how test3 ran for 184 days on a certificate that only covered test1, test2 and staging. |
-| managedCertificates.enabled | bool | `false` |  |
-| managedCertificates.issuerRef.kind | string | `"ClusterIssuer"` |  |
-| managedCertificates.issuerRef.name | string | `"letsencrypt-prod"` |  |
-| monitoring | object | `{"alerting":{"channels":[],"enabled":false,"grafanaUrl":"","groupInterval":"5m","groupWait":"30s","minSeverity":"warning","namespace":"eduide-system","repeatInterval":"4h","runbookUrl":"https://eduide.github.io/Docs/admins/operations","thresholds":{"certExpiryDays":21,"componentRestarts":3,"sessionCrashPerHour":5,"sessionOOMPerHour":3,"startupSeconds":90,"volumePercent":85,"warmPoolFor":"5m","warmPoolHistory":"6h"},"webhookSecret":{"create":false,"data":{},"name":"eduide-alert-webhooks"}},"certManager":{"enabled":false,"namespace":"cert-manager","portName":"http-metrics","selectorLabels":{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"cert-manager"}},"dashboardNamespace":"cattle-dashboards","enabled":false,"namespace":"cattle-monitoring-system","targetNamespaces":[]}` | ------------------------------------------------------------------------ |
-| monitoring.alerting.channels | list | `[]` | Where to send alerts. Each entry needs `name`, `type` (`slack` or `discord`) and `secretKey`; Slack entries may also set `channel`. An empty list with alerting enabled means alerts fire but notify nobody, so the chart fails the render instead.  A channel may set `environments: [ns, ...]` to receive only that installation's alerts. One cluster can host installations belonging to different people - Bonn and Mannheim share a cluster and each has its own Discord - and without scoping, both would see the other's incidents.  Anything no scoped channel claims goes to **every** channel. That is how cluster-scoped alerts still get out: a certificate expiring or the conversion webhook failing is not about any one tenant's namespace, and dropping it for failing to match a tenant route would lose exactly the alerts that matter most.    channels:     - name: mannheim       type: discord       secretKey: discord-mannheim       environments: [eduide-mannheim]     - name: platform       type: slack       secretKey: slack-platform       channel: "#eduide-alerts" |
+| gatewayClass.parametersRef | object | `{}` | Usually points at the EnvoyProxy below, e.g. {group: gateway.envoyproxy.io, kind: EnvoyProxy, name: eduide, namespace: envoy-gateway-system} |
+| monitoring | object | `{"alerting":{"channels":[],"enabled":false,"groupInterval":"5m","groupWait":"30s","minSeverity":"warning","namespace":"eduide-system","repeatInterval":"4h","runbookUrl":"https://eduide.github.io/Docs/admins/operations","thresholds":{"certExpiryDays":21},"webhookSecret":{"create":false,"data":{},"name":"eduide-alert-webhooks"}},"certManager":{"enabled":false,"namespace":"cert-manager","portName":"http-metrics","selectorLabels":{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"cert-manager"}},"enabled":false,"namespace":"cattle-monitoring-system","targetNamespaces":[]}` | ------------------------------------------------------------------------ |
+| monitoring.alerting.channels | list | `[]` | Where to send alerts. Each entry needs `name`, `type` (`slack` or `discord`) and `secretKey`; Slack entries may also set `channel`. An empty list with alerting enabled means alerts fire but notify nobody, so the chart fails the render instead.  A channel may set `environments: [ns, ...]` to receive only that installation's alerts. One cluster can host installations belonging to different people - Bonn and Mannheim share a cluster and each has its own Discord - and without scoping, both would see the other's incidents.  Anything no scoped channel claims goes to **every** channel. That is how cluster-scoped alerts still get out: a certificate expiring is not about any one tenant's namespace, and dropping it for failing to match a tenant route would lose exactly the alerts that matter most.    channels:     - name: mannheim       type: discord       secretKey: discord-mannheim       environments: [eduide-mannheim]     - name: platform       type: slack       secretKey: slack-platform       channel: "#eduide-alerts" |
 | monitoring.alerting.enabled | bool | `false` | Create the PrometheusRule and the AlertmanagerConfig. |
-| monitoring.alerting.grafanaUrl | string | `""` | Base URL of the Grafana that serves the EduIDE dashboards, with no trailing slash. Used to deep-link a notification straight to the affected session. Left empty, notifications carry no dashboard link. |
 | monitoring.alerting.groupInterval | string | `"5m"` | How long to wait before notifying about new alerts added to a group. |
 | monitoring.alerting.groupWait | string | `"30s"` | How long to wait for more alerts in a group before the first notification. |
-| monitoring.alerting.minSeverity | string | `"warning"` | Lowest severity that reaches the notification channels: `warning` or `critical`. Anything below stays in Alertmanager and on the dashboards. This is what keeps the channels worth reading. |
+| monitoring.alerting.minSeverity | string | `"warning"` | Lowest severity that reaches the notification channels: `warning` or `critical`. Anything below stays in Alertmanager. This is what keeps the channels worth reading. |
 | monitoring.alerting.namespace | string | `"eduide-system"` | Namespace both resources go in.  This is also the `namespace` label every EduIDE alert carries, and it is a routing artifact rather than the environment the alert is about. The Prometheus Operator defaults `alertmanagerConfigMatcherStrategy` to `OnNamespace`, which prepends `namespace = <the AlertmanagerConfig's own namespace>` to every route generated from it, so an alert must claim this namespace to reach a receiver at all.  The environment an alert is about is in `eduide_namespace`. Silence on that label, never on `namespace` - `namespace` is identical across every EduIDE alert and silencing it silences all of them. |
 | monitoring.alerting.repeatInterval | string | `"4h"` | How long before an unresolved alert is sent again. |
 | monitoring.alerting.runbookUrl | string | `"https://eduide.github.io/Docs/admins/operations"` | Base URL of the operations runbooks, with no trailing slash. |
 | monitoring.alerting.thresholds.certExpiryDays | int | `21` | Days before certificate expiry to start warning. |
-| monitoring.alerting.thresholds.componentRestarts | int | `3` | Restarts of a platform container within 15m before it counts as crash looping. |
-| monitoring.alerting.thresholds.sessionCrashPerHour | int | `5` | Session crashes per hour in one environment before alerting. |
-| monitoring.alerting.thresholds.sessionOOMPerHour | int | `3` | Session OOM kills per hour in one environment before alerting. |
-| monitoring.alerting.thresholds.startupSeconds | int | `90` | p95 session startup, in seconds, that counts as too slow. |
-| monitoring.alerting.thresholds.volumePercent | int | `85` | Workspace volume fill percentage that counts as nearly full. |
-| monitoring.alerting.thresholds.warmPoolFor | string | `"5m"` | How long an environment's warm pool must be empty before alerting.  Shorter than the other component alerts on purpose. An empty warm pool is immediately visible to students - if the instance deployments are gone rather than unhealthy, session launches fail outright - so ten minutes is long enough for a real outage to pass unnoticed. Long enough, though, that recycling the pool during an image bump does not page. |
-| monitoring.alerting.thresholds.warmPoolHistory | string | `"6h"` | How far back to look for evidence that an environment keeps a warm pool at all.  kube-state-metrics emits nothing for a Deployment that does not exist, so a deleted warm pool leaves no series to compare against. Looking back over this window keeps the environment in the expression after its instances vanish. An environment that has genuinely stopped running a warm pool stops alerting once this window passes. |
 | monitoring.alerting.webhookSecret.create | bool | `false` | Create the Secret from `data` below. Off means the Secret already exists and is referenced by name only. |
 | monitoring.alerting.webhookSecret.data | object | `{}` | Base64-encoded webhook URLs, keyed by the `secretKey` a channel names. Supplied by the workflow, not committed. |
 | monitoring.alerting.webhookSecret.name | string | `"eduide-alert-webhooks"` | Name of the Secret channels read their URL from. |
@@ -77,17 +70,9 @@ cert-manager issuers. Install once per cluster, before any eduide release.
 | monitoring.certManager.namespace | string | `"cert-manager"` | Namespace cert-manager runs in. |
 | monitoring.certManager.portName | string | `"http-metrics"` | Name of the metrics port on that Service. |
 | monitoring.certManager.selectorLabels | object | `{"app.kubernetes.io/component":"controller","app.kubernetes.io/name":"cert-manager"}` | Labels identifying cert-manager's controller Service.  A ServiceMonitor selects on Service **labels**; there is no matcher for `metadata.name`. These are the labels cert-manager's own chart sets, and they are values because a release installed under a different name keeps the labels and changes their values. Get them wrong and the ServiceMonitor is created with no targets and reports no error.  Check with:   kubectl -n cert-manager get svc cert-manager --show-labels |
-| monitoring.dashboardNamespace | string | `"cattle-dashboards"` | Namespace the Grafana dashboard ConfigMaps go in. Must already exist and be watched by Grafana's sidecar. `cattle-dashboards` is Rancher's. |
-| monitoring.enabled | bool | `false` | Create the PodMonitors and Grafana dashboards.  Off by default because it is not portable: it needs the Prometheus Operator CRDs (`monitoring.coreos.com/v1`) to exist, and the two namespaces below are Rancher's. Helm does not create namespaces it was not told to, so on a cluster without them the install fails outright on the dashboards.  Turn it on once you know where your Prometheus and Grafana look for these. |
-| monitoring.namespace | string | `"cattle-monitoring-system"` | Namespace the PodMonitors go in. Must be somewhere your Prometheus discovers. `cattle-monitoring-system` is Rancher's; change it for any other monitoring stack. |
-| monitoring.targetNamespaces | list | `[]` | Namespaces to watch. Bootstrap derives this from the environments on the cluster; it is also the namespace list every dashboard's picker offers. |
-| operatorrole.name | string | `"operator-api-access"` | name for the operator's cluster role |
-| servicerole.name | string | `"service-api-access"` | name for the services' cluster role |
-| wildcardTLSSecret.certificate | string | `""` |  |
-| wildcardTLSSecret.create | bool | `false` |  |
-| wildcardTLSSecret.key | string | `""` |  |
-| wildcardTLSSecret.name | string | `"static-theia-cert"` |  |
-| wildcardTLSSecret.namespace | string | `"eduide-system"` |  |
+| monitoring.enabled | bool | `false` | Create the monitoring resources below. Off by default: it needs the Prometheus Operator CRDs (`monitoring.coreos.com/v1`). |
+| monitoring.namespace | string | `"cattle-monitoring-system"` | Namespace the ServiceMonitor goes in. Must be somewhere your Prometheus discovers. `cattle-monitoring-system` is Rancher's. |
+| monitoring.targetNamespaces | list | `[]` | Namespaces whose certificates the alerts cover, besides the release and alerting namespaces. |
 
 ----------------------------------------------
 Autogenerated from chart metadata using [helm-docs v1.14.2](https://github.com/norwoodj/helm-docs/releases/v1.14.2)

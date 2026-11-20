@@ -1,150 +1,74 @@
 # EduIDE Helm Charts
 
-The installable EduIDE platform. Two charts, published as OCI artifacts to
-`ghcr.io/eduide/charts`.
+The installable EduIDE 3.0 platform on the Go control plane
+([EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane)). Two
+charts, published as OCI artifacts to `ghcr.io/eduide/charts`. The Java (Theia
+Cloud) charts of EduIDE 2.x live on the branch `release/2.x`.
 
 | Chart | Installed | Owns |
 |---|---|---|
-| `eduide-cluster` | once per **cluster** | CRDs, conversion webhook, ClusterRoles, cert-manager issuers |
-| `eduide` | once per **environment** | operator, REST service, landing page, routes |
+| `eduide-cluster` | once per **cluster** | control plane CRDs, cluster identity ConfigMap, optional GatewayClass and EnvoyProxy, optional cert-manager alerting |
+| `eduide` | once per **deployment** (one namespace) | control plane, landing page, Gateway, optional ACME Issuer, IDETemplates and IDEPools |
 
 ```bash
 # once per cluster
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version <chart version> -n eduide-system --create-namespace
+  --version <chart version> -n eduide-system --create-namespace --set clusterName=<name>
 
-# once per environment
+# once per deployment
 helm install eduide oci://ghcr.io/eduide/charts/eduide \
-  --version <chart version> -n eduide-test1 -f my-values.yaml
+  --version <chart version> -n my-deployment --create-namespace -f my-values.yaml
 ```
 
 Both charts always carry the same version. Take `<chart version>` from the
 [releases page](https://github.com/EduIDE/EduIDE-Helm/releases); pass a
-prerelease such as `3.0.0-rc.3` explicitly, because `helm` skips prereleases
-otherwise. `docs/charts.md` explains why the
-split exists and what it is safe to change.
+prerelease such as `3.0.0-rc.9` explicitly, because `helm` skips prereleases
+otherwise. `docs/charts.md` explains why the split exists.
+
+**Never upgrade `eduide-cluster` on a cluster that still runs a 2.x Theia Cloud
+installation.** The chart refuses (see "Upgrading from 2.x" in the CHANGELOG).
 
 ## What one install pins
 
 A bare `--version <chart version>` with no overrides pins every image. Nothing floats.
 
-| Value | Source repository | Default |
-|---|---|---|
-| `versions.ide` | EduIDE (the IDE images) | empty → the chart's `appVersion` |
-| `versions.cloud` | EduIDE-Cloud (operator, REST service) | see `charts/eduide/values.yaml` |
-| `versions.landingPage` | EduIDE-Landing-Page | see `charts/eduide/values.yaml` |
+| Image | Pinned by |
+|---|---|
+| IDE images (EduIDE) | chart `appVersion`; `images.tag` overrides it |
+| control plane and landing page | the `eduide-control-plane` and `eduide-landing-page` dependencies in `charts/eduide/Chart.yaml` |
+| CRDs | the `eduide-control-plane-crds` dependency in `charts/eduide-cluster/Chart.yaml` |
 
-The three release on their own cadence, so each has its own knob and an
-override names exactly one. A blanket tag would be wrong: a pull request only
-builds the images of the repo it came from, so pointing everything at `pr-451`
-puts the rest of the namespace into `ImagePullBackOff`.
+A pull request only builds the images of the repository it came from, so
+override one thing at a time: `images.tag` for the IDE images, or a template's
+own `tag` under `templates.<name>`.
 
-## Choosing and adding IDE apps
+## Choosing IDE templates
 
-`appDefinitions.catalog` holds the IDE images EduIDE officially releases.
-An installation adds its own apps or changes a catalog entry under
-`appDefinitions.apps`, and picks what it offers with `appDefinitions.enabled`.
-An empty `enabled` (the default) offers every definition, catalog and `apps`
-alike:
+`catalog` in `charts/eduide/values.yaml` holds the IDE images EduIDE releases.
+A deployment picks what it offers with `templates`: catalog name to overrides,
+merged over the catalog entry. An entry without a catalog match needs
+`displayName` and `image`.
 
 ```yaml
-appDefinitions:
-  enabled:                  # names from the catalog or from apps
-    - java-25-standalone
-    - python
-    - haskell
-  apps:
-    python:                 # merged over the catalog entry
-      limitsMemory: 4000M
-    haskell:                # your own image
-      image: registry.example.edu/ide/haskell:2.1.0   # a tag or digest is used as given
-      limitsMemory: 4000M
-      landingPage:
-        label: Haskell             # omit landingPage to deploy it but hide it
-        image: theia-logo.png      # a logo the landing page ships, or a path starting with /
+templates:
+  java-25-standalone: {pool: {minIdle: 1, maxInstances: 5}}
+  python-standalone: {}
+  haskell:                         # your own image
+    displayName: Haskell
+    image: registry.example.edu/ide/haskell:2.1.0
 ```
 
-Each app is `appDefinitions.defaults`, then its catalog entry, then its `apps`
-entry. A bare repository such as `eduide/java-17` gets the tag from
-`versions.ide`. `apps.<name>: null` removes an app. A name in `enabled` with
-no definition is skipped, and `helm install` or `helm upgrade` prints a warning
-naming it.
+Every language comes in two editions:
 
-That one merged list drives the AppDefinition custom resource, the landing
-page's app list, and the set of images preloaded onto every node. It used to be
-three hand-maintained lists across two repositories, the preload one addressed
-by array index - which is how production came to offer one app while
-preloading everything except it.
-`scripts/test-app-consistency.sh` asserts the three agree, and CI runs it.
-
-### Editions
-
-Every language comes in two editions, both with Scorpio and the data bridge:
-
-| AppDefinition | Image | Offered on the landing page | Started from |
+| Template | Image | Offered on the landing page | Started from |
 |---|---|---|---|
-| `<lang>` (no suffix) | `eduide/<lang>-artemis` | no (`visible: false`) | Artemis, by name (`?appDef=`) |
-| `<lang>-standalone` | `eduide/<lang>-standalone` | yes | the landing page, or an external start |
+| `<lang>` (no suffix) | `eduide/<lang>-artemis` | no (`listed: false`) | Artemis, by name |
+| `<lang>-standalone` | `eduide/<lang>-standalone` | yes | the landing page |
 
 `<lang>` is one of `java-17`, `java-25`, `python`, `javascript`, `c`, `rust`,
-`go`. The Artemis edition has the Artemis extension; standalone does not.
-Artemis stores the AppDefinition name per exercise, which is why the Artemis
-names stay without a suffix.
-
-`landingPage.buildSystems` of a `-standalone` app lists the ids of the project
-templates its image carries (`maven`, `gradle`, `make`, `bazel`, `python`,
-`node`, `web`, `cargo`, `go`). One entry starts it directly, several show the
-build system step, none starts an empty workspace. The id is the template
-folder in the image; the release train checks every id against the image's
-`templates-<image>.json` (`scripts/check-build-systems.sh`). An installation
-offers fewer templates by overriding `buildSystems` in its `apps`.
-
-`landingPage.ephemeral` (true or false) decides per app whether its sessions
-are temporary. Unset, the app follows `landingPage.ephemeralStorage`. The
-privacy page states the workspace as persistent when any rendered app is
-persistent, hidden Artemis apps included: an Artemis start launches them with
-their own persistence.
-
-An installation's own image needs a full path and tag, because the chart
-prefixes `imageRegistry` to anything that is not one:
-`registry.example.edu/ide/java-25:1.0.0`. Derive it `FROM` a `-standalone` image.
-
-### Upgrading to 3.0.0
-
-Old image names are frozen at their last tag, so 3.0.0 only works with EduIDE
-2.0.0. The `*-templates` apps are renamed; list the new names in
-`appDefinitions.enabled`. The render fails while `enabled` still names an old
-one, because deleting an AppDefinition garbage-collects its live sessions:
-
-| Before | Now |
-|---|---|
-| `java-17-templates` | `java-17-standalone` |
-| `java-25-templates` | `java-25-standalone` |
-| `c-templates` | `c-standalone` |
-| `java-17`, `java-25`, `python`, `javascript`, `c` | same names, image `<lang>-artemis`, no longer offered on the landing page |
-| - | new: `rust`, `go` and every `<lang>-standalone` |
-
-Before you deploy:
-
-- **Maintenance window.** Removing or renaming an app terminates its live
-  sessions (the operator owns the session Deployments and warm pool volumes
-  through the AppDefinition). The new images also replace every running session.
-- **Warm pools.** `minInstances` of a renamed app does not move. Set it on the
-  new app and patch the live AppDefinition, which the chart does not reset.
-- **`python` and `javascript` are hidden now.** An installation that offered
-  them on the landing page switches to `python-standalone` and
-  `javascript-standalone`.
-- **`landingPage.appDefinition`** defaults to `java-17`: the app for links
-  without `?appDef=`, which is the Artemis start. The render fails when it is
-  not an app the installation renders, so update an override that still names a
-  `*-templates` app.
-- **Explicit `enabled`.** An empty `enabled` now offers and preloads 14 images
-  (two editions of seven languages) on every node. List what your courses use.
-- **Persistence.** Template sessions were persistent before and follow
-  `landingPage.ephemeral` now, so a workspace saved under the old template app
-  is no longer reachable and is reaped by the garbage collector. Set
-  `landingPage.ephemeral: false` on the `-standalone` apps to keep them
-  persistent, and bump `versions.landingPage` to a release that reads it.
+`go`. `listed` only hides the start tile; launches by name still work. Hosts,
+gateway and OIDC settings are stated once under the subcharts and checked
+against each other at render time. `deployments/test3/` is a worked example.
 
 Environment configuration for the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.
@@ -166,32 +90,34 @@ Chart changes need no version bump. They go under `## [Unreleased]` in
 
 ### 1. Release pull request
 
-Both charts, one version; `appVersion` and the `versions.*` pins at the
-component releases you want to ship:
+Both charts, one version; `appVersion` at the EduIDE release whose IDE images
+you want to ship and the dependency versions at the control plane release:
 
 ```yaml
 # charts/eduide/Chart.yaml  AND  charts/eduide-cluster/Chart.yaml
-version: 2.3.0
+version: 3.0.0
+appVersion: "3.0.0"
 ```
 
 ```bash
 docker run --rm -v "$PWD/charts:/helm-docs" -u "$(id -u)" jnorwood/helm-docs:v1.14.2
 ```
 
-Move the `## [Unreleased]` entries under `## [eduide 2.3.0] - YYYY-MM-DD`,
+Move the `## [Unreleased]` entries under `## [eduide 3.0.0] - YYYY-MM-DD`,
 open the PR, let CI run, get it reviewed, merge.
 
 ### 2. Run the release
 
 ```bash
-gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=2.3.0
+gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=3.0.0
 ```
 
 It then, in this order:
 
-1. **checks** that the IDE, Cloud (operator, service, conversion webhook) and
-   landing page images the charts pin exist and are multi-arch, and that the
-   chart versions are not published yet
+1. **checks** that the IDE images (at `appVersion`) and the control plane images
+   (operator, service, authz, agent, pool-scaler, landing-page, at the subchart
+   `appVersion`) exist and are multi-arch, and that the chart versions are not
+   published yet
 2. **validates** the version (semver, newer than the last release, matches both
    `Chart.yaml` files, CHANGELOG section exists) and creates a draft GitHub
    Release from the CHANGELOG section
@@ -211,7 +137,7 @@ A release deploys nothing. In EduIDE-deployment:
 # environments/prod-tum/env.yaml
 spec:
   platform:
-    chartVersion: 2.3.0    # the only line that changes
+    chartVersion: 3.0.0    # the only line that changes
 ```
 
 Merge that, then run `Deploy environment`. Production is never deployed
@@ -219,7 +145,7 @@ automatically.
 
 ## Release candidates
 
-Run `release.yml` with `-f version=2.3.0-rc.1`, from any branch: same pipeline,
+Run `release.yml` with `-f version=3.0.0-rc.1`, from any branch: same pipeline,
 same registry, marked as a prerelease on GitHub. The version files are not
 checked for a release candidate; the charts are stamped with it. Consume with
 an explicit `--version`; never `--devel`.
@@ -228,16 +154,15 @@ an explicit `--version`; never `--devel`.
 
 | Thing | Form | Example |
 |---|---|---|
-| git tag | `vX.Y.Z` | `v2.3.0` |
-| chart `version` | `X.Y.Z` | `2.0.0` |
-| chart `appVersion` | the EduIDE IDE image version | `1.2.0` |
-| image tag | `X.Y.Z` | `1.2.0` |
+| git tag | `vX.Y.Z` | `v3.0.0` |
+| chart `version` | `X.Y.Z` | `3.0.0` |
+| chart `appVersion` | the EduIDE IDE image version | `3.0.0` |
+| image tag | `X.Y.Z` | `3.0.0` |
 
 `appVersion` is the tag of the IDE images, so a chart says exactly which IDEs it
-runs. The operator, REST service and landing page carry their own versions in
-`versions.cloud` and `versions.landingPage`, because they release on a different
-cadence and a one-line landing page fix should not rebuild 14
-multi-gigabyte IDE images.
+runs. The control plane and the landing page are dependencies with their own
+versions, because they release on a different cadence and a one-line landing
+page fix should not rebuild the multi-gigabyte IDE images.
 
 The chart version is the platform version and is what an environment pins.
 
@@ -246,8 +171,8 @@ The chart version is the platform version and is what an environment pins.
 ```
 [ ] both Chart.yaml files at the same `version`
 [ ] `appVersion` set to the EduIDE release the IDE images were published under
-[ ] `versions.cloud` and `versions.landingPage` set to their releases
-[ ] scripts/test-app-consistency.sh passes (no floating tags, three consumers agree)
+[ ] dependency versions set to the control plane release
+[ ] scripts/test-eduide.sh passes
 [ ] helm-docs run, READMEs committed
 [ ] CHANGELOG section `## [eduide X.Y.Z]` written
 [ ] release PR reviewed and merged
@@ -272,18 +197,20 @@ The chart version is the platform version and is what an environment pins.
 - **cert-manager** - certificate management, including Let's Encrypt.
   [Install](https://cert-manager.io/docs/installation/helm/).
 - **Envoy Gateway** with the Gateway API CRDs. The GatewayClass name must match
-  `gateway.className` (default `envoy`).
+  `gateway.className` of the `eduide` release; `eduide-cluster` can create the
+  GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`).
 
 ## Working on the charts
 
 ```bash
+./scripts/resolve-deps.sh                  # fetch the subcharts first
 helm lint charts/eduide charts/eduide-cluster
-./scripts/render-envs.sh /tmp/out          # renders every real environment
+./scripts/test-eduide.sh                   # CP_CHARTS=<EduIDE-control-plane>/charts for unreleased subcharts
 ```
 
-CI also renders the PR base and head and posts the diff. **For a refactor the
-expected result is an empty diff** — that is the acceptance criterion, not "it
-still lints".
+CI also renders the PR base and head of every environment that runs 3.x and
+posts the diff; until EduIDE-deployment moves an environment to 3.x that diff is
+empty.
 
 See `AGENTS.md` for the things that catch people out, and
 `.claude/skills/chart-change.md` for the loop to follow when editing a template.
