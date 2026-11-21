@@ -14,7 +14,7 @@ Breaking. EduIDE 3.0.0 replaces the Java control plane (Theia Cloud, EduIDE-Clou
 - [eduide] The OIDC bridge sizes its nginx workers by its CPU limit; it was OOMKilled on a node with 256 CPUs
 - [eduide] 3.0.0-rc.10: IDE images 3.0.0-rc.10 (Artemis extension 1.2.7 shows the exercise description again) and control plane 0.2.1 (one saved workspace per starter template without a repository)
 - [eduide] 3.0.0-rc.11: control plane 0.2.2 (environments named after their project template, complete launch traces, usage metrics); IDE images unchanged at 3.0.0-rc.10
-- [eduide] 3.0.0-rc.12: control plane 0.2.3 (usage recording rules `eduide:usage:*` and the Grafana board "EduIDE usage" with `monitoring.dashboard.enabled`, usage export); IDE images unchanged at 3.0.0-rc.10
+- [eduide] 3.0.0-rc.12: control plane 0.2.3 (usage recording rules `eduide:usage:*` and the Grafana board "EduIDE usage" with `eduide-control-plane.monitoring.dashboard.enabled`, usage export); IDE images unchanged at 3.0.0-rc.10
 - [ci] `scripts/test-eduide.sh` (was `test-eduide-go.sh`) tests both charts including the guard logic. The Java-only checks and scripts are removed. `render-diff` renders only environments of EduIDE-deployment on chart 3.0.0-rc.9 or newer, which is none yet
 
 Upgrade notes:
