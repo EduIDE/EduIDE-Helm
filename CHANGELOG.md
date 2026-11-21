@@ -4,16 +4,17 @@
 
 Breaking. EduIDE 3.0.0 replaces the Java control plane (Theia Cloud, EduIDE-Cloud) with the Go control plane from [EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane). The 2.x charts stay on the branch `release/2.x`.
 
-- [eduide] The chart is now the umbrella of the Go control plane: dependencies `eduide-control-plane` and `eduide-landing-page` (0.2.2), a Gateway, an optional namespaced ACME Issuer, an optional OIDC bridge, and the IDETemplates and IDEPools rendered from a catalog. It replaces the Java `eduide` chart and the experimental `eduide-go` chart. Chart version 3.0.0-rc.11, app version (IDE images) 3.0.0-rc.10
+- [eduide] The chart is now the umbrella of the Go control plane: dependencies `eduide-control-plane` and `eduide-landing-page` (0.2.3), a Gateway, an optional namespaced ACME Issuer, an optional OIDC bridge, and the IDETemplates and IDEPools rendered from a catalog. It replaces the Java `eduide` chart and the experimental `eduide-go` chart. Chart version 3.0.0-rc.12, app version (IDE images) 3.0.0-rc.10
 - [eduide] The IDE image tag defaults to the chart `appVersion` (`images.tag` empty). Set `images.tag` or a template's `tag` to override
 - [eduide] The catalog holds both IDE editions: `<lang>` is the artemis edition and unlisted (`listed: false`), `<lang>-standalone` is the standalone edition and listed. The landing page offers only listed templates; Artemis links and the API still start every template by name
 - [eduide] Three hostnames per deployment (service, instance, `webview.<instance>`) and no wildcard certificate. Each host gets its own certificate from cert-manager
-- [eduide-cluster] The chart is thin: the control plane CRDs (dependency `eduide-control-plane-crds` 0.2.2), the cluster identity ConfigMap `eduide-system/eduide-cluster-identity` (`clusterName`), an optional GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`, `mergeGateways` defaults to true) and optional cert-manager alerting
+- [eduide-cluster] The chart is thin: the control plane CRDs (dependency `eduide-control-plane-crds` 0.2.3), the cluster identity ConfigMap `eduide-system/eduide-cluster-identity` (`clusterName`), an optional GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`, `mergeGateways` defaults to true) and optional cert-manager alerting
 - [eduide-cluster] Removed: the Theia CRDs, the conversion webhook, the Java RBAC, the shared Gateway with its listeners, certificates, wildcard secret and redirect routes, the Java PodMonitors and dashboards, the ClusterIssuers of the shared Gateway, and the alerts about sessions and Java components. The two certificate alerts stay
 - [eduide-cluster] New guard: the install or upgrade fails while the CRD `appdefinitions.theia.cloud` exists, unless `allowRemovingTheiaCloud: true`
 - [eduide] The OIDC bridge sizes its nginx workers by its CPU limit; it was OOMKilled on a node with 256 CPUs
 - [eduide] 3.0.0-rc.10: IDE images 3.0.0-rc.10 (Artemis extension 1.2.7 shows the exercise description again) and control plane 0.2.1 (one saved workspace per starter template without a repository)
 - [eduide] 3.0.0-rc.11: control plane 0.2.2 (environments named after their project template, complete launch traces, usage metrics); IDE images unchanged at 3.0.0-rc.10
+- [eduide] 3.0.0-rc.12: control plane 0.2.3 (usage recording rules `eduide:usage:*` and the Grafana board "EduIDE usage" with `monitoring.dashboard.enabled`, usage export); IDE images unchanged at 3.0.0-rc.10
 - [ci] `scripts/test-eduide.sh` (was `test-eduide-go.sh`) tests both charts including the guard logic. The Java-only checks and scripts are removed. `render-diff` renders only environments of EduIDE-deployment on chart 3.0.0-rc.9 or newer, which is none yet
 
 Upgrade notes:
@@ -23,7 +24,7 @@ Upgrade notes:
 - **Three hostnames.** DNS needs the service, instance and `webview.<instance>` hosts, each pointing at the Gateway. There is no wildcard certificate and no `*.webview` record.
 - **Keycloak.** Add the redirect URI `https://<instance host>/oauth2/callback` to the gateway client.
 - **Values.** The Java values (`appDefinitions`, `versions.*`, `keycloak`, `operator`, `service`) do not exist any more. See `charts/eduide/values.yaml` and `deployments/test3/values-test3.yaml`.
-- **Subcharts.** The subchart versions are 0.2.2; the release workflow reads the control plane images from their `appVersion`.
+- **Subcharts.** The subchart versions are 0.2.3; the release workflow reads the control plane images from their `appVersion`.
 
 ## [eduide 2.10.0] - 2026-11-14
 
