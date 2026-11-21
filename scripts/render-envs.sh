@@ -8,8 +8,7 @@
 # the job passes it so that one copy of this script renders both sides.
 #
 # Only environments/<name>/env.yaml with spec.platform.chartVersion >= MIN_VERSION
-# are rendered. The deployment repo is still Java-shaped, so today that is none
-# and the job passes with an empty diff.
+# are rendered (the go environments), with the values stack of the deploy workflow.
 
 set -euo pipefail
 
@@ -53,7 +52,19 @@ for dir in "$DEPLOY"/environments/*/; do
     continue
   fi
   ns="$(yq -r '.spec.namespace // "default"' "$dir/env.yaml")"
-  helm template "$env_name" "$CHARTS_DIR/eduide" -f "$dir/values.yaml" --namespace "$ns" > "$OUT/$env_name.yaml"
+  # Same values stack as EduIDE-deployment's deploy.yml for a go environment: cluster defaults,
+  # _base-go.yaml, then the environment. The release is always named eduide there.
+  cluster="$DEPLOY/clusters/$(yq -r '.spec.cluster' "$dir/env.yaml").yaml"
+  defaults="$(mktemp)"
+  {
+    echo "gateway: {className: $(yq -r '.spec.gatewayClassName // "eduide"' "$cluster")}"
+    echo "issuer: {acme: {email: $(yq -r '.spec.acmeEmail // "admin@example.org"' "$cluster")}}"
+    echo "eduide-control-plane: {config: {workspaces: {storageClassName: $(yq -r '.spec.storageClassName // "standard"' "$cluster")}, placement: {nodeSelector: $(yq -o=json -I=0 '.spec.nodeSelector // {}' "$cluster")}}}"
+  } > "$defaults"
+  base=()
+  [[ -f "$DEPLOY/environments/_base-go.yaml" ]] && base=(-f "$DEPLOY/environments/_base-go.yaml")
+  helm template eduide "$CHARTS_DIR/eduide" -f "$defaults" "${base[@]}" -f "$dir/values.yaml" --namespace "$ns" > "$OUT/$env_name.yaml"
+  rm -f "$defaults"
   printf '  rendered %-45s %s resources\n' "$env_name" "$(grep -c '^kind:' "$OUT/$env_name.yaml" || true)"
   rendered=$((rendered + 1))
 done
