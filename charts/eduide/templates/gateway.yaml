@@ -73,6 +73,9 @@ spec:
     solvers:
     - http01:
         gatewayHTTPRoute:
+          # The challenge arrives through the Gateway, so a ClusterIP is enough. The default NodePort is
+          # forbidden by Rancher project quotas (services.nodeports: 0 on AET).
+          serviceType: ClusterIP
           parentRefs:
           - group: gateway.networking.k8s.io
             kind: Gateway
