@@ -5,9 +5,9 @@ description: |
   optionally, the Envoy Gateway GatewayClass and EnvoyProxy and cluster alerting.
   Install once per cluster, before any eduide release.
 type: application
-version: 3.0.0-rc.11
+version: 3.0.0-rc.12
 appVersion: "3.0.0-rc.10"
 dependencies:
   - name: eduide-control-plane-crds
-    version: "0.2.2"
+    version: "0.2.3"
     repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"

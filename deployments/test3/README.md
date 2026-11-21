@@ -11,7 +11,7 @@ Install `eduide-cluster` (it carries the CRDs through its `eduide-control-plane-
 ```bash
 helm upgrade --install eduide-control-plane-crds \
   oci://ghcr.io/eduide/eduide-control-plane/charts/eduide-control-plane-crds \
-  --version 0.2.2 --kube-context stud
+  --version 0.2.3 --kube-context stud
 ```
 
 The CRDs are cluster wide and additive; install them before any deployment chart.
@@ -39,7 +39,7 @@ kubectl --context stud -n eduide-test1 get secret service-config-secret \
 ```bash
 helm upgrade --install eduide \
   oci://ghcr.io/eduide/charts/eduide \
-  --version 3.0.0-rc.11 --kube-context stud -n eduide-test3 \
+  --version 3.0.0-rc.12 --kube-context stud -n eduide-test3 \
   -f deployments/test3/values-test3.yaml
 ```
 
