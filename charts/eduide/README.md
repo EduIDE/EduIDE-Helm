@@ -1,6 +1,6 @@
 # eduide
 
-![Version: 3.0.0-rc.10](https://img.shields.io/badge/Version-3.0.0--rc.10-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.0-rc.10](https://img.shields.io/badge/AppVersion-3.0.0--rc.10-informational?style=flat-square)
+![Version: 3.0.0-rc.11](https://img.shields.io/badge/Version-3.0.0--rc.11-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.0-rc.10](https://img.shields.io/badge/AppVersion-3.0.0--rc.10-informational?style=flat-square)
 
 EduIDE on the Go control plane for one deployment: control plane, landing page, Gateway,
 optional ACME Issuer and the IDETemplates and IDEPools. The CRDs are a per-cluster install
@@ -12,7 +12,7 @@ Install the CRDs first (chart `eduide-cluster`, or `eduide-control-plane-crds` a
 
 ```sh
 helm install my-deployment oci://ghcr.io/eduide/charts/eduide \
-  --version 3.0.0-rc.10 -n my-deployment --create-namespace -f values.yaml
+  --version 3.0.0-rc.11 -n my-deployment --create-namespace -f values.yaml
 ```
 
 The IDE images default to the chart appVersion, so a chart release pins the IDE images it was tested with.
@@ -25,8 +25,8 @@ The IDE images default to the chart appVersion, so a chart release pins the IDE 
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.2.1 |
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.2.1 |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.2.2 |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.2.2 |
 
 ## Values
 
