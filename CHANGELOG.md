@@ -2,9 +2,11 @@
 
 ## [Unreleased]
 
+## [eduide 3.0.0] - 2026-11-23
+
 Breaking. EduIDE 3.0.0 replaces the Java control plane (Theia Cloud, EduIDE-Cloud) with the Go control plane from [EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane). The 2.x charts stay on the branch `release/2.x`.
 
-- [eduide] The chart is now the umbrella of the Go control plane: dependencies `eduide-control-plane` and `eduide-landing-page` (0.2.3), a Gateway, an optional namespaced ACME Issuer, an optional OIDC bridge, and the IDETemplates and IDEPools rendered from a catalog. It replaces the Java `eduide` chart and the experimental `eduide-go` chart. Chart version 3.0.0-rc.12, app version (IDE images) 3.0.0-rc.10
+- [eduide] The chart is now the umbrella of the Go control plane: dependencies `eduide-control-plane` and `eduide-landing-page` (0.2.3), a Gateway, an optional namespaced ACME Issuer, an optional OIDC bridge, and the IDETemplates and IDEPools rendered from a catalog. It replaces the Java `eduide` chart and the experimental `eduide-go` chart. Chart and app version (IDE images) 3.0.0
 - [eduide] The IDE image tag defaults to the chart `appVersion` (`images.tag` empty). Set `images.tag` or a template's `tag` to override
 - [eduide] The catalog holds both IDE editions: `<lang>` is the artemis edition and unlisted (`listed: false`), `<lang>-standalone` is the standalone edition and listed. The landing page offers only listed templates; Artemis links and the API still start every template by name
 - [eduide] Three hostnames per deployment (service, instance, `webview.<instance>`) and no wildcard certificate. Each host gets its own certificate from cert-manager
@@ -16,7 +18,8 @@ Breaking. EduIDE 3.0.0 replaces the Java control plane (Theia Cloud, EduIDE-Clou
 - [eduide] 3.0.0-rc.10: IDE images 3.0.0-rc.10 (Artemis extension 1.2.7 shows the exercise description again) and control plane 0.2.1 (one saved workspace per starter template without a repository)
 - [eduide] 3.0.0-rc.11: control plane 0.2.2 (environments named after their project template, complete launch traces, usage metrics); IDE images unchanged at 3.0.0-rc.10
 - [eduide] 3.0.0-rc.12: control plane 0.2.3 (usage recording rules `eduide:usage:*` and the Grafana board "EduIDE usage" with `eduide-control-plane.monitoring.dashboard.enabled`, usage export); IDE images unchanged at 3.0.0-rc.10
-- [ci] `scripts/test-eduide.sh` (was `test-eduide-go.sh`) tests both charts including the guard logic. The Java-only checks and scripts are removed. `render-diff` renders only environments of EduIDE-deployment on chart 3.0.0-rc.9 or newer, which is none yet
+- [eduide] 3.0.0: IDE images 3.0.0 (Artemis extension 1.2.9: an opened repository can no longer set the Artemis server URL and so receive the student's Artemis login), control plane 0.2.3
+- [ci] `scripts/test-eduide.sh` (was `test-eduide-go.sh`) tests both charts including the guard logic. The Java-only checks and scripts are removed. `render-diff` renders only environments of EduIDE-deployment on chart 3.0.0-rc.9 or newer
 
 Upgrade notes:
 
