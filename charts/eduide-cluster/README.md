@@ -1,6 +1,6 @@
 # eduide-cluster
 
-![Version: 3.0.0-rc.12](https://img.shields.io/badge/Version-3.0.0--rc.12-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.0-rc.10](https://img.shields.io/badge/AppVersion-3.0.0--rc.10-informational?style=flat-square)
+![Version: 3.0.0](https://img.shields.io/badge/Version-3.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 3.0.0](https://img.shields.io/badge/AppVersion-3.0.0-informational?style=flat-square)
 
 Cluster-scoped half of EduIDE 3.0: the control plane CRDs, the cluster identity marker and,
 optionally, the Envoy Gateway GatewayClass and EnvoyProxy and cluster alerting.
@@ -12,7 +12,7 @@ Install once per cluster, before any `eduide` release:
 
 ```sh
 helm install eduide-cluster oci://ghcr.io/eduide/charts/eduide-cluster \
-  --version 3.0.0-rc.12 -n eduide-system --create-namespace
+  --version 3.0.0 -n eduide-system --create-namespace
 ```
 
 The chart carries the control plane CRDs (`eduide-control-plane-crds`), the cluster identity ConfigMap `eduide-system/eduide-cluster-identity` (set `clusterName`) and, optionally, the Envoy Gateway GatewayClass and EnvoyProxy (`gatewayClass.create`, `envoyProxy.create`; `mergeGateways` defaults to true) and cert-manager alerting.
