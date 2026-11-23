@@ -46,6 +46,7 @@ for v in "$chart/ci/test-values.yaml" deployments/test3/values-test3.yaml; do
 
   gw=$(d '.kind == "Gateway"' | yq -p=json '.metadata.name')
   [ "$(d '.kind == "Issuer" and .spec.acme' | yq -p=json '.spec.acme.solvers[0].http01.gatewayHTTPRoute.parentRefs[0].name')" = "$gw" ] || fail "Issuer solver does not point at the Gateway"
+  [ "$(d '.kind == "Issuer" and .spec.acme' | yq -p=json '.spec.acme.solvers[0].http01.gatewayHTTPRoute.serviceType')" = "ClusterIP" ] || fail "Issuer solver service is not ClusterIP (NodePort is blocked by project quotas)"
   [ "$(d '.kind == "Gateway"' | yq -p=json '.metadata.annotations["cert-manager.io/issuer"]')" = "$(d '.kind == "Issuer" and .spec.acme' | yq -p=json '.metadata.name')" ] || fail "Gateway annotation does not name the Issuer"
   ok "Issuer solver points at Gateway $gw"
 
