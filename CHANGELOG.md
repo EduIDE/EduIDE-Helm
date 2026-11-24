@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [eduide 3.0.1] - 2026-11-23
+
+- [eduide] IDE images 3.0.0 -> 3.0.1: new workspaces start empty and the image settings live outside the workspace, so a cloned repository's `.vscode` config applies; scorpio 3.4.1 adds a "Clone Repository" button in Source Control that clones into the workspace root; about 100 to 300 MB less memory per session, the spell checker is off by default ([EduIDE 3.0.1](https://github.com/EduIDE/EduIDE/releases/tag/v3.0.1))
+- [eduide-cluster] Version bump only, to keep both charts on the same version
+
+Upgrade notes:
+
+- Existing saved workspaces keep their old `/home/project/.vscode/settings.json`; students can delete it to get the new defaults
+
 ## [eduide 3.0.0] - 2026-11-23
 
 Breaking. EduIDE 3.0.0 replaces the Java control plane (Theia Cloud, EduIDE-Cloud) with the Go control plane from [EduIDE-control-plane](https://github.com/EduIDE/EduIDE-control-plane). The 2.x charts stay on the branch `release/2.x`.
