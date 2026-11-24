@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- [eduide] Git accounts: control plane and landing page with the feature of [EduIDE-control-plane#33](https://github.com/EduIDE/EduIDE-control-plane/pull/33). With `eduide-control-plane.config.gitAccounts.providers` a user connects GitHub or GitLab once and the new `git-proxy` (Deployment, Service, PodDisruptionBudget and three NetworkPolicies) adds the credential to the Git requests of their sessions. Off by default, and an installation without providers renders as before. The umbrella templates need no change: nothing is routed to the `git-proxy`, and `eduide-control-plane.image.tag` also sets its image. The README shows the values. The dependencies point to a preview of that pull request until the control plane release exists
+
+Upgrade notes:
+
+- Nothing changes for an installation that sets no provider
+- With providers, register the OAuth application with the redirect URI `https://<service host>/git/callback`, create the Secret with the client secrets first, and set `eduide-control-plane.gitAccounts.encryptionKey.secretName` when the chart is only rendered (Argo CD, Flux): a generated key is drawn anew on every render
+- Idle pooled sessions keep their old agent settings until the pool replaces them
+
 ## [eduide 3.0.2] - 2026-11-24
 
 - [eduide] Control plane and landing page 0.2.4: `eduide-control-plane.usageArchive.enabled` keeps the usage data (`eduide:usage:*`) beyond the Prometheus retention, one file per day plus the weekly export on a volume that `helm uninstall` keeps, with the alert `EduIDEUsageArchiveStale`. Off by default; needs `eduide-control-plane.usageArchive.prometheusURL` and `eduide-control-plane.monitoring.rules.enabled`. IDE images stay at 3.0.1 ([#108](https://github.com/EduIDE/EduIDE-Helm/pull/108), [EduIDE-control-plane#34](https://github.com/EduIDE/EduIDE-control-plane/pull/34))
