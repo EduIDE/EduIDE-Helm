@@ -4,9 +4,9 @@
 
 ## [eduide 3.0.2] - 2026-11-24
 
-- [eduide] Control plane and landing page 0.2.4: `eduide-control-plane.usageArchive` keeps the usage data (`eduide:usage:*`) beyond the Prometheus retention, one file per day plus the weekly export on a volume that `helm uninstall` keeps, with the alert `EduIDEUsageArchiveStale` ([0.2.4](https://github.com/EduIDE/EduIDE-control-plane/releases/tag/v0.2.4)). Off by default; needs `usageArchive.prometheusURL` and `monitoring.rules.enabled`. IDE images stay at 3.0.1
-- [eduide-cluster] CRD chart 0.2.4, no CRD change
-- Release check: the image `usage-export` must exist for the pinned control plane version
+- [eduide] Control plane and landing page 0.2.4: `eduide-control-plane.usageArchive.enabled` keeps the usage data (`eduide:usage:*`) beyond the Prometheus retention, one file per day plus the weekly export on a volume that `helm uninstall` keeps, with the alert `EduIDEUsageArchiveStale`. Off by default; needs `eduide-control-plane.usageArchive.prometheusURL` and `eduide-control-plane.monitoring.rules.enabled`. IDE images stay at 3.0.1 ([#108](https://github.com/EduIDE/EduIDE-Helm/pull/108), [EduIDE-control-plane#34](https://github.com/EduIDE/EduIDE-control-plane/pull/34))
+- [eduide-cluster] CRD chart 0.2.4, no CRD change ([#108](https://github.com/EduIDE/EduIDE-Helm/pull/108))
+- Release check: the image `usage-export` must exist for the pinned control plane version ([#108](https://github.com/EduIDE/EduIDE-Helm/pull/108))
 
 ## [eduide 3.0.1] - 2026-11-23
 
