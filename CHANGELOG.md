@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [eduide 3.0.2] - 2026-11-24
+
+- [eduide] Control plane and landing page 0.2.4: `eduide-control-plane.usageArchive` keeps the usage data (`eduide:usage:*`) beyond the Prometheus retention, one file per day plus the weekly export on a volume that `helm uninstall` keeps, with the alert `EduIDEUsageArchiveStale` ([0.2.4](https://github.com/EduIDE/EduIDE-control-plane/releases/tag/v0.2.4)). Off by default; needs `usageArchive.prometheusURL` and `monitoring.rules.enabled`. IDE images stay at 3.0.1
+- [eduide-cluster] CRD chart 0.2.4, no CRD change
+- Release check: the image `usage-export` must exist for the pinned control plane version
+
 ## [eduide 3.0.1] - 2026-11-23
 
 - [eduide] IDE images 3.0.0 -> 3.0.1: new workspaces start empty and the image settings live outside the workspace, so a cloned repository's `.vscode` config applies; scorpio 3.4.1 adds a "Clone Repository" button in Source Control that clones into the workspace root; about 100 to 300 MB less memory per session, the spell checker is off by default ([EduIDE 3.0.1](https://github.com/EduIDE/EduIDE/releases/tag/v3.0.1))

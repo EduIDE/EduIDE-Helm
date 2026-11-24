@@ -120,7 +120,7 @@ jobs:
           }
 
           for img in $ide_base $ide_images; do check "ghcr.io/eduide/${img}:${ide}"; done
-          for img in operator service authz agent pool-scaler landing-page; do
+          for img in operator service authz agent usage-export pool-scaler landing-page; do
             check "ghcr.io/eduide/eduide-control-plane/${img}:${cp}"
           done
 
