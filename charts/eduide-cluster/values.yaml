@@ -138,8 +138,8 @@ monitoring:
     #
     # Anything no scoped channel claims goes to **every** channel. That is how
     # cluster-scoped alerts still get out: a certificate expiring is not
-    # about any one tenant's namespace, and
-    # dropping it for failing to match a tenant route would lose exactly the
+    # about any one installation's namespace, and
+    # dropping it for failing to match an installation route would lose exactly the
     # alerts that matter most.
     #
     #   channels:

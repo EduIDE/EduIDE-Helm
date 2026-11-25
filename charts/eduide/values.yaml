@@ -65,7 +65,7 @@ templateDefaults:
   - {name: SCORPIO_THEIA_ENV_STRATEGY, value: data-bridge}
 
 # IDE images EduIDE releases. buildSystems feeds the TEMPLATE key.
-# listed: whether the landing page offers the template as a start tile. Unlisted templates still launch by
+# listed: whether the landing page offers the template as a start tile. Unlisted templates still start by
 # name through the API and Artemis links, so Artemis starts the artemis editions and students pick a standalone one.
 catalog:
   java-17:
