@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [eduide 3.0.3] - 2026-11-25
+
+- [eduide] Control plane and landing page 0.2.5: the operator records the late start phases (`data_delivered`, `ide_usable` and the others in `eduide_session_phase_seconds`) without tracing too, so installations without an OTLP endpoint get usage metric M4. IDE images stay at 3.0.1 ([#109x](https://github.com/EduIDE/EduIDE-Helm/pulls), [EduIDE-control-plane#40](https://github.com/EduIDE/EduIDE-control-plane/pull/40))
+- [eduide-cluster] CRD chart 0.2.5, no CRD change
+
 ## [eduide 3.0.2] - 2026-11-24
 
 - [eduide] Control plane and landing page 0.2.4: `eduide-control-plane.usageArchive.enabled` keeps the usage data (`eduide:usage:*`) beyond the Prometheus retention, one file per day plus the weekly export on a volume that `helm uninstall` keeps, with the alert `EduIDEUsageArchiveStale`. Off by default; needs `eduide-control-plane.usageArchive.prometheusURL` and `eduide-control-plane.monitoring.rules.enabled`. IDE images stay at 3.0.1 ([#108](https://github.com/EduIDE/EduIDE-Helm/pull/108), [EduIDE-control-plane#34](https://github.com/EduIDE/EduIDE-control-plane/pull/34))
