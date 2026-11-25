@@ -86,6 +86,11 @@ grep -q "proxy_pass https://$iss_host;" <<<"$br" || fail "bridge does not proxy 
 ! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'oidc-bridge' || fail "oidcBridge renders while disabled"
 ok "oidcBridge"
 
+# The IDE image pull policy is unset by default and follows templateDefaults.imagePullPolicy.
+! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | yq -N 'select(.kind == "IDETemplate") | .spec.imagePullPolicy' | grep -qv '^null$' || fail "IDE templates carry a pull policy by default"
+[ -z "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set templateDefaults.imagePullPolicy=Always | yq -N 'select(.kind == "IDETemplate") | .spec.imagePullPolicy' | grep -v '^Always$')" ] || fail "templateDefaults.imagePullPolicy does not reach every IDE template"
+ok "IDE image pull policy"
+
 # Git accounts (control plane ADR 0023): nothing renders without providers; with providers the git-proxy renders,
 # the Gateway routes nothing to it and the control plane image tag override reaches it.
 ! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'git-proxy' || fail "git-proxy renders without providers"
