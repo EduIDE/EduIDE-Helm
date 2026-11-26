@@ -38,7 +38,7 @@ issuer:
 oidcBridge:
   enabled: false
   replicas: 2
-  image: nginxinc/nginx-unprivileged:1.29-alpine
+  image: nginxinc/nginx-unprivileged:1.31-alpine
 
 # Where the IDE images come from: <registry>/<image>:<tag>.
 # An empty tag means the chart appVersion, so a chart release pins the IDE images it was tested with.
