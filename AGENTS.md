@@ -1,7 +1,7 @@
 # AGENTS.md - EduIDE-Helm
 
 The Helm charts of EduIDE 3.0 on the Go control plane. This is the installable
-product: an administrator anywhere gets EduIDE from here. The Java (Theia Cloud)
+product: an admin anywhere gets EduIDE from here. The Java (Theia Cloud)
 charts of 2.x live on the branch release/2.x.
 
 `CLAUDE.md` is a symlink to this file.
@@ -11,7 +11,7 @@ charts of 2.x live on the branch release/2.x.
 | Chart | Installed | Owns |
 |---|---|---|
 | `eduide-cluster` | once per **cluster** | control plane CRDs (dependency `eduide-control-plane-crds`), cluster identity ConfigMap, optional GatewayClass and EnvoyProxy, optional cert-manager alerting |
-| `eduide` | once per **deployment** | control plane and landing page (dependencies), Gateway, optional ACME Issuer, OIDC bridge, IDETemplates and IDEPools |
+| `eduide` | once per **installation** | control plane and landing page (dependencies), Gateway, optional ACME Issuer, OIDC bridge, IDETemplates and IDEPools |
 
 Released together, same version. Deployment values live in
 **EduIDE-deployment**, not here; `deployments/test3` is an example.
@@ -48,7 +48,7 @@ a template's own `tag` wins over it. Never default it to `latest`.
 
 **`listed`.** The artemis editions (`<lang>`) are `listed: false`, the
 `<lang>-standalone` editions are listed. `listed` renders to
-`IDETemplate.spec.listed` and only hides the start tile; launches by name still
+`IDETemplate.spec.listed` and only hides the start tile; starts by name still
 work.
 
 **`mergeGateways` defaults to true** in the EnvoyProxy of `eduide-cluster`, so
@@ -103,3 +103,10 @@ degrading.
 
 Call `scripts/resolve-deps.sh <chart>` first; every caller does. The
 dependencies are OCI charts from `oci://ghcr.io/eduide/eduide-control-plane/charts`.
+
+## Terminology
+
+Use the terms of the [EduIDE glossary](https://eduide.github.io/Docs/glossary) in code, UI texts, docs, values and comments, in exactly the meaning it gives.
+Do not introduce synonyms (environment, instance, workspace, launch, lecturer, start page) for a term the glossary defines, and never write "frontend" or "backend".
+When a new term is needed or a term changes, update the glossary in `EduIDE/Docs` first.
+Most relevant here: template (`IDETemplate`), pool, idle instance, installation, saved workspace, session.

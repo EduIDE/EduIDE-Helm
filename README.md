@@ -66,11 +66,11 @@ Every language comes in two editions:
 | `<lang>-standalone` | `eduide/<lang>-standalone` | yes | the landing page |
 
 `<lang>` is one of `java-17`, `java-25`, `python`, `javascript`, `c`, `rust`,
-`go`. `listed` only hides the start tile; launches by name still work. Hosts,
+`go`. `listed` only hides the start tile; starts by name still work. Hosts,
 gateway and OIDC settings are stated once under the subcharts and checked
 against each other at render time. `deployments/test3/` is a worked example.
 
-Environment configuration for the TUM installations lives in
+The configuration of the TUM installations lives in
 [EduIDE-deployment](https://github.com/EduIDE/EduIDE-deployment), not here.
 
 ---
@@ -115,7 +115,7 @@ gh workflow run release.yml -R EduIDE/EduIDE-Helm -f version=3.0.0
 It then, in this order:
 
 1. **checks** that the IDE images (at `appVersion`) and the control plane images
-   (operator, service, authz, agent, pool-scaler, landing-page, at the subchart
+   (operator, service, authz, agent, usage-export, pool-scaler, landing-page, at the subchart
    `appVersion`) exist and are multi-arch, and that the chart versions are not
    published yet
 2. **validates** the version (semver, newer than the last release, matches both
@@ -134,7 +134,7 @@ draft, not a tag for charts that were never published.
 A release deploys nothing. In EduIDE-deployment:
 
 ```yaml
-# environments/prod-tum/env.yaml
+# environments/eduide.artemis.cit.tum.de/env.yaml
 spec:
   platform:
     chartVersion: 3.0.0    # the only line that changes

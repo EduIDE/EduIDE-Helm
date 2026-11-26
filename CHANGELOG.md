@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Docs: align terminology with the EduIDE glossary (installation, start), fix the README example path and image list, add a Terminology section to AGENTS.md
+
 ## [eduide 3.0.3] - 2026-11-25
 
 - [eduide] Control plane and landing page 0.2.4 -> 0.2.5: the operator records the late start phases (`data_delivered`, `ide_usable` and the others in `eduide_session_phase_seconds`) without tracing too, so installations without an OTLP endpoint get usage metric M4. IDE images stay at 3.0.1 ([#110](https://github.com/EduIDE/EduIDE-Helm/pull/110), [EduIDE-control-plane#40](https://github.com/EduIDE/EduIDE-control-plane/pull/40))
