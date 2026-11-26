@@ -5,12 +5,12 @@ description: |
   optional ACME Issuer and the IDETemplates and IDEPools. The CRDs are a per-cluster install
   (eduide-cluster, or eduide-control-plane-crds) and must be installed first.
 type: application
-version: 3.0.2
+version: 3.0.3
 appVersion: "3.0.1"
 dependencies:
   - name: eduide-control-plane
-    version: "0.0.0-pr.33.e6b3831"
+    version: "0.0.0-pr.33.c233879"
     repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"
   - name: eduide-landing-page
-    version: "0.0.0-pr.33.e6b3831"
+    version: "0.0.0-pr.33.c233879"
     repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"
