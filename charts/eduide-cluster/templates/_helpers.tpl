@@ -3,7 +3,7 @@ A RE2 alternation of the namespaces whose certificates EduIDE alerts on: the
 monitored environments plus the release and alerting namespaces.
 
 cert-manager exports every Certificate on the cluster. On a shared cluster that
-includes other tenants' broken ones, which must not page as EduIDE alerts.
+includes other installations' broken ones, which must not page as EduIDE alerts.
 */}}
 {{- define "eduide.certificateNamespaceRegex" -}}
 {{- $ns := concat (.Values.monitoring.targetNamespaces | default list) (list .Release.Namespace .Values.monitoring.alerting.namespace) | uniq | compact -}}
