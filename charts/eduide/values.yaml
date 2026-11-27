@@ -59,6 +59,9 @@ templateDefaults:
   # Accept a GIT_URI with user info: Artemis (Artemis#14702) sends the repository URL with the student's VCS token.
   # The host allowlist still applies; the value reaches only the launch data Secret.
   gitUriAllowCredentials: false
+  # Pull policy of the IDE image (Always, IfNotPresent, Never). Not set by default. Set Always when the image tag
+  # is reused for new builds (a preview tag such as pr-<N>), otherwise nodes keep their cached image.
+  # imagePullPolicy: Always
   env:
   - {name: THEIA, value: "1"}
   # Scorpio reads launch data through the eduide-session extension (the old operator set this per pod).

@@ -13,6 +13,9 @@ spec:
   listed: {{ $e.listed }}
   {{- end }}
   image: {{ $image | quote }}
+  {{- with $e.imagePullPolicy }}
+  imagePullPolicy: {{ . }}
+  {{- end }}
   port: {{ $e.port }}
   {{- with $e.runAsUser }}
   runAsUser: {{ . }}

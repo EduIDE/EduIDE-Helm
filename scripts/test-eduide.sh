@@ -86,6 +86,30 @@ grep -q "proxy_pass https://$iss_host;" <<<"$br" || fail "bridge does not proxy 
 ! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'oidc-bridge' || fail "oidcBridge renders while disabled"
 ok "oidcBridge"
 
+# The IDE image pull policy is unset by default and follows templateDefaults.imagePullPolicy.
+! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | yq -N 'select(.kind == "IDETemplate") | .spec.imagePullPolicy' | grep -qv '^null$' || fail "IDE templates carry a pull policy by default"
+[ -z "$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns --set templateDefaults.imagePullPolicy=Always | yq -N 'select(.kind == "IDETemplate") | .spec.imagePullPolicy' | grep -v '^Always$')" ] || fail "templateDefaults.imagePullPolicy does not reach every IDE template"
+ok "IDE image pull policy"
+
+# Git accounts (control plane ADR 0023): nothing renders without providers; with providers the git-proxy renders,
+# the Gateway routes nothing to it and the control plane image tag override reaches it.
+! helm template r "$chart" -f "$chart/ci/test-values.yaml" -n ns | grep -q 'git-proxy' || fail "git-proxy renders without providers"
+gv="$tmp/git-values.yaml"
+cat > "$gv" <<'EOF2'
+eduide-control-plane:
+  config:
+    gitAccounts:
+      providers:
+      - {name: github, type: github, host: github.com, displayName: GitHub, clientID: a, clientSecretRef: {name: git-oauth, key: github}}
+      - {name: gitlab-example, type: gitlab, host: gitlab.example.org, displayName: GitLab, clientID: b, clientSecretRef: {name: git-oauth, key: gitlab}}
+EOF2
+gitout=$(helm template r "$chart" -f "$chart/ci/test-values.yaml" -f "$gv" -n ns --set eduide-control-plane.image.tag=pr-33) || fail "render with Git providers"
+[ "$(yq -N 'select(.kind == "Deployment" and (.metadata.name | test("git-proxy$"))) | .spec.template.spec.containers[0].image' <<<"$gitout")" = "ghcr.io/eduide/eduide-control-plane/git-proxy:pr-33" ] || fail "image tag override does not reach git-proxy"
+[ "$(yq -N 'select(.kind == "PodDisruptionBudget" or .kind == "Service") | select(.metadata.name | test("git-proxy$")) | .kind' <<<"$gitout" | sort | paste -sd, -)" = "PodDisruptionBudget,Service" ] || fail "git-proxy Service or PodDisruptionBudget missing"
+[ "$(yq -N 'select(.kind == "NetworkPolicy") | select(.metadata.name | test("git-proxy$|service-internal$|session-to-git-proxy$")) | .metadata.name' <<<"$gitout" | wc -l)" -eq 3 ] || fail "expected the three Git NetworkPolicies"
+[ "$(yq -N 'select(.kind == "HTTPRoute") | .spec.rules[].backendRefs[].name' <<<"$gitout" | grep -c 'git-proxy')" -eq 0 ] || fail "an HTTPRoute sends traffic to git-proxy"
+ok "Git accounts: off without providers, git-proxy not routed, image tag follows eduide-control-plane.image.tag"
+
 # Mismatching landing page host must be refused.
 if helm template r "$chart" -f "$chart/ci/test-values.yaml" --set eduide-landing-page.host=other.example.org >/dev/null 2>&1; then fail "landing page host mismatch accepted"; fi
 ok "host mismatch refused"

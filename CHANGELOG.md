@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+- [eduide] Git accounts: control plane and landing page with the feature of [EduIDE-control-plane#33](https://github.com/EduIDE/EduIDE-control-plane/pull/33). With `eduide-control-plane.config.gitAccounts.providers` a user connects GitHub or GitLab once and the new `git-proxy` (Deployment, Service, PodDisruptionBudget and three NetworkPolicies) adds the credential to the Git requests of their sessions. Off by default, and an installation without providers renders as before. The umbrella templates need no change: nothing is routed to the `git-proxy`, and `eduide-control-plane.image.tag` also sets its image. The README shows the values. The dependencies point to a preview of that pull request until the control plane release exists
+- [eduide] `templateDefaults.imagePullPolicy` (also per template): the pull policy of the IDE image. Not set by default. Set `Always` when an image tag is reused for new builds, for example a preview tag `pr-<N>`
 - Docs: align terminology with the EduIDE glossary (installation, start), fix the README example path and image list, add a Terminology section to AGENTS.md
+
+Upgrade notes:
+
+- Nothing changes for an installation that sets no provider
+- With providers, register the OAuth application with the redirect URI `https://<service host>/git/callback`, create the Secret with the client secrets first, and set `eduide-control-plane.gitAccounts.encryptionKey.secretName` when the chart is only rendered (Argo CD, Flux): a generated key is drawn anew on every render
+- Idle pooled sessions keep their old agent settings until the pool replaces them
 
 ## [eduide 3.0.3] - 2026-11-25
 

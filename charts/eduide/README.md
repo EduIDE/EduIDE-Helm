@@ -18,6 +18,32 @@ helm install my-deployment oci://ghcr.io/eduide/charts/eduide \
 The IDE images default to the chart appVersion, so a chart release pins the IDE images it was tested with.
 `deployments/test3/` in the repository is a worked example.
 
+## Git accounts
+
+Students connect GitHub or GitLab once; a `git-proxy` adds their credential to Git requests of their sessions ([ADR 0023](https://github.com/EduIDE/EduIDE-control-plane/blob/main/docs/adr/0023-git-accounts-and-git-proxy.md)).
+The feature is off, and nothing extra renders, until `eduide-control-plane.config.gitAccounts.providers` lists a provider.
+The umbrella needs no further values: the Gateway routes nothing to the `git-proxy`, and `eduide-control-plane.image.tag` also sets the `git-proxy` image.
+
+Register an OAuth application per provider with the redirect URI `https://<service host>/git/callback`, create the client secrets in the release namespace, then set:
+
+```sh
+kubectl create secret generic git-oauth -n my-deployment --from-literal=github=<client secret> --from-literal=gitlab=<client secret>
+```
+
+```yaml
+eduide-control-plane:
+  config:
+    gitAccounts:
+      providers:
+      - {name: github, type: github, host: github.com, displayName: GitHub, clientID: <client id>, clientSecretRef: {name: git-oauth, key: github}}
+      - {name: gitlab-example, type: gitlab, host: gitlab.example.org, displayName: GitLab Example, clientID: <client id>, clientSecretRef: {name: git-oauth, key: gitlab}}
+  # GitOps renderers (Argo CD, Flux) must name an own key Secret, see the control plane README:
+  # gitAccounts: {encryptionKey: {secretName: git-accounts-key}}
+```
+
+All other keys (`gitAccounts`, `gitProxy`, `networkPolicy.gitProxyEgressExtra`, `config.gitAccounts.approval`, a private CA) are documented in the [control plane chart](https://github.com/EduIDE/EduIDE-control-plane/blob/main/charts/eduide-control-plane/README.md).
+Sessions use the feature only when the IDE image ships `eduide-session` 0.2.0 or newer.
+
 *This chart was tested with Helm version v3.17.0.*
 *Other versions may work as well, but if you encounter any issues, we recommend trying with the tested version to rule out version-specific problems.*
 
@@ -25,8 +51,8 @@ The IDE images default to the chart appVersion, so a chart release pins the IDE 
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.2.5 |
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.2.5 |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.0.0-pr.33.21da9a7 |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.0.0-pr.33.21da9a7 |
 
 ## Values
 
