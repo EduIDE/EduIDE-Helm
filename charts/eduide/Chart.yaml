@@ -9,8 +9,8 @@ version: 3.0.3
 appVersion: "3.0.1"
 dependencies:
   - name: eduide-control-plane
-    version: "0.0.0-pr.33.877fed2"
+    version: "0.0.0-pr.33.ff1a65e"
     repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"
   - name: eduide-landing-page
-    version: "0.0.0-pr.33.877fed2"
+    version: "0.0.0-pr.33.ff1a65e"
     repository: "oci://ghcr.io/eduide/eduide-control-plane/charts"
