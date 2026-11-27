@@ -51,8 +51,8 @@ Sessions use the feature only when the IDE image ships `eduide-session` 0.2.0 or
 
 | Repository | Name | Version |
 |------------|------|---------|
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.0.0-pr.33.ff1a65e |
-| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.0.0-pr.33.ff1a65e |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-control-plane | 0.0.0-pr.33.21da9a7 |
+| oci://ghcr.io/eduide/eduide-control-plane/charts | eduide-landing-page | 0.0.0-pr.33.21da9a7 |
 
 ## Values
 
